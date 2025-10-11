@@ -1,0 +1,74 @@
+<?php
+
+use App\Http\Controllers\AssetAssignmentController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\UserImportController;
+use App\Http\Controllers\TaskController;
+use App\Http\Controllers\UserController;
+use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
+
+Route::get('/', function () {
+    return Inertia::render('Welcome', [
+        'canLogin' => Route::has('login'),
+        'canRegister' => Route::has('register'),
+        'laravelVersion' => Application::VERSION,
+        'phpVersion' => PHP_VERSION,
+    ]);
+});
+
+Route::middleware('auth')->group(function () {
+    // Dashboard
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Profile
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Settings
+    Route::prefix('settings')->name('settings.')->group(function () {
+        Route::get('/', [SettingsController::class, 'index'])->name('index');
+        Route::post('/profile', [SettingsController::class, 'updateProfile'])->name('update-profile');
+        Route::put('/password', [SettingsController::class, 'updatePassword'])->name('update-password');
+        Route::delete('/account', [SettingsController::class, 'destroy'])->name('destroy');
+    });
+
+    // Inventory
+    Route::resource('inventory', InventoryController::class);
+
+    // Users - Import routes MUST come BEFORE resource routes
+    Route::get('/users/import', [UserImportController::class, 'show'])->name('users.import');
+    Route::post('/users/import', [UserImportController::class, 'import'])->name('users.import.store');
+    Route::resource('users', UserController::class);
+
+    // Projects
+    Route::resource('projects', ProjectController::class);
+
+    // Tasks
+    Route::prefix('tasks')->name('tasks.')->group(function () {
+        Route::get('/', [TaskController::class, 'index'])->name('index');
+        Route::get('/kanban', [TaskController::class, 'kanban'])->name('kanban');
+        Route::get('/create', [TaskController::class, 'create'])->name('create');
+        Route::post('/', [TaskController::class, 'store'])->name('store');
+        Route::put('/{task}', [TaskController::class, 'update'])->name('update');
+        Route::patch('/{task}/status', [TaskController::class, 'updateStatus'])->name('updateStatus');
+        Route::delete('/{task}', [TaskController::class, 'destroy'])->name('destroy');
+    });
+
+    // Asset Assignments
+    Route::prefix('assets')->name('assets.')->group(function () {
+        Route::get('/', [AssetAssignmentController::class, 'index'])->name('index');
+        Route::get('/assign/{inventoryItem?}', [AssetAssignmentController::class, 'create'])->name('assign');
+        Route::post('/assign', [AssetAssignmentController::class, 'store'])->name('store');
+        Route::post('/{assignment}/return', [AssetAssignmentController::class, 'return'])->name('return');
+        Route::post('/lookup', [AssetAssignmentController::class, 'lookup'])->name('lookup');
+    });
+});
+
+require __DIR__.'/auth.php';
