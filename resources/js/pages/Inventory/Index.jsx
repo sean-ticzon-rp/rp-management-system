@@ -1,7 +1,7 @@
 // resources/js/Pages/Inventory/Index.jsx
 import { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import DeleteConfirmationModal from '@/Components/DeleteConfirmationModal';
@@ -51,6 +51,9 @@ import {
     ChevronLeft,
     ChevronRight,
     X,
+    Laptop,
+    CheckCircle2,
+    AlertCircle,
 } from 'lucide-react';
 
 export default function Index({ auth, items, categories, filters }) {
@@ -60,6 +63,7 @@ export default function Index({ auth, items, categories, filters }) {
     const [assetType, setAssetType] = useState(filters.asset_type || 'all');
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
+    const { flash } = usePage().props;
 
     const handleSearch = (e) => {
         e.preventDefault();
@@ -135,6 +139,20 @@ export default function Index({ auth, items, categories, filters }) {
             }
         >
             <Head title="Inventory" />
+
+            {/* Flash Messages */}
+            {flash?.success && (
+                <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg animate-fade-in flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <p className="text-green-800 font-medium">{flash.success}</p>
+                </div>
+            )}
+            {flash?.error && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg animate-fade-in flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-red-600" />
+                    <p className="text-red-800 font-medium">{flash.error}</p>
+                </div>
+            )}
 
             <div className="space-y-6">
                 {/* Filters Card */}
@@ -239,7 +257,6 @@ export default function Index({ auth, items, categories, filters }) {
                                     <TableHead className="font-semibold">Stock</TableHead>
                                     <TableHead className="font-semibold">Type</TableHead>
                                     <TableHead className="font-semibold">Status</TableHead>
-                                    <TableHead className="font-semibold">Assigned To</TableHead>
                                     <TableHead className="text-right font-semibold">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -290,20 +307,41 @@ export default function Index({ auth, items, categories, filters }) {
                                                 )}
                                             </TableCell>
                                             <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <div>
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className={`font-semibold ${item.quantity <= item.min_quantity ? 'text-red-600' : 'text-gray-900'}`}>
-                                                                {item.quantity}
-                                                            </span>
-                                                            <span className="text-gray-400 text-sm">/ {item.min_quantity}</span>
+                                                {item.asset_type === 'asset' ? (
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs text-gray-600">Total:</span>
+                                                            <span className="font-semibold text-gray-900">{item.assets?.length || 0}</span>
                                                         </div>
-                                                        <p className="text-xs text-gray-500 mt-0.5">{item.unit}</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs text-gray-600">Available:</span>
+                                                            <span className="font-semibold text-green-600">
+                                                                {item.assets?.filter(a => a.status === 'Available').length || 0}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs text-gray-600">Assigned:</span>
+                                                            <span className="font-semibold text-blue-600">
+                                                                {item.assets?.filter(a => a.status === 'Assigned').length || 0}
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                    {item.quantity <= item.min_quantity && (
-                                                        <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
-                                                    )}
-                                                </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-2">
+                                                        <div>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className={`font-semibold ${item.quantity <= item.min_quantity ? 'text-red-600' : 'text-gray-900'}`}>
+                                                                    {item.quantity}
+                                                                </span>
+                                                                <span className="text-gray-400 text-sm">/ {item.min_quantity}</span>
+                                                            </div>
+                                                            <p className="text-xs text-gray-500 mt-0.5">{item.unit}</p>
+                                                        </div>
+                                                        {item.quantity <= item.min_quantity && (
+                                                            <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                                                        )}
+                                                    </div>
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getAssetTypeBadge(item.asset_type)}`}>
@@ -315,20 +353,6 @@ export default function Index({ auth, items, categories, filters }) {
                                                     {item.status.replace('_', ' ')}
                                                 </span>
                                             </TableCell>
-                                            <TableCell>
-                                                {item.current_assignment?.user ? (
-                                                    <div className="text-sm">
-                                                        <p className="font-medium text-gray-900">
-                                                            {item.current_assignment.user.name}
-                                                        </p>
-                                                        <p className="text-xs text-gray-500 mt-0.5">
-                                                            {item.current_assignment.user.email}
-                                                        </p>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-gray-400 text-sm">Unassigned</span>
-                                                )}
-                                            </TableCell>
                                             <TableCell className="text-right">
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
@@ -336,13 +360,24 @@ export default function Index({ auth, items, categories, filters }) {
                                                             <MoreVertical className="h-4 w-4" />
                                                         </button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-40">
+                                                    <DropdownMenuContent align="end" className="w-48">
                                                         <DropdownMenuItem asChild>
                                                             <Link href={route('inventory.show', item.id)} className="cursor-pointer flex items-center">
                                                                 <Eye className="h-4 w-4 mr-2" />
-                                                                View
+                                                                View Details
                                                             </Link>
                                                         </DropdownMenuItem>
+                                                        {item.asset_type === 'asset' && (
+                                                            <DropdownMenuItem asChild>
+                                                                <Link 
+                                                                    href={route('individual-assets.index', { inventory_item_id: item.id })} 
+                                                                    className="cursor-pointer flex items-center"
+                                                                >
+                                                                    <Laptop className="h-4 w-4 mr-2" />
+                                                                    View Assets ({item.assets?.length || 0})
+                                                                </Link>
+                                                            </DropdownMenuItem>
+                                                        )}
                                                         <DropdownMenuItem asChild>
                                                             <Link href={route('inventory.edit', item.id)} className="cursor-pointer flex items-center">
                                                                 <Edit className="h-4 w-4 mr-2" />
@@ -363,7 +398,7 @@ export default function Index({ auth, items, categories, filters }) {
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={8} className="text-center py-16">
+                                        <TableCell colSpan={7} className="text-center py-16">
                                             <div className="flex flex-col items-center">
                                                 <div className="p-4 bg-gray-100 rounded-full mb-4">
                                                     <Package className="h-12 w-12 text-gray-400" />

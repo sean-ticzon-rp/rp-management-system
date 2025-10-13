@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Com
 import { Checkbox } from '@/Components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
 import ProfilePictureUpload from '@/Components/ProfilePictureUpload';
-import { SSSInput, TINInput, PhilHealthInput, HDMFInput, PayrollAccountInput, PhoneInput } from '@/Components/FormattedInput';
+import { SSSInput, TINInput, PhilHealthInput, HDMFInput, PayrollAccountInput } from '@/Components/FormattedInput';
 import {
     Users as UsersIcon,
     ArrowLeft,
@@ -224,7 +224,7 @@ export default function Edit({ auth, user, roles }) {
                     </CardContent>
                 </Card>
 
-                {/* Contact */}
+                {/* Contact Information - UPDATED */}
                 <Card className="animate-fade-in animation-delay-100">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -233,7 +233,7 @@ export default function Edit({ auth, user, roles }) {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-2">
                                 <Label>Primary Email *</Label>
                                 <Input
@@ -253,9 +253,7 @@ export default function Edit({ auth, user, roles }) {
                                     onChange={(e) => setData('work_email', e.target.value)}
                                 />
                             </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-2">
                                 <Label>Personal Email</Label>
                                 <Input
@@ -264,21 +262,27 @@ export default function Edit({ auth, user, roles }) {
                                     onChange={(e) => setData('personal_email', e.target.value)}
                                 />
                             </div>
+                        </div>
 
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label>Mobile Number</Label>
-                                <PhoneInput
+                                <Label>Phone Number 1</Label>
+                                <Input
                                     value={data.phone_number}
                                     onChange={(e) => setData('phone_number', e.target.value)}
+                                    placeholder="9123456789"
                                 />
+                                <p className="text-xs text-gray-500">10 digits (no leading 0)</p>
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Personal Mobile</Label>
-                                <PhoneInput
+                                <Label>Phone Number 2</Label>
+                                <Input
                                     value={data.personal_mobile}
                                     onChange={(e) => setData('personal_mobile', e.target.value)}
+                                    placeholder="9987654321"
                                 />
+                                <p className="text-xs text-gray-500">10 digits (no leading 0)</p>
                             </div>
                         </div>
                     </CardContent>
@@ -479,21 +483,23 @@ export default function Edit({ auth, user, roles }) {
                     </CardContent>
                 </Card>
 
-                {/* Emergency Contact */}
+                {/* Emergency Contact - UPDATED */}
                 <Card className="animate-fade-in animation-delay-500">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Heart className="h-5 w-5" />
                             Emergency Contact
                         </CardTitle>
+                        <CardDescription>Person to contact in case of emergency</CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Contact Name</Label>
                                 <Input
                                     value={data.emergency_contact_name}
                                     onChange={(e) => setData('emergency_contact_name', e.target.value)}
+                                    placeholder="Jane Doe"
                                 />
                             </div>
 
@@ -502,25 +508,30 @@ export default function Edit({ auth, user, roles }) {
                                 <Input
                                     value={data.emergency_contact_relationship}
                                     onChange={(e) => setData('emergency_contact_relationship', e.target.value)}
+                                    placeholder="Spouse, Parent, Sibling..."
                                 />
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label>Contact Phone</Label>
-                                <PhoneInput
+                                <Label>Phone Number 1</Label>
+                                <Input
                                     value={data.emergency_contact_phone}
                                     onChange={(e) => setData('emergency_contact_phone', e.target.value)}
+                                    placeholder="9111111111"
                                 />
+                                <p className="text-xs text-gray-500">10 digits (no leading 0)</p>
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Contact Mobile</Label>
-                                <PhoneInput
+                                <Label>Phone Number 2</Label>
+                                <Input
                                     value={data.emergency_contact_mobile}
                                     onChange={(e) => setData('emergency_contact_mobile', e.target.value)}
+                                    placeholder="9222222222"
                                 />
+                                <p className="text-xs text-gray-500">10 digits (no leading 0)</p>
                             </div>
                         </div>
                     </CardContent>

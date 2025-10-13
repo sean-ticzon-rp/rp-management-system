@@ -60,6 +60,29 @@ class InventoryItem extends Model
     {
         return $this->hasOne(AssetAssignment::class)->where('status', 'active');
     }
+    // Relationship: An inventory item has many individual assets
+    public function assets()
+    {
+        return $this->hasMany(Asset::class);
+    }
+
+    // Get total quantity based on number of assets
+    public function getTotalAssetsAttribute()
+    {
+        return $this->assets()->count();
+    }
+
+    // Get available quantity based on available assets
+    public function getAvailableAssetsAttribute()
+    {
+        return $this->assets()->where('status', 'Available')->count();
+    }
+
+    // Get assigned quantity based on assigned assets
+    public function getAssignedAssetsAttribute()
+    {
+        return $this->assets()->where('status', 'Assigned')->count();
+    }
 
     // Relationship: An inventory item has many history records
     public function history()

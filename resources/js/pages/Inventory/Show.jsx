@@ -23,6 +23,9 @@ import {
     CheckCircle2,
     Clock,
     History,
+    Laptop,
+    Barcode,
+    UserPlus,
 } from 'lucide-react';
 
 export default function Show({ auth, item }) {
@@ -216,6 +219,83 @@ export default function Show({ auth, item }) {
                         </CardContent>
                     </Card>
 
+                    {/* Individual Assets - NEW SECTION */}
+                    {item.asset_type === 'asset' && item.assets && item.assets.length > 0 && (
+                        <Card className="animate-fade-in animation-delay-150">
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Laptop className="h-5 w-5" />
+                                        Individual Assets
+                                    </CardTitle>
+                                    <Button asChild size="sm" variant="outline">
+                                        <Link href={route('individual-assets.index', { inventory_item_id: item.id })}>
+                                            View All ({item.assets.length})
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-3">
+                                    {item.assets.slice(0, 5).map((asset) => (
+                                        <div key={asset.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+                                            <div className="flex items-center gap-4 flex-1">
+                                                <div className="p-2 bg-blue-100 rounded-lg">
+                                                    <Hash className="h-5 w-5 text-blue-600" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-3 mb-1">
+                                                        <p className="font-mono font-medium text-gray-900">{asset.asset_tag}</p>
+                                                        <Badge className={asset.status === 'Available' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}>
+                                                            {asset.status}
+                                                        </Badge>
+                                                    </div>
+                                                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                                                        {asset.serial_number && (
+                                                            <span className="font-mono">SN: {asset.serial_number}</span>
+                                                        )}
+                                                        <span className="font-mono flex items-center gap-1">
+                                                            <Barcode className="h-3.5 w-3.5" />
+                                                            {asset.barcode}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                {asset.current_assignment?.user ? (
+                                                    <div className="text-sm">
+                                                        <p className="font-medium text-gray-900">{asset.current_assignment.user.name}</p>
+                                                        <p className="text-xs text-gray-500">Assigned</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-sm">
+                                                        <p className="text-gray-500 mb-1">Unassigned</p>
+                                                        <Button asChild size="sm" variant="outline">
+                                                            <Link href={route('individual-assets.assign', asset.id)}>
+                                                                <UserPlus className="h-3 w-3 mr-1" />
+                                                                Assign
+                                                            </Link>
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {item.assets.length > 5 && (
+                                        <div className="text-center pt-2">
+                                            <Button asChild variant="outline" size="sm">
+                                                <Link href={route('individual-assets.index', { inventory_item_id: item.id })}>
+                                                    <Laptop className="h-4 w-4 mr-2" />
+                                                    View All {item.assets.length} Assets
+                                                </Link>
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
                     {/* Additional Details */}
                     <Card className="animate-fade-in animation-delay-200">
                         <CardHeader>
@@ -372,6 +452,14 @@ export default function Show({ auth, item }) {
                             <CardTitle>Quick Actions</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
+                            {item.asset_type === 'asset' && (
+                                <Button className="w-full justify-start" variant="outline" asChild>
+                                    <Link href={route('individual-assets.index', { inventory_item_id: item.id })}>
+                                        <Laptop className="h-4 w-4 mr-2" />
+                                        View Individual Assets ({item.assets?.length || 0})
+                                    </Link>
+                                </Button>
+                            )}
                             <Button className="w-full justify-start" variant="outline" asChild>
                                 <Link href={route('inventory.edit', item.id)}>
                                     <Edit className="h-4 w-4 mr-2" />

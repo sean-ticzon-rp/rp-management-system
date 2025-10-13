@@ -101,7 +101,7 @@ export default function Show({ auth, user }) {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Column */}
                 <div className="lg:col-span-2 space-y-6">
-                    {/* Profile Picture Card - New Addition */}
+                    {/* Profile Picture Card */}
                     <Card className="animate-fade-in">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
@@ -218,8 +218,17 @@ export default function Show({ auth, user }) {
                                     <div className="flex items-center gap-3">
                                         <Phone className="h-5 w-5 text-gray-400" />
                                         <div>
-                                            <p className="text-sm text-gray-600">Phone Number</p>
+                                            <p className="text-sm text-gray-600">Phone Number 1</p>
                                             <p className="font-medium text-gray-900">{user.phone_number}</p>
+                                        </div>
+                                    </div>
+                                )}
+                                {user.personal_mobile && (
+                                    <div className="flex items-center gap-3">
+                                        <Phone className="h-5 w-5 text-gray-400" />
+                                        <div>
+                                            <p className="text-sm text-gray-600">Phone Number 2</p>
+                                            <p className="font-medium text-gray-900">{user.personal_mobile}</p>
                                         </div>
                                     </div>
                                 )}
@@ -251,41 +260,65 @@ export default function Show({ auth, user }) {
                         </Card>
                     )}
 
-                    {/* Emergency Contact */}
-                    {user.emergency_contact_name && (
+                    {/* Emergency Contact - UPDATED SECTION */}
+                    {(user.emergency_contact_name || user.emergency_contact_phone || user.emergency_contact_mobile) && (
                         <Card className="animate-fade-in animation-delay-300">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <Heart className="h-5 w-5" />
+                                    <Heart className="h-5 w-5 text-red-600" />
                                     Emergency Contact
                                 </CardTitle>
+                                <CardDescription>Person to contact in case of emergency</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div>
-                                        <p className="text-sm text-gray-600 mb-1">Name</p>
-                                        <p className="font-medium text-gray-900">{user.emergency_contact_name}</p>
-                                    </div>
-                                    {user.emergency_contact_relationship && (
-                                        <div>
-                                            <p className="text-sm text-gray-600 mb-1">Relationship</p>
-                                            <p className="font-medium text-gray-900">{user.emergency_contact_relationship}</p>
+                                <div className="space-y-4">
+                                    {user.emergency_contact_name && (
+                                        <div className="flex items-start gap-3">
+                                            <div className="p-2 bg-red-50 rounded-lg">
+                                                <UserIcon className="h-5 w-5 text-red-600" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-gray-600 mb-1">Contact Name</p>
+                                                <p className="font-medium text-gray-900">{user.emergency_contact_name}</p>
+                                            </div>
                                         </div>
                                     )}
-                                    <div>
-                                        {user.emergency_contact_phone && (
-                                            <div className="mb-3">
-                                                <p className="text-sm text-gray-600 mb-1">Phone</p>
+                                    
+                                    {user.emergency_contact_relationship && (
+                                        <div className="flex items-start gap-3">
+                                            <div className="p-2 bg-pink-50 rounded-lg">
+                                                <Heart className="h-5 w-5 text-pink-600" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-gray-600 mb-1">Relationship</p>
+                                                <p className="font-medium text-gray-900">{user.emergency_contact_relationship}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {user.emergency_contact_phone && (
+                                        <div className="flex items-start gap-3">
+                                            <div className="p-2 bg-orange-50 rounded-lg">
+                                                <Phone className="h-5 w-5 text-orange-600" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-gray-600 mb-1">Phone Number 1</p>
                                                 <p className="font-medium text-gray-900">{user.emergency_contact_phone}</p>
                                             </div>
-                                        )}
-                                        {user.emergency_contact_mobile && (
+                                        </div>
+                                    )}
+                                    
+                                    {user.emergency_contact_mobile && (
+                                        <div className="flex items-start gap-3">
+                                            <div className="p-2 bg-blue-50 rounded-lg">
+                                                <Phone className="h-5 w-5 text-blue-600" />
+                                            </div>
                                             <div>
-                                                <p className="text-sm text-gray-600 mb-1">Mobile</p>
+                                                <p className="text-sm text-gray-600 mb-1">Phone Number 2</p>
                                                 <p className="font-medium text-gray-900">{user.emergency_contact_mobile}</p>
                                             </div>
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>

@@ -1,12 +1,12 @@
 <?php
 
-use App\Http\Controllers\AssetAssignmentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserImportController;
+use App\Http\Controllers\AssetController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\UserController;
 use Illuminate\Foundation\Application;
@@ -61,13 +61,16 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{task}', [TaskController::class, 'destroy'])->name('destroy');
     });
 
-    // Asset Assignments
-    Route::prefix('assets')->name('assets.')->group(function () {
-        Route::get('/', [AssetAssignmentController::class, 'index'])->name('index');
-        Route::get('/assign/{inventoryItem?}', [AssetAssignmentController::class, 'create'])->name('assign');
-        Route::post('/assign', [AssetAssignmentController::class, 'store'])->name('store');
-        Route::post('/{assignment}/return', [AssetAssignmentController::class, 'return'])->name('return');
-        Route::post('/lookup', [AssetAssignmentController::class, 'lookup'])->name('lookup');
+    // Individual Assets (NEW system - tracks specific physical items)
+    Route::prefix('individual-assets')->name('individual-assets.')->group(function () {
+        Route::get('/', [AssetController::class, 'index'])->name('index');
+        Route::get('/{asset}', [AssetController::class, 'show'])->name('show');
+        Route::get('/{asset}/edit', [AssetController::class, 'edit'])->name('edit');  // ADD THIS
+        Route::put('/{asset}', [AssetController::class, 'update'])->name('update');  // ADD THIS
+        Route::get('/assign/{asset?}', [AssetController::class, 'assignForm'])->name('assign');
+        Route::post('/assign', [AssetController::class, 'assign'])->name('store-assignment');
+        Route::post('/{assignment}/return', [AssetController::class, 'return'])->name('return');
+        Route::post('/lookup', [AssetController::class, 'lookup'])->name('lookup');
     });
 });
 

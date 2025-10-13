@@ -58,10 +58,10 @@ class User extends Authenticatable
     ];
 
     protected $casts = [
-    'email_verified_at' => 'datetime',
-    'birthday' => 'date',
-    'hire_date' => 'date',
-    'password' => 'hashed',
+        'email_verified_at' => 'datetime',
+        'birthday' => 'date',
+        'hire_date' => 'date',
+        'password' => 'hashed',
     ];
 
     /**
@@ -88,7 +88,8 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
-    // Add this to your existing User model
+
+    // Roles & Permissions
     public function roles()
     {
         return $this->belongsToMany(Role::class);
@@ -105,8 +106,8 @@ class User extends Authenticatable
             $query->where('slug', $permission);
         })->exists();
     }
-    // Add these to your existing User model
 
+    // Projects & Tasks
     public function ownedProjects()
     {
         return $this->hasMany(Project::class, 'owner_id');
@@ -122,6 +123,7 @@ class User extends Authenticatable
         return $this->hasMany(Task::class, 'created_by');
     }
 
+    // OLD SYSTEM: Asset Assignments (inventory_item based)
     public function assetAssignments()
     {
         return $this->hasMany(AssetAssignment::class);
@@ -130,5 +132,32 @@ class User extends Authenticatable
     public function currentAssets()
     {
         return $this->hasMany(AssetAssignment::class)->where('status', 'active');
+    }
+
+    // NEW SYSTEM: Individual Asset Assignments (asset based)
+    public function individualAssetAssignments()
+    {
+        return $this->hasMany(IndividualAssetAssignment::class);
+    }
+
+    public function currentIndividualAssets()
+    {
+        return $this->hasMany(IndividualAssetAssignment::class)
+                    ->where('status', 'active')
+                    ->whereNull('actual_return_date')
+                    ->with('asset.inventoryItem');
+    }
+
+    public function assignedAssets()
+    {
+        return $this->hasManyThrough(
+            Asset::class,
+            IndividualAssetAssignment::class,
+            'user_id',      // Foreign key on individual_asset_assignments
+            'id',           // Foreign key on assets
+            'id',           // Local key on users
+            'asset_id'      // Local key on individual_asset_assignments
+        )->where('individual_asset_assignments.status', 'active')
+         ->whereNull('individual_asset_assignments.actual_return_date');
     }
 }
