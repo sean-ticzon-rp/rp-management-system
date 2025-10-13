@@ -22,7 +22,7 @@ return new class extends Migration
             // Unique identifiers for THIS SPECIFIC physical asset
             $table->string('asset_tag')->unique();  // e.g., "LAPTOP-001"
             $table->string('serial_number')->unique()->nullable();  // Manufacturer serial
-            $table->string('barcode')->unique();  // Scannable barcode for THIS specific unit
+            $table->string('barcode')->nullable();
             
             // Purchase information (specific to this unit)
             $table->date('purchase_date')->nullable();

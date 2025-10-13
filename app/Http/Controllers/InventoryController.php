@@ -138,7 +138,11 @@ class InventoryController extends Controller
         $categories = Category::where('type', 'inventory')->get();
         
         return Inertia::render('Inventory/Edit', [
-            'item' => $inventory,
+            'item' => [
+                ...$inventory->toArray(),
+                'purchase_date' => $inventory->purchase_date?->format('Y-m-d'),
+                'warranty_expiry' => $inventory->warranty_expiry?->format('Y-m-d'),
+            ],
             'categories' => $categories,
         ]);
     }
@@ -221,6 +225,9 @@ class InventoryController extends Controller
                 return back()->with('error', "Cannot delete this item! {$assignedAssets} of {$totalAssets} individual asset(s) are currently assigned to users. Please return all assigned assets first.");
             }
 
+            // ✅ NEW LINE - Delete all related assets first
+            $inventory->assets()->delete();
+            
             // Show info about how many assets will be deleted
             if ($totalAssets > 0) {
                 $inventory->delete();

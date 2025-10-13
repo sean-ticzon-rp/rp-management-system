@@ -73,7 +73,16 @@ class AssetController extends Controller
         $asset->load('inventoryItem.category');
         
         return Inertia::render('Assets/IndividualAssets/Edit', [
-            'asset' => $asset,
+            'asset' => [
+                ...$asset->toArray(),
+                'purchase_date' => $asset->purchase_date?->format('Y-m-d'),
+                'warranty_expiry' => $asset->warranty_expiry?->format('Y-m-d'),
+                // Also ensure these relationships are properly serialized
+                'inventory_item' => $asset->inventoryItem ? [
+                    ...$asset->inventoryItem->toArray(),
+                    'category' => $asset->inventoryItem->category,
+                ] : null,
+            ],
         ]);
     }
 

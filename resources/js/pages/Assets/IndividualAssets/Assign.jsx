@@ -151,7 +151,7 @@ export default function Assign({ auth, preselectedAsset, availableAssets, users 
                                 <Alert className="mt-4 bg-green-50 border-green-200">
                                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                                     <AlertDescription className="text-green-800 font-medium">
-                                        Found: {searchedAsset.inventory_item.name} ({searchedAsset.asset_tag})
+                                        Found: {searchedAsset.inventory_item?.name || 'Unknown Item'} ({searchedAsset.asset_tag})
                                     </AlertDescription>
                                 </Alert>
                             )}
@@ -180,7 +180,7 @@ export default function Assign({ auth, preselectedAsset, availableAssets, users 
                                         <SelectContent>
                                             {availableAssets.map((asset) => (
                                                 <SelectItem key={asset.id} value={asset.id.toString()}>
-                                                    {asset.asset_tag} - {asset.inventory_item.name}
+                                                    {asset.asset_tag} - {asset.inventory_item?.name || 'Unknown Item'}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -295,11 +295,15 @@ export default function Assign({ auth, preselectedAsset, availableAssets, users 
                                         <div className="flex items-center gap-3 mb-3">
                                             <Package className="h-6 w-6 text-gray-600" />
                                             <div>
-                                                <p className="font-medium text-gray-900">{selectedAsset.inventory_item.name}</p>
-                                                <p className="text-sm text-gray-600">{selectedAsset.inventory_item.sku}</p>
+                                                <p className="font-medium text-gray-900">
+                                                    {selectedAsset.inventory_item?.name || 'Unknown Item'}
+                                                </p>
+                                                <p className="text-sm text-gray-600">
+                                                    {selectedAsset.inventory_item?.sku || 'N/A'}
+                                                </p>
                                             </div>
                                         </div>
-                                        {selectedAsset.inventory_item.category && (
+                                        {selectedAsset.inventory_item?.category && (
                                             <span 
                                                 className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border"
                                                 style={{ 

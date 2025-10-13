@@ -74,18 +74,24 @@ export default function Edit({ auth, asset }) {
                             <Package className="h-5 w-5" />
                             Product Information
                         </CardTitle>
-                        <CardDescription>This asset is a {asset.inventory_item.name}</CardDescription>
+                        <CardDescription>
+                            This asset is a {asset.inventory_item?.name || 'Unknown Item'}
+                        </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="p-4 bg-blue-50 rounded-lg">
                             <div className="flex items-center gap-3 mb-2">
                                 <Package className="h-6 w-6 text-blue-600" />
                                 <div>
-                                    <p className="font-medium text-gray-900">{asset.inventory_item.name}</p>
-                                    <p className="text-sm text-gray-600">{asset.inventory_item.sku}</p>
+                                    <p className="font-medium text-gray-900">
+                                        {asset.inventory_item?.name || 'Unknown Item'}
+                                    </p>
+                                    <p className="text-sm text-gray-600">
+                                        {asset.inventory_item?.sku || 'N/A'}
+                                    </p>
                                 </div>
                             </div>
-                            {asset.inventory_item.category && (
+                            {asset.inventory_item?.category && (
                                 <span 
                                     className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border"
                                     style={{ 
