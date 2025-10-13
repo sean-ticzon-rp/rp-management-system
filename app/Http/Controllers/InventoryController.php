@@ -138,7 +138,11 @@ class InventoryController extends Controller
         $categories = Category::where('type', 'inventory')->get();
         
         return Inertia::render('Inventory/Edit', [
-            'item' => $inventory,
+            'item' => [
+                ...$inventory->toArray(),
+                'purchase_date' => $inventory->purchase_date?->format('Y-m-d'),
+                'warranty_expiry' => $inventory->warranty_expiry?->format('Y-m-d'),
+            ],
             'categories' => $categories,
         ]);
     }
@@ -210,25 +214,6 @@ class InventoryController extends Controller
 
     public function destroy(InventoryItem $inventory)
     {
-        // If it's an asset type, check if any individual assets are assigned
-        if ($inventory->asset_type === 'asset') {
-            $totalAssets = $inventory->assets()->count();
-            $assignedAssets = $inventory->assets()
-                ->where('status', 'Assigned')
-                ->count();
-            
-            if ($assignedAssets > 0) {
-                return back()->with('error', "Cannot delete this item! {$assignedAssets} of {$totalAssets} individual asset(s) are currently assigned to users. Please return all assigned assets first.");
-            }
-
-            // Show info about how many assets will be deleted
-            if ($totalAssets > 0) {
-                $inventory->delete();
-                return redirect()->route('inventory.index')
-                    ->with('success', "Inventory item deleted successfully! {$totalAssets} individual asset(s) were also removed.");
-            }
-        }
-
         $inventory->delete();
 
         return redirect()->route('inventory.index')->with('success', 'Inventory item deleted successfully!');

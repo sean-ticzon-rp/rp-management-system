@@ -21,24 +21,34 @@ class UserController extends Controller
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
-        // Filter by role - FIX: Specify the table name for the id column
+        // Filter by role
         if ($request->has('role')) {
             $query->whereHas('roles', function($q) use ($request) {
-                $q->where('roles.id', $request->role); // Changed from 'id' to 'roles.id'
+                $q->where('roles.id', $request->role);
             });
         }
+        
+        // ✅ ADD: Filter by account status
+        if ($request->has('account_status')) {
+            $query->where('account_status', $request->account_status);
+        }
 
-        $users = $query->latest()->paginate(15)->withQueryString();
+        // ✅ ADD: Order by pending first, then by newest
+        $users = $query->orderByRaw("FIELD(account_status, 'pending', 'active', 'suspended', 'rejected')")
+                    ->latest()
+                    ->paginate(15)
+                    ->withQueryString();
+        
         $roles = Role::all();
 
         return Inertia::render('Users/Index', [
             'users' => $users,
             'roles' => $roles,
-            'filters' => $request->only(['search', 'role']),
+            'filters' => $request->only(['search', 'role', 'account_status']),
         ]);
     }
 
@@ -303,4 +313,39 @@ class UserController extends Controller
 
         return redirect()->route('users.index')->with('success', 'User deleted successfully!');
     }
+
+    public function approve(User $user)
+    {
+        // Only allow if user is pending
+        if ($user->account_status !== 'pending') {
+            return back()->with('error', 'User is not pending approval!');
+        }
+
+        $user->update([
+            'account_status' => 'active',
+            'approved_by' => auth()->id(),
+            'approved_at' => now(),
+        ]);
+
+        // TODO: Send email to user notifying approval
+        
+        return back()->with('success', "User {$user->name} has been approved!");
+    }
+
+    public function reject(User $user)
+    {
+        // Only allow if user is pending
+        if ($user->account_status !== 'pending') {
+            return back()->with('error', 'User is not pending approval!');
+        }
+
+        $user->update([
+            'account_status' => 'rejected',
+        ]);
+
+        // TODO: Send email to user notifying rejection
+        
+        return back()->with('success', "User {$user->name} has been rejected.");
+    }
+
 }
