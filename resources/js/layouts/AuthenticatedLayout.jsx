@@ -32,12 +32,12 @@ export default function AuthenticatedLayout({ header, children }) {
     const [sidebarMinimized, setSidebarMinimized] = useState(false);
     const { auth } = usePage().props;
     const currentUrl = usePage().url;
-
+    
     const navigation = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Users', href: '/users', icon: Users },
         { name: 'Inventory', href: '/inventory', icon: Package },
-        { name: 'Assets', href: '/assets', icon: Laptop },
+        { name: 'Assets', href: '/individual-assets', icon: Laptop },
         { name: 'Projects', href: '/projects', icon: FolderKanban },
         { name: 'Tasks', href: '/tasks', icon: ClipboardList },
         { name: 'Settings', href: '/settings', icon: Settings },

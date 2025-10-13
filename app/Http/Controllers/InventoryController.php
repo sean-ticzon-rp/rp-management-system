@@ -11,7 +11,8 @@ class InventoryController extends Controller
 {
     public function index(Request $request)
     {
-        $query = InventoryItem::with(['category', 'creator', 'currentAssignment.user']);
+        // Load assets relationship to show individual asset counts
+        $query = InventoryItem::with(['category', 'creator', 'currentAssignment.user', 'assets']);
 
         // Search
         if ($request->has('search')) {
@@ -88,14 +89,44 @@ class InventoryController extends Controller
 
         $validated['created_by'] = auth()->id();
 
-        InventoryItem::create($validated);
+        // Create the inventory item
+        $inventoryItem = InventoryItem::create($validated);
 
-        return redirect()->route('inventory.index')->with('success', 'Inventory item created successfully!');
+        // If it's an asset type, automatically create individual assets (placeholders)
+        if ($validated['asset_type'] === 'asset' && $validated['quantity'] > 0) {
+            for ($i = 1; $i <= $validated['quantity']; $i++) {
+                \App\Models\Asset::create([
+                    'inventory_item_id' => $inventoryItem->id,
+                    'asset_tag' => 'ASSET-' . $inventoryItem->id . '-' . str_pad($i, 3, '0', STR_PAD_LEFT),
+                    'serial_number' => null,  // HR will enter manually
+                    'barcode' => null,  // HR will enter manually
+                    'purchase_date' => $validated['purchase_date'],
+                    'purchase_price' => $validated['unit_price'],
+                    'warranty_expiry' => $validated['warranty_expiry'],
+                    'condition' => 'Good',
+                    'status' => 'Available',
+                    'location' => $validated['location'],
+                    'notes' => "Placeholder asset #{$i} - Please add serial number and barcode",
+                ]);
+            }
+        }
+
+        return redirect()->route('inventory.index')->with('success', 'Inventory item created successfully!' . 
+            ($validated['asset_type'] === 'asset' ? " {$validated['quantity']} individual assets were created. Please add serial numbers and barcodes." : ''));
     }
 
     public function show(InventoryItem $inventory)
     {
-        $inventory->load(['category', 'creator', 'assignments.user', 'assignments.assignedBy', 'history.user', 'history.performedBy']);
+        // Load both old assignments and new individual assets
+        $inventory->load([
+            'category', 
+            'creator', 
+            'assignments.user', 
+            'assignments.assignedBy', 
+            'history.user', 
+            'history.performedBy',
+            'assets.currentAssignment.user'  // NEW: Load individual assets
+        ]);
 
         return Inertia::render('Inventory/Show', [
             'item' => $inventory,
@@ -136,11 +167,68 @@ class InventoryController extends Controller
 
         $inventory->update($validated);
 
-        return redirect()->route('inventory.index')->with('success', 'Inventory item updated successfully!');
+        // If it's an asset type, sync the individual assets with the new quantity
+        if ($validated['asset_type'] === 'asset') {
+            $currentAssetCount = $inventory->assets()->count();
+            $newQuantity = $validated['quantity'];
+
+            // If quantity increased, create more assets
+            if ($newQuantity > $currentAssetCount) {
+                $assetsToCreate = $newQuantity - $currentAssetCount;
+                
+                for ($i = 1; $i <= $assetsToCreate; $i++) {
+                    $assetNumber = $currentAssetCount + $i;
+                    
+                    \App\Models\Asset::create([
+                        'inventory_item_id' => $inventory->id,
+                        'asset_tag' => 'ASSET-' . $inventory->id . '-' . str_pad($assetNumber, 3, '0', STR_PAD_LEFT),
+                        'serial_number' => null,  // HR will enter manually
+                        'barcode' => null,  // HR will enter manually
+                        'purchase_date' => $validated['purchase_date'],
+                        'purchase_price' => $validated['unit_price'],
+                        'warranty_expiry' => $validated['warranty_expiry'],
+                        'condition' => 'Good',
+                        'status' => 'Available',
+                        'location' => $validated['location'],
+                        'notes' => "Placeholder asset #{$assetNumber} - Please add serial number and barcode",
+                    ]);
+                }
+            }
+            // If quantity decreased, we DON'T automatically delete assets (to prevent data loss)
+            // Admin can manually delete individual assets if needed
+        }
+
+        $message = 'Inventory item updated successfully!';
+        
+        if ($validated['asset_type'] === 'asset') {
+            $currentCount = $inventory->assets()->count();
+            $message .= " (Total individual assets: {$currentCount})";
+        }
+
+        return redirect()->route('inventory.index')->with('success', $message);
     }
 
     public function destroy(InventoryItem $inventory)
     {
+        // If it's an asset type, check if any individual assets are assigned
+        if ($inventory->asset_type === 'asset') {
+            $totalAssets = $inventory->assets()->count();
+            $assignedAssets = $inventory->assets()
+                ->where('status', 'Assigned')
+                ->count();
+            
+            if ($assignedAssets > 0) {
+                return back()->with('error', "Cannot delete this item! {$assignedAssets} of {$totalAssets} individual asset(s) are currently assigned to users. Please return all assigned assets first.");
+            }
+
+            // Show info about how many assets will be deleted
+            if ($totalAssets > 0) {
+                $inventory->delete();
+                return redirect()->route('inventory.index')
+                    ->with('success', "Inventory item deleted successfully! {$totalAssets} individual asset(s) were also removed.");
+            }
+        }
+
         $inventory->delete();
 
         return redirect()->route('inventory.index')->with('success', 'Inventory item deleted successfully!');

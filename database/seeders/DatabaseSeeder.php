@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             CategorySeeder::class,
             InventoryItemSeeder::class,
+            AssetSeeder::class,  // ADD THIS LINE
             ProjectSeeder::class,
         ]);
     }
