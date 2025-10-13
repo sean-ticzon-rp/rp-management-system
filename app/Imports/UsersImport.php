@@ -4,50 +4,259 @@ namespace App\Imports;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
+use Maatwebsite\Excel\Concerns\SkipsOnError;
+use Maatwebsite\Excel\Concerns\SkipsErrors;
+use Maatwebsite\Excel\Concerns\SkipsOnFailure;
+use Maatwebsite\Excel\Concerns\SkipsFailures;
 
-class UsersImport implements ToModel, WithHeadingRow, WithValidation
+class UsersImport implements ToModel, WithHeadingRow, WithValidation, SkipsOnError, SkipsOnFailure
 {
+    use SkipsErrors, SkipsFailures;
+
+    private $rowCount = 0;
+
     public function model(array $row)
     {
-        // Combine name fields
-        $fullName = trim(
-            ($row['first_name'] ?? '') . ' ' . 
-            ($row['middle_name'] ?? '') . ' ' . 
-            ($row['last_name'] ?? '')
-        );
+        $this->rowCount++;
+        
+        // Debug: Log first 3 rows to see actual column names and data
+        if ($this->rowCount <= 3) {
+            Log::info("Excel Import - Row {$this->rowCount} Columns:", array_keys($row));
+            Log::info("Excel Import - Row {$this->rowCount} Data:", $row);
+        }
+
+        // Helper function to get value with fallback keys (including numeric indices)
+        $getValue = function($possibleKeys) use ($row) {
+            foreach ($possibleKeys as $key) {
+                if (isset($row[$key]) && $row[$key] !== null && $row[$key] !== '') {
+                    return $row[$key];
+                }
+            }
+            return null;
+        };
+
+        // Get name fields
+        $firstName = $getValue(['first_name', 'firstname']);
+        $middleName = $getValue(['middle_name', 'middlename']);
+        $lastName = $getValue(['last_name', 'lastname']);
+        
+        // Combine full name
+        $fullName = trim(($firstName ?? '') . ' ' . ($middleName ?? '') . ' ' . ($lastName ?? ''));
+
+        // Get work email - this is the primary login email
+        $workEmail = $getValue(['work_email', 'workemail', 'email']);
+        
+        // Skip row if no work email (required field)
+        if (!$workEmail || !$firstName || !$lastName) {
+            Log::warning("Row {$this->rowCount}: Skipped - Missing required fields (first_name: {$firstName}, last_name: {$lastName}, work_email: {$workEmail})");
+            return null;
+        }
+        
+        // Get employee mobile numbers - First "Mobile Number" column
+        $employeeMobile = $getValue(['mobile_number', 'mobilenumber', 'mobile', 'phone']);
+        $employeePhones = $this->splitPhoneNumbers($employeeMobile);
+        
+        // Get emergency mobile - Second "Mobile Number" column (numeric index)
+        $emergencyMobile = $getValue([
+            'mobile_number_1',
+            23, 24, 25, // Numeric indices from your log
+            'emergency_mobile_number',
+            'emergency_mobile',
+        ]);
+        $emergencyPhones = $this->splitPhoneNumbers($emergencyMobile);
+        
+        Log::info("Row {$this->rowCount}: Creating user - {$fullName} ({$workEmail})");
 
         return new User([
-            'employee_id' => $row['employee_no'] ?? null,
-            'first_name' => $row['first_name'] ?? null,
-            'middle_name' => $row['middle_name'] ?? null,
-            'last_name' => $row['last_name'] ?? null,
+            'employee_id' => $getValue(['employee_no', 'employeeno', 'employee_number']),
+            'first_name' => $firstName,
+            'middle_name' => $middleName,
+            'last_name' => $lastName,
             'name' => $fullName,
-            'gender' => $this->mapGender($row['gender'] ?? null),
-            'civil_status' => $this->mapCivilStatus($row['civil_status'] ?? null),
-            'birthday' => $this->parseDate($row['date_of_birth'] ?? null),
-            'employment_status' => $this->mapStatus($row['status'] ?? 'active'),
-            'address_line_1' => $row['home_address'] ?? null,
-            'phone_number' => $row['mobile_number'] ?? null,
-            'personal_mobile' => $row['mobile_number'] ?? null,
-            'sss_number' => $row['sss_number'] ?? null,
-            'tin_number' => $row['tin_number'] ?? null,
-            'hdmf_number' => $row['hdmf_pagibig_number'] ?? null,
-            'philhealth_number' => $row['philhealth_number'] ?? null,
-            'position' => $row['job_title'] ?? null,
-            'payroll_account' => $row['union_bank_payroll_account'] ?? null,
-            'hire_date' => $this->parseDate($row['hire_date'] ?? null),
-            'employment_type' => $this->mapEmploymentType($row['employment_type'] ?? 'full_time'),
-            'work_email' => $row['work_email'] ?? null,
-            'email' => $row['work_email'] ?? $row['personalemail'] ?? null,
-            'personal_email' => $row['personalemail'] ?? null,
-            'emergency_contact_name' => $row['contact_person_in_case_of_emergency'] ?? null,
-            'emergency_contact_relationship' => $row['relationship'] ?? null,
-            'emergency_contact_mobile' => $row['mobile_number_emergency'] ?? null,
+            'gender' => $this->mapGender($getValue(['gender'])),
+            'civil_status' => $this->mapCivilStatus($getValue(['status', 'civil_status', 'civilstatus', 'marital_status'])),
+            'birthday' => $this->parseDate($getValue(['date_of_birth', 'dateofbirth', 'birthday', 'dob'])),
+            'address_line_1' => $getValue(['home_address', 'homeaddress', 'address']),
+            
+            // Employee phones - split from first Mobile Number column
+            'phone_number' => $employeePhones[0] ?? null,
+            'personal_mobile' => $employeePhones[1] ?? null,
+            
+            // Government IDs - NO splitting, just clean
+            'sss_number' => $this->cleanSSS($getValue(['sss_number', 'sssnumber', 'sss'])),
+            'tin_number' => $this->cleanTIN($getValue(['tin_number', 'tinnumber', 'tin'])),
+            'hdmf_number' => $this->cleanHDMF($getValue([
+                'hdmf_pagibig_number', 
+                'hdmfpagibignumber', 
+                'hdmf_number',
+                'hdmf',
+                'pagibig_number',
+                'pagibig'
+            ])),
+            'philhealth_number' => $this->cleanPhilHealth($getValue(['philhealth_number', 'philhealthnumber', 'philhealth'])),
+            'payroll_account' => $this->cleanPayrollAccount($getValue([
+                'union_bank_payroll_account',
+                'unionbankpayrollaccount',
+                'union_bankpayroll_account',
+                'payroll_account',
+                'payrollaccount'
+            ])),
+            
+            'position' => $getValue(['job_title', 'jobtitle', 'position']),
+            'hire_date' => $this->parseDate($getValue(['hire_date', 'hiredate', 'date_hired'])),
+            'employment_type' => $this->mapEmploymentType($getValue(['employment_type', 'employmenttype'])),
+            'employment_status' => 'active',
+            'work_email' => $workEmail,
+            'email' => $workEmail,
+            'personal_email' => $getValue(['personalemail', 'personal_email']),
+            
+            // Emergency Contact
+            'emergency_contact_name' => $getValue([
+                'contact_person_in_case_of_emergency',
+                'contact_person_incase_of_emergency',
+                'contactpersonincaseofemergency',
+                'emergency_contact_name',
+                'emergency_contact'
+            ]),
+            'emergency_contact_relationship' => $getValue(['relationship', 'emergency_relationship']),
+            
+            // Emergency phones - split from second Mobile Number column
+            'emergency_contact_phone' => $emergencyPhones[0] ?? null,
+            'emergency_contact_mobile' => $emergencyPhones[1] ?? null,
+            
             'password' => Hash::make('password123'),
         ]);
+    }
+
+    /**
+     * Split phone numbers by / separator and normalize to 10 digits
+     * Input: "9123456789/9987654321" (both 10 digits in Excel)
+     * Output: ["9123456789", "9987654321"]
+     */
+    private function splitPhoneNumbers($phoneString)
+    {
+        if (!$phoneString) return [null, null];
+        
+        $phoneString = trim((string)$phoneString);
+        
+        // Split by /
+        $parts = explode('/', $phoneString);
+        
+        $phone1 = isset($parts[0]) ? $this->normalizePhoneNumber(trim($parts[0])) : null;
+        $phone2 = isset($parts[1]) ? $this->normalizePhoneNumber(trim($parts[1])) : null;
+        
+        return [$phone1, $phone2];
+    }
+
+    /**
+     * Normalize phone number to 10 digits
+     */
+    private function normalizePhoneNumber($phone)
+    {
+        if (!$phone) return null;
+        
+        $numbers = preg_replace('/[^0-9]/', '', $phone);
+        if (!$numbers) return null;
+        
+        // If 11 digits starting with 0, remove leading 0
+        if (strlen($numbers) === 11 && substr($numbers, 0, 1) === '0') {
+            return substr($numbers, 1);
+        }
+        
+        // If already 10 digits, return as-is
+        if (strlen($numbers) === 10) {
+            return $numbers;
+        }
+        
+        // Pad or truncate to 10 digits
+        return strlen($numbers) > 10 
+            ? substr($numbers, -10) 
+            : str_pad($numbers, 10, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Clean SSS - NO splitting by /
+     */
+    private function cleanSSS($sss)
+    {
+        if (!$sss) return null;
+        
+        $sss = trim((string)$sss);
+        $numbers = preg_replace('/[^0-9]/', '', $sss);
+        
+        if (strlen($numbers) === 10) {
+            return substr($numbers, 0, 2) . '-' . substr($numbers, 2, 7) . '-' . substr($numbers, 9, 1);
+        }
+        
+        return $numbers ?: null;
+    }
+
+    /**
+     * Clean TIN - NO splitting by /
+     */
+    private function cleanTIN($tin)
+    {
+        if (!$tin) return null;
+        
+        $tin = trim((string)$tin);
+        $numbers = preg_replace('/[^0-9]/', '', $tin);
+        
+        if (strlen($numbers) >= 9) {
+            $formatted = substr($numbers, 0, 3) . '-' . substr($numbers, 3, 3) . '-' . substr($numbers, 6, 3);
+            if (strlen($numbers) > 9) {
+                $formatted .= '-' . substr($numbers, 9);
+            }
+            return $formatted;
+        }
+        
+        return $numbers ?: null;
+    }
+
+    /**
+     * Clean HDMF - NO splitting by /
+     */
+    private function cleanHDMF($hdmf)
+    {
+        if (!$hdmf) return null;
+        
+        $hdmf = trim((string)$hdmf);
+        $numbers = preg_replace('/[^0-9]/', '', $hdmf);
+        
+        return substr($numbers, 0, 12) ?: null;
+    }
+
+    /**
+     * Clean PhilHealth - NO splitting by /
+     */
+    private function cleanPhilHealth($philhealth)
+    {
+        if (!$philhealth) return null;
+        
+        $philhealth = trim((string)$philhealth);
+        $numbers = preg_replace('/[^0-9]/', '', $philhealth);
+        
+        if (strlen($numbers) === 11) {
+            return substr($numbers, 0, 4) . '-' . substr($numbers, 4, 5) . '-' . substr($numbers, 9, 2);
+        }
+        
+        return $numbers ?: null;
+    }
+
+    /**
+     * Clean Payroll Account - NO splitting by /
+     */
+    private function cleanPayrollAccount($account)
+    {
+        if (!$account) return null;
+        
+        $account = trim((string)$account);
+        $numbers = preg_replace('/[^0-9]/', '', $account);
+        
+        return substr($numbers, 0, 12) ?: null;
     }
 
     private function mapGender($gender)
@@ -70,9 +279,16 @@ class UsersImport implements ToModel, WithHeadingRow, WithValidation
         if (!$status) return null;
         
         $status = strtolower(trim($status));
-        $validStatuses = ['single', 'married', 'widowed', 'divorced', 'separated'];
+        $map = [
+            'single' => 'single',
+            'married' => 'married',
+            'widowed' => 'widowed',
+            'widow' => 'widowed',
+            'divorced' => 'divorced',
+            'separated' => 'separated',
+        ];
         
-        return in_array($status, $validStatuses) ? $status : null;
+        return $map[$status] ?? null;
     }
 
     private function mapStatus($status)
@@ -100,9 +316,12 @@ class UsersImport implements ToModel, WithHeadingRow, WithValidation
         if (!$date) return null;
         
         try {
-            // Handles YYYY-MM-DD format and Excel date formats
+            if (is_numeric($date)) {
+                return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($date)->format('Y-m-d');
+            }
             return \Carbon\Carbon::parse($date)->format('Y-m-d');
         } catch (\Exception $e) {
+            Log::warning("Failed to parse date: {$date}");
             return null;
         }
     }
