@@ -66,17 +66,16 @@ export default function AuthenticatedLayout({ header, children }) {
                                     <Menu className="h-6 w-6" />
                                 )}
                             </button>
-
-                            {/* Logo */}
-                            <Link href="/dashboard" className="flex items-center ml-4 lg:ml-0">
-                                <div className="flex items-center justify-center w-10 h-10 bg-blue-600 rounded-lg">
-                                    <LayoutDashboard className="w-6 h-6 text-white" />
+                            {/* Logo - Dark background to see white text */}
+                            <Link href="/dashboard" className="flex items-center ml-4 lg:ml-0 group">
+                                <div className="bg-gray-900 px-4 py-2 rounded-lg shadow-sm group-hover:shadow-md transition-shadow">
+                                    <img 
+                                        src="/images/logo.png" 
+                                        alt="Company Logo" 
+                                        className="h-8 w-auto"
+                                    />
                                 </div>
-                                <span className="ml-3 text-xl font-bold text-gray-900">
-                                    Your Company
-                                </span>
                             </Link>
-
                             {/* Search Bar - Desktop */}
                             <div className="hidden md:ml-8 md:flex md:items-center">
                                 <div className="relative">
@@ -100,35 +99,40 @@ export default function AuthenticatedLayout({ header, children }) {
 
                             {/* User Dropdown */}
                             <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <button className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors">
-                                        <div className="flex items-center justify-center w-8 h-8 bg-blue-600 rounded-full">
-                                            <span className="text-sm font-medium text-white">
-                                                {auth.user.name.charAt(0).toUpperCase()}
-                                            </span>
+                                <DropdownMenuTrigger className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors">
+                                    <div className="flex items-center justify-center w-8 h-8 bg-blue-600 rounded-full">
+                                        <span className="text-sm font-medium text-white">
+                                            {auth.user.name.charAt(0).toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <div className="hidden md:block text-left">
+                                        <div className="text-sm font-medium text-gray-900">
+                                            {auth.user.name}
                                         </div>
-                                        <div className="hidden md:block text-left">
-                                            <div className="text-sm font-medium text-gray-900">
-                                                {auth.user.name}
-                                            </div>
-                                            <div className="text-xs text-gray-500">
-                                                {auth.user.email}
-                                            </div>
+                                        <div className="text-xs text-gray-500">
+                                            {auth.user.email}
                                         </div>
-                                        <ChevronDown className="h-4 w-4 text-gray-400" />
-                                    </button>
+                                    </div>
+                                    <ChevronDown className="h-4 w-4 text-gray-400" />
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-56">
                                     <DropdownMenuLabel>My Account</DropdownMenuLabel>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem asChild>
-                                        <Link href={route('profile.edit')} className="flex items-center cursor-pointer">
+                                        <Link href={route('profile.edit')} className="cursor-pointer">
                                             <User className="mr-2 h-4 w-4" />
                                             <span>Profile</span>
                                         </Link>
                                     </DropdownMenuItem>
                                     <DropdownMenuItem asChild>
-                                        <Link href={route('logout')} method="post" as="button" className="flex items-center w-full cursor-pointer text-red-600">
+                                        <Link href={route('settings.index')} className="cursor-pointer">
+                                            <Settings className="mr-2 h-4 w-4" />
+                                            <span>Settings</span>
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem asChild>
+                                        <Link href={route('logout')} method="post" as="button" className="w-full cursor-pointer text-red-600">
                                             <LogOut className="mr-2 h-4 w-4" />
                                             <span>Log Out</span>
                                         </Link>

@@ -25,10 +25,10 @@ class UserController extends Controller
             });
         }
 
-        // Filter by role
+        // Filter by role - FIX: Specify the table name for the id column
         if ($request->has('role')) {
             $query->whereHas('roles', function($q) use ($request) {
-                $q->where('id', $request->role);
+                $q->where('roles.id', $request->role); // Changed from 'id' to 'roles.id'
             });
         }
 

@@ -7,9 +7,9 @@ import { Label } from '@/Components/ui/label';
 import { Checkbox } from '@/Components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Alert, AlertDescription } from '@/Components/ui/alert';
-import { Building2, Mail, Lock, AlertCircle } from 'lucide-react';
+import { Mail, Lock, AlertCircle } from 'lucide-react';
 
-export default function Login({ status, canResetPassword }) {
+export default function Login({ status, canResetPassword, userCount = 0 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
         password: '',
@@ -42,28 +42,24 @@ export default function Login({ status, canResetPassword }) {
                     </div>
 
                     <div className="text-center relative z-10 animate-fade-in-up">
-                        {/* Logo */}
-                        <div className="inline-flex items-center justify-center w-32 h-32 bg-white/10 backdrop-blur-sm rounded-3xl mb-8 animate-scale-in hover:scale-110 transition-transform duration-300">
-                            <Building2 className="w-20 h-20 text-white animate-float" />
+                        {/* Logo - Bigger size */}
+                        <div className="inline-flex items-center justify-center bg-white/10 backdrop-blur-sm rounded-3xl p-10 mb-8 animate-scale-in hover:scale-105 transition-transform duration-300">
+                            <img 
+                                src="/images/logo.png" 
+                                alt="Company Logo" 
+                                className="h-32 w-auto object-contain"
+                            />
                         </div>
-                        
-                        <h1 className="text-5xl font-bold text-white mb-4 animate-fade-in-up animation-delay-200">
-                            Your Company
-                        </h1>
+                    
                         <p className="text-xl text-blue-100 max-w-md animate-fade-in-up animation-delay-400">
                             Managing your business operations with ease and efficiency
                         </p>
                         
-                        {/* Stats */}
+                        {/* Stats - Now showing actual user count */}
                         <div className="mt-12 flex items-center justify-center gap-8 text-blue-100 animate-fade-in-up animation-delay-600">
                             <div className="text-center hover:scale-110 transition-transform duration-300">
-                                <div className="text-3xl font-bold">500+</div>
+                                <div className="text-3xl font-bold">{userCount}+</div>
                                 <div className="text-sm">Active Users</div>
-                            </div>
-                            <div className="w-px h-12 bg-blue-400"></div>
-                            <div className="text-center hover:scale-110 transition-transform duration-300">
-                                <div className="text-3xl font-bold">99.9%</div>
-                                <div className="text-sm">Uptime</div>
                             </div>
                             <div className="w-px h-12 bg-blue-400"></div>
                             <div className="text-center hover:scale-110 transition-transform duration-300">
@@ -77,19 +73,35 @@ export default function Login({ status, canResetPassword }) {
                 {/* Right Side - Login Form */}
                 <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50">
                     <div className="w-full max-w-md animate-fade-in-right">
-                        {/* Mobile Logo */}
+                        {/* Mobile Logo - Bigger */}
                         <div className="lg:hidden text-center mb-8">
-                            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4 animate-scale-in">
-                                <Building2 className="w-8 h-8 text-white" />
+                            <div className="inline-flex items-center justify-center bg-white rounded-2xl p-6 mb-4 animate-scale-in shadow-lg">
+                                <img 
+                                    src="/images/logo.png" 
+                                    alt="Company Logo" 
+                                    className="h-16 w-auto object-contain"
+                                />
                             </div>
                         </div>
 
                         <Card className="animate-fade-in animation-delay-200 hover:shadow-xl transition-shadow duration-300">
-                            <CardHeader className="space-y-1">
-                                <CardTitle className="text-3xl font-bold">Welcome Back</CardTitle>
-                                <CardDescription>
-                                    Enter your credentials to access your account
-                                </CardDescription>
+                            <CardHeader className="space-y-4">
+                                {/* Logo in Card Header */}
+                                <div className="flex justify-center">
+                                    <div className="inline-flex items-center justify-center bg-blue-50 rounded-xl p-3">
+                                        <img 
+                                            src="/images/icon.png" 
+                                            alt="Company Logo" 
+                                            className="h-20 w-auto object-contain"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="text-center">
+                                    <CardTitle className="text-3xl font-bold">Welcome Back</CardTitle>
+                                    <CardDescription className="mt-2">
+                                        Enter your credentials to access your account
+                                    </CardDescription>
+                                </div>
                             </CardHeader>
                             
                             <CardContent>
@@ -209,7 +221,7 @@ export default function Login({ status, canResetPassword }) {
                         </Card>
 
                         <p className="text-center text-sm text-gray-500 mt-8 animate-fade-in animation-delay-900">
-                            © 2024 Your Company. All rights reserved.
+                            © 2024 Rocket Partners. All rights reserved.
                         </p>
                     </div>
                 </div>
