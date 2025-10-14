@@ -32,8 +32,13 @@ class RegisteredUserController extends Controller
     {
         $allowedDomains = ['rocketpartners.ph', 'rocketpartners.io'];
         
+        $allowedDomains = ['rocketpartners.ph', 'rocketpartners.io'];
+        
         $request->validate([
-            'name' => 'required|string|max:255',
+            'first_name' => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'suffix' => 'nullable|string|max:10',
             'email' => [
                 'required',
                 'string',
@@ -62,21 +67,36 @@ class RegisteredUserController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
-        $nameParts = explode(' ', trim($request->name), 2);
-        $firstName = $nameParts[0];
-        $lastName = $nameParts[1] ?? '';
+        // Build full name from parts
+        $nameParts = [$request->first_name];
+        if ($request->middle_name) {
+            $nameParts[] = $request->middle_name;
+        }
+        $nameParts[] = $request->last_name;
+        
+        $fullName = implode(' ', $nameParts);
+        
+        // Add suffix if provided and not "none"
+        if ($request->suffix && $request->suffix !== 'none') {
+            $fullName .= ' ' . $request->suffix;
+        }
 
         $user = User::create([
-            'name' => $request->name,
-            'first_name' => $firstName,
-            'last_name' => $lastName,
+            'name' => $fullName,
+            'first_name' => $request->first_name,
+            'middle_name' => $request->middle_name,
+            'last_name' => $request->last_name,
+            'suffix' => $request->suffix === 'none' ? null : $request->suffix,
             'email' => $request->email,
+            'work_email' => $request->email,
             'work_email' => $request->email,
             'password' => Hash::make($request->password),
             'employment_status' => 'active',
-            'account_status' => 'pending', // ✅ NEW: Start as pending
+            'account_status' => 'pending', // ✅ Start as pending
+            'email_verified_at' => now(), // ✅ Auto-verify email for development
         ]);
 
+        event(new Registered($user)); // This sends verification email
         event(new Registered($user)); // This sends verification email
 
         Auth::login($user);

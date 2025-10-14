@@ -5,6 +5,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Badge } from '@/Components/ui/badge';
+import { Alert, AlertDescription } from '@/Components/ui/alert';
 import DeleteConfirmationModal from '@/Components/DeleteConfirmationModal';
 import {
     User as UserIcon,
@@ -25,6 +26,12 @@ import {
     ClipboardList,
     CreditCard,
     Camera,
+    UserCheck,
+    UserX,
+    Clock,
+    XCircle,
+    AlertCircle,
+    Tag,
 } from 'lucide-react';
 
 export default function Show({ auth, user }) {
@@ -38,9 +45,39 @@ export default function Show({ auth, user }) {
         router.delete(route('users.destroy', user.id));
     };
 
-    const canDelete = user.id !== auth.user.id;
+    const handleApprove = () => {
+        router.post(route('users.approve', user.id), {}, {
+            preserveScroll: true,
+        });
+    };
 
-    // Function to get profile picture URL or fallback to initials
+    const handleReject = () => {
+        router.post(route('users.reject', user.id), {}, {
+            preserveScroll: true,
+        });
+    };
+
+    const canDelete = user.id !== auth.user.id;
+    const isPending = user.account_status === 'pending';
+    
+    // Check if current user can approve
+    const canApprove = auth.user.roles?.some(role => 
+        ['super-admin', 'admin', 'hr-manager'].includes(role.slug)
+    );
+
+    const getAccountStatusBadge = (status) => {
+        const styles = {
+            'pending': { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-200', icon: Clock },
+            'active': { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200', icon: CheckCircle2 },
+            'rejected': { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200', icon: XCircle },
+            'suspended': { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200', icon: AlertCircle },
+        };
+        return styles[status] || styles.active;
+    };
+
+    const statusStyle = getAccountStatusBadge(user.account_status);
+    const StatusIcon = statusStyle.icon;
+
     const getProfileDisplay = () => {
         if (user.profile_picture) {
             return (
@@ -74,12 +111,39 @@ export default function Show({ auth, user }) {
                         <div className="flex items-center gap-3">
                             {getProfileDisplay()}
                             <div>
-                                <h2 className="text-3xl font-bold text-gray-900">{user.name}</h2>
+                                <div className="flex items-center gap-2">
+                                    <h2 className="text-3xl font-bold text-gray-900">{user.name}</h2>
+                                    <Badge className={`${statusStyle.bg} ${statusStyle.text} ${statusStyle.border} border flex items-center gap-1.5`}>
+                                        <StatusIcon className="h-3.5 w-3.5" />
+                                        {user.account_status.charAt(0).toUpperCase() + user.account_status.slice(1)}
+                                    </Badge>
+                                </div>
                                 <p className="text-gray-600 mt-1">{user.position || 'Employee'}</p>
                             </div>
                         </div>
                     </div>
                     <div className="flex gap-3">
+                        {/* 🎯 APPROVAL BUTTONS (only for pending users) */}
+                        {canApprove && isPending && (
+                            <>
+                                <Button 
+                                    onClick={handleApprove}
+                                    className="bg-green-600 hover:bg-green-700 text-white"
+                                >
+                                    <UserCheck className="h-4 w-4 mr-2" />
+                                    Approve User
+                                </Button>
+                                <Button 
+                                    onClick={handleReject}
+                                    variant="outline"
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-300"
+                                >
+                                    <UserX className="h-4 w-4 mr-2" />
+                                    Reject User
+                                </Button>
+                            </>
+                        )}
+                        
                         <Button asChild variant="outline">
                             <Link href={route('users.edit', user.id)}>
                                 <Edit className="h-4 w-4 mr-2" />
@@ -97,6 +161,20 @@ export default function Show({ auth, user }) {
             }
         >
             <Head title={user.name} />
+
+            {/* 🎯 PENDING APPROVAL ALERT (top of page) */}
+            {isPending && (
+                <Alert className="mb-6 bg-yellow-50 border-yellow-300 animate-fade-in">
+                    <Clock className="h-5 w-5 text-yellow-600" />
+                    <AlertDescription className="text-yellow-800">
+                        <strong>Account Pending Approval</strong>
+                        <p className="text-sm mt-1">
+                            This user registered on {new Date(user.created_at).toLocaleDateString()} and is waiting for HR approval.
+                            {canApprove && " Review their information below and approve or reject their account."}
+                        </p>
+                    </AlertDescription>
+                </Alert>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Column */}
@@ -260,7 +338,7 @@ export default function Show({ auth, user }) {
                         </Card>
                     )}
 
-                    {/* Emergency Contact - UPDATED SECTION */}
+                    {/* Emergency Contact */}
                     {(user.emergency_contact_name || user.emergency_contact_phone || user.emergency_contact_mobile) && (
                         <Card className="animate-fade-in animation-delay-300">
                             <CardHeader>
@@ -370,7 +448,7 @@ export default function Show({ auth, user }) {
                         </Card>
                     )}
 
-                    {/* Assigned Assets */}
+                    {/* 🎯 UPDATED: Assigned Individual Assets */}
                     <Card className="animate-fade-in animation-delay-400">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
@@ -379,21 +457,41 @@ export default function Show({ auth, user }) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            {user.current_assets && user.current_assets.length > 0 ? (
+                            {user.current_individual_assets && user.current_individual_assets.length > 0 ? (
                                 <div className="space-y-3">
-                                    {user.current_assets.map((assignment) => (
-                                        <div key={assignment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-2 bg-blue-100 rounded-lg">
+                                    {user.current_individual_assets.map((assignment) => (
+                                        <div key={assignment.id} className="flex items-start justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                            <div className="flex items-start gap-3 flex-1">
+                                                <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
                                                     <Package className="h-5 w-5 text-blue-600" />
                                                 </div>
-                                                <div>
-                                                    <p className="font-medium text-gray-900">{assignment.inventory_item.name}</p>
-                                                    <p className="text-sm text-gray-600">{assignment.inventory_item.sku}</p>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="font-medium text-gray-900">
+                                                        {assignment.asset?.inventory_item?.name || 'Unknown Asset'}
+                                                    </p>
+                                                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                        {assignment.asset?.asset_tag && (
+                                                            <Badge variant="outline" className="text-xs">
+                                                                <Tag className="h-3 w-3 mr-1" />
+                                                                {assignment.asset.asset_tag}
+                                                            </Badge>
+                                                        )}
+                                                        {assignment.asset?.serial_number && (
+                                                            <span className="text-xs text-gray-600 font-mono">
+                                                                SN: {assignment.asset.serial_number}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                        {assignment.asset?.inventory_item?.sku}
+                                                    </p>
                                                 </div>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="text-sm text-gray-600">
+                                            <div className="text-right flex-shrink-0 ml-4">
+                                                <Badge className="bg-green-100 text-green-700 border-green-200 border mb-1">
+                                                    {assignment.status}
+                                                </Badge>
+                                                <p className="text-xs text-gray-600">
                                                     Since {new Date(assignment.assigned_date).toLocaleDateString()}
                                                 </p>
                                             </div>
@@ -402,7 +500,7 @@ export default function Show({ auth, user }) {
                                 </div>
                             ) : (
                                 <div className="text-center py-8 text-gray-500">
-                                    <CheckCircle2 className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                                    <Laptop className="h-12 w-12 mx-auto mb-2 text-gray-400" />
                                     <p>No assets currently assigned</p>
                                 </div>
                             )}
@@ -441,6 +539,43 @@ export default function Show({ auth, user }) {
 
                 {/* Sidebar */}
                 <div className="space-y-6">
+                    {/* 🎯 APPROVAL ACTIONS CARD (only for pending users) */}
+                    {canApprove && isPending && (
+                        <Card className="animate-fade-in border-yellow-300 border-2">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-yellow-700">
+                                    <Clock className="h-5 w-5" />
+                                    Approval Required
+                                </CardTitle>
+                                <CardDescription>
+                                    Review and approve or reject this account
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <Button 
+                                    className="w-full bg-green-600 hover:bg-green-700 text-white justify-start"
+                                    onClick={handleApprove}
+                                >
+                                    <UserCheck className="h-5 w-5 mr-2" />
+                                    Approve User
+                                </Button>
+                                <Button 
+                                    variant="outline"
+                                    className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 border-red-300 justify-start"
+                                    onClick={handleReject}
+                                >
+                                    <UserX className="h-5 w-5 mr-2" />
+                                    Reject User
+                                </Button>
+                                <Alert className="bg-blue-50 border-blue-200 mt-4">
+                                    <AlertDescription className="text-blue-800 text-xs">
+                                        <strong>Note:</strong> User will receive an email notification after approval or rejection.
+                                    </AlertDescription>
+                                </Alert>
+                            </CardContent>
+                        </Card>
+                    )}
+
                     {/* Employment Info */}
                     <Card className="animate-fade-in animation-delay-100">
                         <CardHeader>
@@ -477,7 +612,7 @@ export default function Show({ auth, user }) {
                                 </div>
                             )}
                             <div>
-                                <p className="text-sm text-gray-600 mb-1">Status</p>
+                                <p className="text-sm text-gray-600 mb-1">Employment Status</p>
                                 <Badge className={
                                     user.employment_status === 'active' ? 'bg-green-100 text-green-700' :
                                     user.employment_status === 'on_leave' ? 'bg-yellow-100 text-yellow-700' :
@@ -518,7 +653,7 @@ export default function Show({ auth, user }) {
                         </CardContent>
                     </Card>
 
-                    {/* Quick Stats */}
+                    {/* 🎯 UPDATED: Quick Stats */}
                     <Card className="animate-fade-in animation-delay-300">
                         <CardHeader>
                             <CardTitle>Quick Stats</CardTitle>
@@ -530,7 +665,7 @@ export default function Show({ auth, user }) {
                                     <span className="text-sm font-medium text-gray-700">Assigned Assets</span>
                                 </div>
                                 <span className="text-xl font-bold text-gray-900">
-                                    {user.current_assets?.length || 0}
+                                    {user.current_individual_assets?.length || 0}
                                 </span>
                             </div>
 
@@ -563,6 +698,13 @@ export default function Show({ auth, user }) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div>
+                                <p className="text-sm text-gray-600 mb-1">Account Status</p>
+                                <Badge className={`${statusStyle.bg} ${statusStyle.text} ${statusStyle.border} border flex items-center gap-1.5 w-fit`}>
+                                    <StatusIcon className="h-3.5 w-3.5" />
+                                    {user.account_status.charAt(0).toUpperCase() + user.account_status.slice(1)}
+                                </Badge>
+                            </div>
+                            <div>
                                 <p className="text-sm text-gray-600 mb-1">Member Since</p>
                                 <p className="font-medium text-gray-900">
                                     {new Date(user.created_at).toLocaleDateString()}
@@ -574,6 +716,15 @@ export default function Show({ auth, user }) {
                                     {new Date(user.updated_at).toLocaleDateString()}
                                 </p>
                             </div>
+                            {user.approved_at && user.approved_by && (
+                                <div className="pt-3 border-t">
+                                    <p className="text-sm text-gray-600 mb-1">Approved By</p>
+                                    <p className="font-medium text-gray-900">Admin</p>
+                                    <p className="text-xs text-gray-500">
+                                        on {new Date(user.approved_at).toLocaleDateString()}
+                                    </p>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>

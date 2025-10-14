@@ -14,7 +14,8 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::with('roles', 'currentAssets.inventoryItem');
+        // ✅ FIX: Load Individual Assets instead of old Asset Assignments
+        $query = User::with('roles', 'currentIndividualAssets.asset.inventoryItem');
 
         // Search
         if ($request->has('search')) {
@@ -22,22 +23,23 @@ class UserController extends Controller
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%");
+                ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
         // Filter by role
-        if ($request->has('role')) {
+        if ($request->has('role') && $request->role !== 'all') {
             $query->whereHas('roles', function($q) use ($request) {
                 $q->where('roles.id', $request->role);
             });
         }
         
-        // ✅ ADD: Filter by account status
-        if ($request->has('account_status')) {
+        // ✅ Filter by account status
+        if ($request->has('account_status') && $request->account_status !== 'all') {
             $query->where('account_status', $request->account_status);
         }
 
-        // ✅ ADD: Order by pending first, then by newest
+        // ✅ Order by pending first, then by newest
         $users = $query->orderByRaw("FIELD(account_status, 'pending', 'active', 'suspended', 'rejected')")
                     ->latest()
                     ->paginate(15)
@@ -48,6 +50,7 @@ class UserController extends Controller
         return Inertia::render('Users/Index', [
             'users' => $users,
             'roles' => $roles,
+            'filters' => $request->only(['search', 'role', 'account_status']),
             'filters' => $request->only(['search', 'role', 'account_status']),
         ]);
     }
@@ -64,7 +67,7 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB max
+            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
             'first_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name' => 'required|string|max:255',
@@ -150,7 +153,7 @@ class UserController extends Controller
             'position' => $validated['position'],
             'hire_date' => $validated['hire_date'],
             'employment_status' => $validated['employment_status'] ?? 'active',
-            'employment_type' => $validated['employment_type'] ?? 'full_time',
+            'employment_type' => $validated['employment_type'],
             'password' => Hash::make($validated['password']),
         ]);
 
@@ -163,10 +166,11 @@ class UserController extends Controller
 
     public function show(User $user)
     {
+        // ✅ FIX: Load Individual Assets instead of old Asset Assignments
         $user->load([
             'roles', 
-            'currentAssets.inventoryItem.category',
-            'assetAssignments.inventoryItem',
+            'currentIndividualAssets.asset.inventoryItem.category',
+            'individualAssetAssignments.asset.inventoryItem',
             'ownedProjects',
             'assignedTasks.project'
         ]);
@@ -178,6 +182,7 @@ class UserController extends Controller
 
     public function edit(User $user)
     {
+        // ✅ FIX: Load roles relationship
         $user->load('roles');
         $roles = Role::all();
         
@@ -190,7 +195,7 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
-            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB max
+            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
             'first_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name' => 'required|string|max:255',
@@ -231,7 +236,6 @@ class UserController extends Controller
 
         // Handle profile picture upload
         if ($request->hasFile('profile_picture')) {
-            // Delete old picture if exists
             if ($user->profile_picture) {
                 Storage::disk('public')->delete($user->profile_picture);
             }
@@ -283,7 +287,6 @@ class UserController extends Controller
             'password' => $validated['password'] ? Hash::make($validated['password']) : $user->password,
         ];
 
-        // Add profile picture if uploaded
         if (isset($validated['profile_picture'])) {
             $updateData['profile_picture'] = $validated['profile_picture'];
         }
@@ -299,12 +302,10 @@ class UserController extends Controller
 
     public function destroy(User $user)
     {
-        // Prevent deleting yourself
         if ($user->id === auth()->id()) {
             return back()->with('error', 'You cannot delete your own account!');
         }
 
-        // Delete profile picture if exists
         if ($user->profile_picture) {
             Storage::disk('public')->delete($user->profile_picture);
         }
@@ -316,7 +317,6 @@ class UserController extends Controller
 
     public function approve(User $user)
     {
-        // Only allow if user is pending
         if ($user->account_status !== 'pending') {
             return back()->with('error', 'User is not pending approval!');
         }
@@ -334,7 +334,6 @@ class UserController extends Controller
 
     public function reject(User $user)
     {
-        // Only allow if user is pending
         if ($user->account_status !== 'pending') {
             return back()->with('error', 'User is not pending approval!');
         }
@@ -347,5 +346,4 @@ class UserController extends Controller
         
         return back()->with('success', "User {$user->name} has been rejected.");
     }
-
 }

@@ -15,8 +15,9 @@ class CheckAccountStatus
             
             // If account is pending approval
             if ($user->account_status === 'pending') {
-                // Allow access to logout and verification routes only
-                if (!$request->routeIs('logout') && 
+                // ✅ FIX: Allow access to the pending page itself, logout, and verification routes
+                if (!$request->routeIs('account.pending') && 
+                    !$request->routeIs('logout') && 
                     !$request->routeIs('verification.*') && 
                     !str_starts_with($request->path(), 'user/')) {
                     return redirect()->route('account.pending');
@@ -25,9 +26,12 @@ class CheckAccountStatus
             
             // If account is rejected or suspended
             if (in_array($user->account_status, ['rejected', 'suspended'])) {
-                auth()->logout();
-                return redirect()->route('login')
-                    ->with('error', 'Your account has been ' . $user->account_status . '.');
+                // ✅ Don't redirect if already on login page
+                if (!$request->routeIs('login')) {
+                    auth()->logout();
+                    return redirect()->route('login')
+                        ->with('error', 'Your account has been ' . $user->account_status . '.');
+                }
             }
         }
         

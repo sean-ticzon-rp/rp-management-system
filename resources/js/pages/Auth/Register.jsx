@@ -1,5 +1,7 @@
 // resources/js/Pages/Auth/Register.jsx
 import { useState, useEffect } from 'react';
+// resources/js/Pages/Auth/Register.jsx
+import { useState, useEffect } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
@@ -7,9 +9,10 @@ import { Label } from '@/Components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Alert, AlertDescription } from '@/Components/ui/alert';
 import { Progress } from '@/Components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
 import { User, Mail, Lock, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, Shield } from 'lucide-react';
 
-const ALLOWED_EMAIL_DOMAINS = ['@rocketpartners.ph', '@rocketpartners.io']; // Company email domains
+const ALLOWED_EMAIL_DOMAINS = ['@rocketpartners.ph', '@rocketpartners.io'];
 
 export default function Register() {
     const [currentStep, setCurrentStep] = useState(1);
@@ -17,8 +20,16 @@ export default function Register() {
     const [verifying, setVerifying] = useState(false);
     const [emailError, setEmailError] = useState('');
 
+    const [currentStep, setCurrentStep] = useState(1);
+    const [emailVerified, setEmailVerified] = useState(false);
+    const [verifying, setVerifying] = useState(false);
+    const [emailError, setEmailError] = useState('');
+
     const { data, setData, post, processing, errors, reset } = useForm({
-        name: '',
+        first_name: '',
+        middle_name: '',
+        last_name: '',
+        suffix: 'none',
         email: '',
         password: '',
         password_confirmation: '',
@@ -34,10 +45,8 @@ export default function Register() {
     const verifyEmail = async () => {
         setEmailError('');
         
-        // Extract domain from email
         const emailParts = data.email.toLowerCase().split('@');
         
-        // Security check: Email must have exactly 2 parts (user@domain)
         if (emailParts.length !== 2) {
             setEmailError('Invalid email format');
             setEmailVerified(false);
@@ -46,7 +55,6 @@ export default function Register() {
         
         const domain = '@' + emailParts[1];
         
-        // Check if domain matches allowed domains exactly
         const isValidDomain = ALLOWED_EMAIL_DOMAINS.some(allowedDomain => 
             domain === allowedDomain.toLowerCase()
         );
@@ -59,7 +67,6 @@ export default function Register() {
 
         setVerifying(true);
 
-        // TODO: Add real email verification here (send verification code/link)
         setTimeout(() => {
             setEmailVerified(true);
             setVerifying(false);
@@ -74,7 +81,7 @@ export default function Register() {
     const nextStep = () => {
         if (currentStep === 1 && emailVerified) {
             setCurrentStep(2);
-        } else if (currentStep === 2 && data.name) {
+        } else if (currentStep === 2 && data.first_name && data.last_name) {
             setCurrentStep(3);
         }
     };
@@ -87,7 +94,15 @@ export default function Register() {
 
     const progressPercentage = (currentStep / 3) * 100;
 
+    // Get full name for display
+    const getFullName = () => {
+        const parts = [data.first_name, data.middle_name, data.last_name];
+        const name = parts.filter(Boolean).join(' ');
+        return data.suffix && data.suffix !== 'none' ? `${name} ${data.suffix}` : name;
+    };
+
     return (
+        <>
         <>
             <Head title="Register" />
             
@@ -99,7 +114,65 @@ export default function Register() {
                         <div className="absolute top-1/2 -right-24 w-80 h-80 bg-indigo-400/20 rounded-full animate-blob animation-delay-2000"></div>
                         <div className="absolute -bottom-24 left-1/3 w-72 h-72 bg-purple-400/20 rounded-full animate-blob animation-delay-4000"></div>
                     </div>
+            
+            <div className="min-h-screen flex overflow-hidden">
+                {/* Left Side - Branding */}
+                <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 items-center justify-center p-12 relative overflow-hidden">
+                    <div className="absolute inset-0 overflow-hidden">
+                        <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-400/20 rounded-full animate-blob"></div>
+                        <div className="absolute top-1/2 -right-24 w-80 h-80 bg-indigo-400/20 rounded-full animate-blob animation-delay-2000"></div>
+                        <div className="absolute -bottom-24 left-1/3 w-72 h-72 bg-purple-400/20 rounded-full animate-blob animation-delay-4000"></div>
+                    </div>
 
+                    <div className="text-center relative z-10 animate-fade-in-up">
+                        <div className="inline-flex items-center justify-center bg-white/10 backdrop-blur-sm rounded-3xl p-10 mb-8 animate-scale-in hover:scale-105 transition-transform duration-300">
+                            <img 
+                                src="/images/logo.png" 
+                                alt="Company Logo" 
+                                className="h-32 w-auto object-contain"
+                            />
+                        </div>
+                        
+                        <h1 className="text-4xl font-bold text-white mb-4 animate-fade-in-up animation-delay-200">
+                            Join Our Team
+                        </h1>
+                        <p className="text-xl text-blue-100 max-w-md animate-fade-in-up animation-delay-400">
+                            Create your account and start managing your business operations efficiently
+                        </p>
+                        
+                        {/* Registration Steps Indicator */}
+                        <div className="mt-12 space-y-4 text-left max-w-sm mx-auto animate-fade-in-up animation-delay-600">
+                            <div className={`flex items-center gap-3 p-3 rounded-lg transition-all ${currentStep >= 1 ? 'bg-white/20' : 'bg-white/5'}`}>
+                                <div className={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep >= 1 ? 'bg-white text-blue-600' : 'bg-white/20 text-white'} font-bold text-sm`}>
+                                    {currentStep > 1 ? <CheckCircle2 className="h-5 w-5" /> : '1'}
+                                </div>
+                                <div className="text-white">
+                                    <p className="font-medium">Verify Email</p>
+                                    <p className="text-xs text-blue-100">Company email required</p>
+                                </div>
+                            </div>
+
+                            <div className={`flex items-center gap-3 p-3 rounded-lg transition-all ${currentStep >= 2 ? 'bg-white/20' : 'bg-white/5'}`}>
+                                <div className={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep >= 2 ? 'bg-white text-blue-600' : 'bg-white/20 text-white'} font-bold text-sm`}>
+                                    {currentStep > 2 ? <CheckCircle2 className="h-5 w-5" /> : '2'}
+                                </div>
+                                <div className="text-white">
+                                    <p className="font-medium">Your Information</p>
+                                    <p className="text-xs text-blue-100">Name and details</p>
+                                </div>
+                            </div>
+
+                            <div className={`flex items-center gap-3 p-3 rounded-lg transition-all ${currentStep >= 3 ? 'bg-white/20' : 'bg-white/5'}`}>
+                                <div className={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep >= 3 ? 'bg-white text-blue-600' : 'bg-white/20 text-white'} font-bold text-sm`}>
+                                    3
+                                </div>
+                                <div className="text-white">
+                                    <p className="font-medium">Set Password</p>
+                                    <p className="text-xs text-blue-100">Secure your account</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <div className="text-center relative z-10 animate-fade-in-up">
                         <div className="inline-flex items-center justify-center bg-white/10 backdrop-blur-sm rounded-3xl p-10 mb-8 animate-scale-in hover:scale-105 transition-transform duration-300">
                             <img 
@@ -187,7 +260,6 @@ export default function Register() {
                                     </CardDescription>
                                 </div>
                                 
-                                {/* Progress Bar */}
                                 <div className="pt-2">
                                     <Progress value={progressPercentage} className="h-2" />
                                 </div>
@@ -290,28 +362,79 @@ export default function Register() {
                                     {/* STEP 2: Personal Information */}
                                     {currentStep === 2 && (
                                         <div className="space-y-6 animate-fade-in">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="name">Full Name</Label>
-                                                <div className="relative">
-                                                    <User className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                                                    <Input
-                                                        id="name"
-                                                        name="name"
-                                                        value={data.name}
-                                                        className={`pl-10 ${errors.name ? 'border-red-500' : ''}`}
-                                                        autoComplete="name"
-                                                        placeholder="John Doe"
-                                                        onChange={(e) => setData('name', e.target.value)}
-                                                        required
-                                                        autoFocus
-                                                    />
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="first_name">First Name *</Label>
+                                                    <div className="relative">
+                                                        <User className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                                                        <Input
+                                                            id="first_name"
+                                                            name="first_name"
+                                                            value={data.first_name}
+                                                            className={`pl-10 ${errors.first_name ? 'border-red-500' : ''}`}
+                                                            autoComplete="given-name"
+                                                            placeholder="John"
+                                                            onChange={(e) => setData('first_name', e.target.value)}
+                                                            required
+                                                            autoFocus
+                                                        />
+                                                    </div>
+                                                    {errors.first_name && (
+                                                        <p className="text-sm text-red-500 flex items-center gap-1">
+                                                            <AlertCircle className="h-4 w-4" />
+                                                            {errors.first_name}
+                                                        </p>
+                                                    )}
                                                 </div>
-                                                {errors.name && (
-                                                    <p className="text-sm text-red-500 flex items-center gap-1">
-                                                        <AlertCircle className="h-4 w-4" />
-                                                        {errors.name}
-                                                    </p>
-                                                )}
+
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="last_name">Last Name *</Label>
+                                                    <Input
+                                                        id="last_name"
+                                                        name="last_name"
+                                                        value={data.last_name}
+                                                        className={errors.last_name ? 'border-red-500' : ''}
+                                                        autoComplete="family-name"
+                                                        placeholder="Doe"
+                                                        onChange={(e) => setData('last_name', e.target.value)}
+                                                        required
+                                                    />
+                                                    {errors.last_name && (
+                                                        <p className="text-sm text-red-500 flex items-center gap-1">
+                                                            <AlertCircle className="h-4 w-4" />
+                                                            {errors.last_name}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label htmlFor="middle_name">Middle Name (Optional)</Label>
+                                                <Input
+                                                    id="middle_name"
+                                                    name="middle_name"
+                                                    value={data.middle_name}
+                                                    autoComplete="additional-name"
+                                                    placeholder="Optional"
+                                                    onChange={(e) => setData('middle_name', e.target.value)}
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label htmlFor="suffix">Suffix (Optional)</Label>
+                                                <Select value={data.suffix} onValueChange={(value) => setData('suffix', value)}>
+                                                    <SelectTrigger>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">None</SelectItem>
+                                                        <SelectItem value="Jr.">Jr.</SelectItem>
+                                                        <SelectItem value="Sr.">Sr.</SelectItem>
+                                                        <SelectItem value="II">II</SelectItem>
+                                                        <SelectItem value="III">III</SelectItem>
+                                                        <SelectItem value="IV">IV</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
 
                                             <div className="p-4 bg-blue-50 rounded-lg">
@@ -335,7 +458,7 @@ export default function Register() {
                                                 <Button 
                                                     type="button"
                                                     onClick={nextStep}
-                                                    disabled={!data.name}
+                                                    disabled={!data.first_name || !data.last_name}
                                                     className="flex-1 bg-blue-600 hover:bg-blue-700"
                                                 >
                                                     Continue
@@ -404,13 +527,13 @@ export default function Register() {
                                                 <div className="space-y-2 text-sm">
                                                     <div className="flex items-center gap-2">
                                                         <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                                        <span className="text-green-800 font-medium">Email:</span>
-                                                        <span className="text-green-700 font-mono text-xs">{data.email}</span>
+                                                        <span className="text-green-800 font-medium">Name:</span>
+                                                        <span className="text-green-700">{getFullName()}</span>
                                                     </div>
                                                     <div className="flex items-center gap-2">
                                                         <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                                        <span className="text-green-800 font-medium">Name:</span>
-                                                        <span className="text-green-700">{data.name}</span>
+                                                        <span className="text-green-800 font-medium">Email:</span>
+                                                        <span className="text-green-700 font-mono text-xs">{data.email}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -469,7 +592,63 @@ export default function Register() {
                             © 2024 Rocket Partners. All rights reserved.
                         </p>
                     </div>
+                                            <div className="flex gap-3">
+                                                <Button 
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={prevStep}
+                                                    className="flex-1"
+                                                >
+                                                    <ArrowLeft className="h-4 w-4 mr-2" />
+                                                    Back
+                                                </Button>
+                                                <Button 
+                                                    type="submit"
+                                                    disabled={processing || !data.password || !data.password_confirmation}
+                                                    className="flex-1 bg-green-600 hover:bg-green-700"
+                                                >
+                                                    {processing ? (
+                                                        <>
+                                                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                            </svg>
+                                                            Creating Account...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            Create Account
+                                                            <CheckCircle2 className="h-4 w-4 ml-2" />
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                </form>
+
+                                <div className="mt-6 text-center animate-fade-in">
+                                    <p className="text-sm text-gray-600">
+                                        Already have an account?{' '}
+                                        <Link 
+                                            href={route('login')} 
+                                            className="text-blue-600 hover:text-blue-700 font-medium hover:underline transition-colors"
+                                        >
+                                            Sign in
+                                        </Link>
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <p className="text-center text-sm text-gray-500 mt-8 animate-fade-in animation-delay-900">
+                            © 2024 Rocket Partners. All rights reserved.
+                        </p>
+                    </div>
                 </div>
+            </div>
+        </>
             </div>
         </>
     );
