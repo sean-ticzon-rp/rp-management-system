@@ -23,9 +23,9 @@ class UserController extends Controller
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%");
-                ->orWhere('email', 'like', "%{$search}%");
             });
         }
+
 
         // Filter by role
         if ($request->has('role') && $request->role !== 'all') {

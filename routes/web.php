@@ -105,6 +105,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // Inventory
+    Route::post('/inventory/delete-assets', [InventoryController::class, 'deleteSelectedAssets'])->name('inventory.delete-assets');
     Route::resource('inventory', InventoryController::class);
 
     // Users - Import routes MUST come BEFORE resource routes

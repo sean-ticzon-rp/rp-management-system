@@ -86,7 +86,6 @@ class AssetController extends Controller
         ]);
     }
 
-    // Update a specific asset
     public function update(Request $request, Asset $asset)
     {
         $validated = $request->validate([
@@ -102,10 +101,36 @@ class AssetController extends Controller
             'notes' => 'nullable|string',
         ]);
 
+        // ✅ CHECK: If status changed from "Assigned" to something else, auto-return the asset
+        $oldStatus = $asset->status;
+        $newStatus = $validated['status'];
+        
+        if ($oldStatus === 'Assigned' && $newStatus !== 'Assigned') {
+            // Find the active assignment and mark it as returned
+            $activeAssignment = $asset->currentAssignment;
+            
+            if ($activeAssignment) {
+                $activeAssignment->update([
+                    'actual_return_date' => now(),
+                    'status' => 'returned',
+                    'return_notes' => 'Asset status changed to ' . $newStatus . ' via Edit Asset form',
+                    'condition_on_return' => $validated['condition'],
+                ]);
+            }
+        }
+        
+        // ✅ CHECK: If status changed TO "Assigned" but no active assignment exists
+        if ($newStatus === 'Assigned' && !$asset->currentAssignment) {
+            // This shouldn't happen through normal flow, but let's prevent orphaned "Assigned" status
+            return back()->withInput()->with('error', 
+                'Cannot set status to "Assigned" without creating an assignment. Please use the "Assign Asset" feature instead.'
+            );
+        }
+
         $asset->update($validated);
 
         return redirect()->route('individual-assets.index')
-                         ->with('success', 'Asset updated successfully!');
+                        ->with('success', 'Asset updated successfully!');
     }
 
     // Show assign form

@@ -169,15 +169,13 @@ class InventoryController extends Controller
             'asset_type' => 'required|in:consumable,asset',
         ]);
 
-        $inventory->update($validated);
-
-        // If it's an asset type, sync the individual assets with the new quantity
+        // Handle asset quantity changes BEFORE updating
         if ($validated['asset_type'] === 'asset') {
             $currentAssetCount = $inventory->assets()->count();
             $newQuantity = $validated['quantity'];
 
-            // If quantity increased, create more assets
             if ($newQuantity > $currentAssetCount) {
+                // INCREASE: Create more assets
                 $assetsToCreate = $newQuantity - $currentAssetCount;
                 
                 for ($i = 1; $i <= $assetsToCreate; $i++) {
@@ -186,8 +184,8 @@ class InventoryController extends Controller
                     \App\Models\Asset::create([
                         'inventory_item_id' => $inventory->id,
                         'asset_tag' => 'ASSET-' . $inventory->id . '-' . str_pad($assetNumber, 3, '0', STR_PAD_LEFT),
-                        'serial_number' => null,  // HR will enter manually
-                        'barcode' => null,  // HR will enter manually
+                        'serial_number' => null,
+                        'barcode' => null,
                         'purchase_date' => $validated['purchase_date'],
                         'purchase_price' => $validated['unit_price'],
                         'warranty_expiry' => $validated['warranty_expiry'],
@@ -197,25 +195,122 @@ class InventoryController extends Controller
                         'notes' => "Placeholder asset #{$assetNumber} - Please add serial number and barcode",
                     ]);
                 }
+                
+                $message = "Inventory updated! Added {$assetsToCreate} new placeholder asset(s). Total: {$newQuantity}";
+                
+            } elseif ($newQuantity < $currentAssetCount) {
+                // DECREASE: Try to auto-delete placeholder assets
+                $assetsToRemove = $currentAssetCount - $newQuantity;
+                
+                // Find empty placeholder assets (safe to delete)
+                $placeholderAssets = $inventory->assets()
+                    ->where('status', 'Available')
+                    ->whereNull('serial_number')
+                    ->whereNull('barcode')
+                    ->limit($assetsToRemove)
+                    ->get();
+                
+                // Check if we have enough placeholders to delete
+                if ($placeholderAssets->count() < $assetsToRemove) {
+                    $assetsWithData = $currentAssetCount - $placeholderAssets->count();
+                    
+                    return back()->withInput()->with('error', 
+                        "Cannot reduce quantity from {$currentAssetCount} to {$newQuantity}. " .
+                        "Only {$placeholderAssets->count()} empty placeholder(s) available to remove. " .
+                        "{$assetsWithData} asset(s) have serial numbers, barcodes, or are assigned. " .
+                        "Please delete specific assets from the 'View Details' page using selective delete."
+                    );
+                }
+                
+                // Safe to delete - all are empty placeholders
+                foreach ($placeholderAssets as $asset) {
+                    $asset->delete();
+                }
+                
+                $message = "Inventory updated! Removed {$placeholderAssets->count()} placeholder asset(s). Total: {$newQuantity}";
+                
+            } else {
+                // Same quantity - no asset changes needed
+                $message = 'Inventory item updated successfully!';
             }
-            // If quantity decreased, we DON'T automatically delete assets (to prevent data loss)
-            // Admin can manually delete individual assets if needed
+        } else {
+            // Consumable type - quantity is manual input
+            $message = 'Inventory item updated successfully!';
         }
 
-        $message = 'Inventory item updated successfully!';
-        
-        if ($validated['asset_type'] === 'asset') {
-            $currentCount = $inventory->assets()->count();
-            $message .= " (Total individual assets: {$currentCount})";
-        }
+        $inventory->update($validated);
 
         return redirect()->route('inventory.index')->with('success', $message);
     }
 
     public function destroy(InventoryItem $inventory)
     {
+        // Check if this item has individual assets
+        if ($inventory->asset_type === 'asset') {
+            $totalAssets = $inventory->assets()->count();
+            
+            if ($totalAssets > 0) {
+                // Check for ANY assigned assets
+                $assignedCount = $inventory->assets()
+                    ->where('status', 'Assigned')
+                    ->count();
+                
+                if ($assignedCount > 0) {
+                    return back()->with('error', 
+                        "Cannot delete '{$inventory->name}'. {$assignedCount} asset(s) are currently assigned to users. Please return them first."
+                    );
+                }
+                
+                // All assets are unassigned - safe to delete everything
+                // This includes both empty placeholders AND assets with serial/barcode
+                $inventory->assets()->delete();
+            }
+        }
+        
         $inventory->delete();
+        
+        return redirect()->route('inventory.index')
+                         ->with('success', 'Inventory item and all associated assets deleted successfully!');
+    }
 
-        return redirect()->route('inventory.index')->with('success', 'Inventory item deleted successfully!');
+    /**
+     * Delete selected individual assets (AJAX endpoint)
+     * Only deletes assets that are NOT assigned to users
+     * Assets can have serial numbers or barcodes and still be deleted if unassigned
+     */
+    public function deleteSelectedAssets(Request $request)
+    {
+        $validated = $request->validate([
+            'asset_ids' => 'required|array',
+            'asset_ids.*' => 'required|exists:assets,id'
+        ]);
+
+        // Get the assets
+        $assets = \App\Models\Asset::whereIn('id', $validated['asset_ids'])->get();
+
+        // Verify all assets are deletable (NOT assigned to users)
+        $assignedAssets = $assets->filter(function ($asset) {
+            return $asset->status === 'Assigned';
+        });
+
+        if ($assignedAssets->count() > 0) {
+            return back()->with('error', 
+                'Cannot delete selected assets. ' . $assignedAssets->count() . ' asset(s) are currently assigned to users. Please return them first.'
+            );
+        }
+
+        // Get the inventory item to update quantity
+        $inventoryItem = $assets->first()->inventoryItem;
+        $deletedCount = $assets->count();
+
+        // Delete the assets (they're all unassigned)
+        \App\Models\Asset::whereIn('id', $validated['asset_ids'])->delete();
+
+        // Update the inventory quantity
+        $inventoryItem->decrement('quantity', $deletedCount);
+
+        return back()->with('success', 
+            "Successfully deleted {$deletedCount} asset(s). Inventory quantity updated to {$inventoryItem->fresh()->quantity}."
+        );
     }
 }
