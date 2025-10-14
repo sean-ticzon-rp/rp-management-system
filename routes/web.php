@@ -43,6 +43,36 @@ Route::prefix('api')->name('api.')->group(function () {
     
 });
 
+// ============================================
+// API Routes for Postman Testing (JSON Responses)
+// ============================================
+Route::prefix('api')->name('api.')->group(function () {
+    
+    // Get all inventory items
+    Route::get('/inventory', function () {
+        $items = \App\Models\InventoryItem::with(['category', 'creator', 'assets'])
+            ->get();
+        
+        return response()->json([
+            'success' => true,
+            'count' => $items->count(),
+            'data' => $items
+        ]);
+    })->name('inventory.index');
+    
+    // Get single inventory item by ID
+    Route::get('/inventory/{id}', function ($id) {
+        $item = \App\Models\InventoryItem::with(['category', 'creator', 'assets.currentAssignment.user'])
+            ->findOrFail($id);
+        
+        return response()->json([
+            'success' => true,
+            'data' => $item
+        ]);
+    })->name('inventory.show');
+    
+});
+
 Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
@@ -102,6 +132,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // Individual Assets (NEW system - tracks specific physical items)
+    // ✅ IMPORTANT: Specific routes MUST come BEFORE dynamic {asset} routes
     Route::prefix('individual-assets')->name('individual-assets.')->group(function () {
         Route::get('/', [AssetController::class, 'index'])->name('index');
         

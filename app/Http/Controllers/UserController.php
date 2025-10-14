@@ -23,6 +23,7 @@ class UserController extends Controller
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%");
+                ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
@@ -49,6 +50,7 @@ class UserController extends Controller
         return Inertia::render('Users/Index', [
             'users' => $users,
             'roles' => $roles,
+            'filters' => $request->only(['search', 'role', 'account_status']),
             'filters' => $request->only(['search', 'role', 'account_status']),
         ]);
     }

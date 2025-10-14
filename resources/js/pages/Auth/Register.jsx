@@ -1,5 +1,7 @@
 // resources/js/Pages/Auth/Register.jsx
 import { useState, useEffect } from 'react';
+// resources/js/Pages/Auth/Register.jsx
+import { useState, useEffect } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
@@ -13,6 +15,11 @@ import { User, Mail, Lock, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, Shi
 const ALLOWED_EMAIL_DOMAINS = ['@rocketpartners.ph', '@rocketpartners.io'];
 
 export default function Register() {
+    const [currentStep, setCurrentStep] = useState(1);
+    const [emailVerified, setEmailVerified] = useState(false);
+    const [verifying, setVerifying] = useState(false);
+    const [emailError, setEmailError] = useState('');
+
     const [currentStep, setCurrentStep] = useState(1);
     const [emailVerified, setEmailVerified] = useState(false);
     const [verifying, setVerifying] = useState(false);
@@ -96,6 +103,7 @@ export default function Register() {
 
     return (
         <>
+        <>
             <Head title="Register" />
             
             <div className="min-h-screen flex overflow-hidden">
@@ -106,7 +114,65 @@ export default function Register() {
                         <div className="absolute top-1/2 -right-24 w-80 h-80 bg-indigo-400/20 rounded-full animate-blob animation-delay-2000"></div>
                         <div className="absolute -bottom-24 left-1/3 w-72 h-72 bg-purple-400/20 rounded-full animate-blob animation-delay-4000"></div>
                     </div>
+            
+            <div className="min-h-screen flex overflow-hidden">
+                {/* Left Side - Branding */}
+                <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 items-center justify-center p-12 relative overflow-hidden">
+                    <div className="absolute inset-0 overflow-hidden">
+                        <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-400/20 rounded-full animate-blob"></div>
+                        <div className="absolute top-1/2 -right-24 w-80 h-80 bg-indigo-400/20 rounded-full animate-blob animation-delay-2000"></div>
+                        <div className="absolute -bottom-24 left-1/3 w-72 h-72 bg-purple-400/20 rounded-full animate-blob animation-delay-4000"></div>
+                    </div>
 
+                    <div className="text-center relative z-10 animate-fade-in-up">
+                        <div className="inline-flex items-center justify-center bg-white/10 backdrop-blur-sm rounded-3xl p-10 mb-8 animate-scale-in hover:scale-105 transition-transform duration-300">
+                            <img 
+                                src="/images/logo.png" 
+                                alt="Company Logo" 
+                                className="h-32 w-auto object-contain"
+                            />
+                        </div>
+                        
+                        <h1 className="text-4xl font-bold text-white mb-4 animate-fade-in-up animation-delay-200">
+                            Join Our Team
+                        </h1>
+                        <p className="text-xl text-blue-100 max-w-md animate-fade-in-up animation-delay-400">
+                            Create your account and start managing your business operations efficiently
+                        </p>
+                        
+                        {/* Registration Steps Indicator */}
+                        <div className="mt-12 space-y-4 text-left max-w-sm mx-auto animate-fade-in-up animation-delay-600">
+                            <div className={`flex items-center gap-3 p-3 rounded-lg transition-all ${currentStep >= 1 ? 'bg-white/20' : 'bg-white/5'}`}>
+                                <div className={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep >= 1 ? 'bg-white text-blue-600' : 'bg-white/20 text-white'} font-bold text-sm`}>
+                                    {currentStep > 1 ? <CheckCircle2 className="h-5 w-5" /> : '1'}
+                                </div>
+                                <div className="text-white">
+                                    <p className="font-medium">Verify Email</p>
+                                    <p className="text-xs text-blue-100">Company email required</p>
+                                </div>
+                            </div>
+
+                            <div className={`flex items-center gap-3 p-3 rounded-lg transition-all ${currentStep >= 2 ? 'bg-white/20' : 'bg-white/5'}`}>
+                                <div className={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep >= 2 ? 'bg-white text-blue-600' : 'bg-white/20 text-white'} font-bold text-sm`}>
+                                    {currentStep > 2 ? <CheckCircle2 className="h-5 w-5" /> : '2'}
+                                </div>
+                                <div className="text-white">
+                                    <p className="font-medium">Your Information</p>
+                                    <p className="text-xs text-blue-100">Name and details</p>
+                                </div>
+                            </div>
+
+                            <div className={`flex items-center gap-3 p-3 rounded-lg transition-all ${currentStep >= 3 ? 'bg-white/20' : 'bg-white/5'}`}>
+                                <div className={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep >= 3 ? 'bg-white text-blue-600' : 'bg-white/20 text-white'} font-bold text-sm`}>
+                                    3
+                                </div>
+                                <div className="text-white">
+                                    <p className="font-medium">Set Password</p>
+                                    <p className="text-xs text-blue-100">Secure your account</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <div className="text-center relative z-10 animate-fade-in-up">
                         <div className="inline-flex items-center justify-center bg-white/10 backdrop-blur-sm rounded-3xl p-10 mb-8 animate-scale-in hover:scale-105 transition-transform duration-300">
                             <img 
@@ -526,7 +592,63 @@ export default function Register() {
                             © 2024 Rocket Partners. All rights reserved.
                         </p>
                     </div>
+                                            <div className="flex gap-3">
+                                                <Button 
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={prevStep}
+                                                    className="flex-1"
+                                                >
+                                                    <ArrowLeft className="h-4 w-4 mr-2" />
+                                                    Back
+                                                </Button>
+                                                <Button 
+                                                    type="submit"
+                                                    disabled={processing || !data.password || !data.password_confirmation}
+                                                    className="flex-1 bg-green-600 hover:bg-green-700"
+                                                >
+                                                    {processing ? (
+                                                        <>
+                                                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                            </svg>
+                                                            Creating Account...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            Create Account
+                                                            <CheckCircle2 className="h-4 w-4 ml-2" />
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                </form>
+
+                                <div className="mt-6 text-center animate-fade-in">
+                                    <p className="text-sm text-gray-600">
+                                        Already have an account?{' '}
+                                        <Link 
+                                            href={route('login')} 
+                                            className="text-blue-600 hover:text-blue-700 font-medium hover:underline transition-colors"
+                                        >
+                                            Sign in
+                                        </Link>
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <p className="text-center text-sm text-gray-500 mt-8 animate-fade-in animation-delay-900">
+                            © 2024 Rocket Partners. All rights reserved.
+                        </p>
+                    </div>
                 </div>
+            </div>
+        </>
             </div>
         </>
     );

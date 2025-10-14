@@ -32,6 +32,8 @@ class RegisteredUserController extends Controller
     {
         $allowedDomains = ['rocketpartners.ph', 'rocketpartners.io'];
         
+        $allowedDomains = ['rocketpartners.ph', 'rocketpartners.io'];
+        
         $request->validate([
             'first_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
@@ -87,12 +89,14 @@ class RegisteredUserController extends Controller
             'suffix' => $request->suffix === 'none' ? null : $request->suffix,
             'email' => $request->email,
             'work_email' => $request->email,
+            'work_email' => $request->email,
             'password' => Hash::make($request->password),
             'employment_status' => 'active',
             'account_status' => 'pending', // ✅ Start as pending
             'email_verified_at' => now(), // ✅ Auto-verify email for development
         ]);
 
+        event(new Registered($user)); // This sends verification email
         event(new Registered($user)); // This sends verification email
 
         Auth::login($user);
