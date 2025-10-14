@@ -14,8 +14,8 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        // ✅ FIX: Load roles relationship
-        $query = User::with('roles', 'currentAssets.inventoryItem');
+        // ✅ FIX: Load Individual Assets instead of old Asset Assignments
+        $query = User::with('roles', 'currentIndividualAssets.asset.inventoryItem');
 
         // Search
         if ($request->has('search')) {
@@ -164,11 +164,11 @@ class UserController extends Controller
 
     public function show(User $user)
     {
-        // ✅ FIX: Load roles relationship
+        // ✅ FIX: Load Individual Assets instead of old Asset Assignments
         $user->load([
             'roles', 
-            'currentAssets.inventoryItem.category',
-            'assetAssignments.inventoryItem',
+            'currentIndividualAssets.asset.inventoryItem.category',
+            'individualAssetAssignments.asset.inventoryItem',
             'ownedProjects',
             'assignedTasks.project'
         ]);

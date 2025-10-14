@@ -31,6 +31,7 @@ import {
     Clock,
     XCircle,
     AlertCircle,
+    Tag,
 } from 'lucide-react';
 
 export default function Show({ auth, user }) {
@@ -447,7 +448,7 @@ export default function Show({ auth, user }) {
                         </Card>
                     )}
 
-                    {/* Assigned Assets */}
+                    {/* 🎯 UPDATED: Assigned Individual Assets */}
                     <Card className="animate-fade-in animation-delay-400">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
@@ -456,21 +457,41 @@ export default function Show({ auth, user }) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            {user.current_assets && user.current_assets.length > 0 ? (
+                            {user.current_individual_assets && user.current_individual_assets.length > 0 ? (
                                 <div className="space-y-3">
-                                    {user.current_assets.map((assignment) => (
-                                        <div key={assignment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-2 bg-blue-100 rounded-lg">
+                                    {user.current_individual_assets.map((assignment) => (
+                                        <div key={assignment.id} className="flex items-start justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                            <div className="flex items-start gap-3 flex-1">
+                                                <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
                                                     <Package className="h-5 w-5 text-blue-600" />
                                                 </div>
-                                                <div>
-                                                    <p className="font-medium text-gray-900">{assignment.inventory_item.name}</p>
-                                                    <p className="text-sm text-gray-600">{assignment.inventory_item.sku}</p>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="font-medium text-gray-900">
+                                                        {assignment.asset?.inventory_item?.name || 'Unknown Asset'}
+                                                    </p>
+                                                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                        {assignment.asset?.asset_tag && (
+                                                            <Badge variant="outline" className="text-xs">
+                                                                <Tag className="h-3 w-3 mr-1" />
+                                                                {assignment.asset.asset_tag}
+                                                            </Badge>
+                                                        )}
+                                                        {assignment.asset?.serial_number && (
+                                                            <span className="text-xs text-gray-600 font-mono">
+                                                                SN: {assignment.asset.serial_number}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                        {assignment.asset?.inventory_item?.sku}
+                                                    </p>
                                                 </div>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="text-sm text-gray-600">
+                                            <div className="text-right flex-shrink-0 ml-4">
+                                                <Badge className="bg-green-100 text-green-700 border-green-200 border mb-1">
+                                                    {assignment.status}
+                                                </Badge>
+                                                <p className="text-xs text-gray-600">
                                                     Since {new Date(assignment.assigned_date).toLocaleDateString()}
                                                 </p>
                                             </div>
@@ -479,7 +500,7 @@ export default function Show({ auth, user }) {
                                 </div>
                             ) : (
                                 <div className="text-center py-8 text-gray-500">
-                                    <CheckCircle2 className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                                    <Laptop className="h-12 w-12 mx-auto mb-2 text-gray-400" />
                                     <p>No assets currently assigned</p>
                                 </div>
                             )}
@@ -632,7 +653,7 @@ export default function Show({ auth, user }) {
                         </CardContent>
                     </Card>
 
-                    {/* Quick Stats */}
+                    {/* 🎯 UPDATED: Quick Stats */}
                     <Card className="animate-fade-in animation-delay-300">
                         <CardHeader>
                             <CardTitle>Quick Stats</CardTitle>
@@ -644,7 +665,7 @@ export default function Show({ auth, user }) {
                                     <span className="text-sm font-medium text-gray-700">Assigned Assets</span>
                                 </div>
                                 <span className="text-xl font-bold text-gray-900">
-                                    {user.current_assets?.length || 0}
+                                    {user.current_individual_assets?.length || 0}
                                 </span>
                             </div>
 

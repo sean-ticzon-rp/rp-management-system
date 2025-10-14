@@ -433,7 +433,7 @@ export default function Index({ auth, users, roles, filters }) {
                                                         <div className="flex items-center justify-center gap-2">
                                                             <Laptop className="h-4 w-4 text-gray-400" />
                                                             <span className="text-sm font-semibold text-gray-900">
-                                                                {user.current_assets?.length || 0}
+                                                                {user.current_individual_assets?.length || 0}
                                                             </span>
                                                         </div>
                                                     </TableCell>
@@ -651,7 +651,7 @@ export default function Index({ auth, users, roles, filters }) {
                                                     <span className="text-sm text-gray-700">Assets</span>
                                                 </div>
                                                 <span className="text-lg font-bold text-gray-900">
-                                                    {user.current_assets?.length || 0}
+                                                    {user.current_individual_assets?.length || 0}
                                                 </span>
                                             </div>
 
