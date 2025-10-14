@@ -119,10 +119,6 @@ export default function AuthenticatedLayout({ header, children }) {
                                     <DropdownMenuLabel>My Account</DropdownMenuLabel>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem asChild>
-                                        <Link href={route('profile.edit')} className="cursor-pointer">
-                                            <User className="mr-2 h-4 w-4" />
-                                            <span>Profile</span>
-                                        </Link>
                                     </DropdownMenuItem>
                                     <DropdownMenuItem asChild>
                                         <Link href={route('settings.index')} className="cursor-pointer">

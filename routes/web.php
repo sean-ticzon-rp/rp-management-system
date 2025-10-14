@@ -57,7 +57,7 @@ Route::middleware('auth')->get('/account/pending', function () {
     return Inertia::render('Auth/PendingApproval');
 })->name('account.pending');
 
-Route::middleware(['auth', 'verified'])->group(function () { // ✅ ADD 'verified'
+Route::middleware(['auth', 'verified'])->group(function () {
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
@@ -80,6 +80,11 @@ Route::middleware(['auth', 'verified'])->group(function () { // ✅ ADD 'verifie
     // Users - Import routes MUST come BEFORE resource routes
     Route::get('/users/import', [UserImportController::class, 'show'])->name('users.import');
     Route::post('/users/import', [UserImportController::class, 'import'])->name('users.import.store');
+    
+    // ✅ NEW: User Approval Routes (BEFORE resource routes)
+    Route::post('/users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
+    Route::post('/users/{user}/reject', [UserController::class, 'reject'])->name('users.reject');
+    
     Route::resource('users', UserController::class);
 
     // Projects
@@ -97,25 +102,20 @@ Route::middleware(['auth', 'verified'])->group(function () { // ✅ ADD 'verifie
     });
 
     // Individual Assets (NEW system - tracks specific physical items)
-    // ✅ IMPORTANT: Specific routes MUST come BEFORE dynamic {asset} routes
     Route::prefix('individual-assets')->name('individual-assets.')->group(function () {
         Route::get('/', [AssetController::class, 'index'])->name('index');
         
-        // ✅ SPECIFIC ROUTES FIRST (these have exact paths)
+        // Specific routes FIRST
         Route::get('/assign/{asset?}', [AssetController::class, 'assignForm'])->name('assign');
         Route::post('/assign', [AssetController::class, 'assign'])->name('store-assignment');
         Route::post('/lookup', [AssetController::class, 'lookup'])->name('lookup');
         
-        // ✅ DYNAMIC ROUTES LAST (these use {asset} parameter and catch everything else)
+        // Dynamic routes LAST
         Route::get('/{asset}/edit', [AssetController::class, 'edit'])->name('edit');
         Route::put('/{asset}', [AssetController::class, 'update'])->name('update');
         Route::post('/{assignment}/return', [AssetController::class, 'return'])->name('return');
         Route::get('/{asset}', [AssetController::class, 'show'])->name('show');
-
-        // User Approval Routes (only for HR/Admin)
-        Route::post('/users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
-        Route::post('/users/{user}/reject', [UserController::class, 'reject'])->name('users.reject');
-     });
+    });
 });
 
 require __DIR__.'/auth.php';

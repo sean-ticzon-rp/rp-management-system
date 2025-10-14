@@ -7,9 +7,10 @@ import { Label } from '@/Components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Alert, AlertDescription } from '@/Components/ui/alert';
 import { Progress } from '@/Components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
 import { User, Mail, Lock, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, Shield } from 'lucide-react';
 
-const ALLOWED_EMAIL_DOMAINS = ['@rocketpartners.ph', '@rocketpartners.io']; // Company email domains
+const ALLOWED_EMAIL_DOMAINS = ['@rocketpartners.ph', '@rocketpartners.io'];
 
 export default function Register() {
     const [currentStep, setCurrentStep] = useState(1);
@@ -18,7 +19,10 @@ export default function Register() {
     const [emailError, setEmailError] = useState('');
 
     const { data, setData, post, processing, errors, reset } = useForm({
-        name: '',
+        first_name: '',
+        middle_name: '',
+        last_name: '',
+        suffix: 'none',
         email: '',
         password: '',
         password_confirmation: '',
@@ -34,10 +38,8 @@ export default function Register() {
     const verifyEmail = async () => {
         setEmailError('');
         
-        // Extract domain from email
         const emailParts = data.email.toLowerCase().split('@');
         
-        // Security check: Email must have exactly 2 parts (user@domain)
         if (emailParts.length !== 2) {
             setEmailError('Invalid email format');
             setEmailVerified(false);
@@ -46,7 +48,6 @@ export default function Register() {
         
         const domain = '@' + emailParts[1];
         
-        // Check if domain matches allowed domains exactly
         const isValidDomain = ALLOWED_EMAIL_DOMAINS.some(allowedDomain => 
             domain === allowedDomain.toLowerCase()
         );
@@ -59,7 +60,6 @@ export default function Register() {
 
         setVerifying(true);
 
-        // TODO: Add real email verification here (send verification code/link)
         setTimeout(() => {
             setEmailVerified(true);
             setVerifying(false);
@@ -74,7 +74,7 @@ export default function Register() {
     const nextStep = () => {
         if (currentStep === 1 && emailVerified) {
             setCurrentStep(2);
-        } else if (currentStep === 2 && data.name) {
+        } else if (currentStep === 2 && data.first_name && data.last_name) {
             setCurrentStep(3);
         }
     };
@@ -86,6 +86,13 @@ export default function Register() {
     };
 
     const progressPercentage = (currentStep / 3) * 100;
+
+    // Get full name for display
+    const getFullName = () => {
+        const parts = [data.first_name, data.middle_name, data.last_name];
+        const name = parts.filter(Boolean).join(' ');
+        return data.suffix && data.suffix !== 'none' ? `${name} ${data.suffix}` : name;
+    };
 
     return (
         <>
@@ -187,7 +194,6 @@ export default function Register() {
                                     </CardDescription>
                                 </div>
                                 
-                                {/* Progress Bar */}
                                 <div className="pt-2">
                                     <Progress value={progressPercentage} className="h-2" />
                                 </div>
@@ -290,28 +296,79 @@ export default function Register() {
                                     {/* STEP 2: Personal Information */}
                                     {currentStep === 2 && (
                                         <div className="space-y-6 animate-fade-in">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="name">Full Name</Label>
-                                                <div className="relative">
-                                                    <User className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                                                    <Input
-                                                        id="name"
-                                                        name="name"
-                                                        value={data.name}
-                                                        className={`pl-10 ${errors.name ? 'border-red-500' : ''}`}
-                                                        autoComplete="name"
-                                                        placeholder="John Doe"
-                                                        onChange={(e) => setData('name', e.target.value)}
-                                                        required
-                                                        autoFocus
-                                                    />
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="first_name">First Name *</Label>
+                                                    <div className="relative">
+                                                        <User className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                                                        <Input
+                                                            id="first_name"
+                                                            name="first_name"
+                                                            value={data.first_name}
+                                                            className={`pl-10 ${errors.first_name ? 'border-red-500' : ''}`}
+                                                            autoComplete="given-name"
+                                                            placeholder="John"
+                                                            onChange={(e) => setData('first_name', e.target.value)}
+                                                            required
+                                                            autoFocus
+                                                        />
+                                                    </div>
+                                                    {errors.first_name && (
+                                                        <p className="text-sm text-red-500 flex items-center gap-1">
+                                                            <AlertCircle className="h-4 w-4" />
+                                                            {errors.first_name}
+                                                        </p>
+                                                    )}
                                                 </div>
-                                                {errors.name && (
-                                                    <p className="text-sm text-red-500 flex items-center gap-1">
-                                                        <AlertCircle className="h-4 w-4" />
-                                                        {errors.name}
-                                                    </p>
-                                                )}
+
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="last_name">Last Name *</Label>
+                                                    <Input
+                                                        id="last_name"
+                                                        name="last_name"
+                                                        value={data.last_name}
+                                                        className={errors.last_name ? 'border-red-500' : ''}
+                                                        autoComplete="family-name"
+                                                        placeholder="Doe"
+                                                        onChange={(e) => setData('last_name', e.target.value)}
+                                                        required
+                                                    />
+                                                    {errors.last_name && (
+                                                        <p className="text-sm text-red-500 flex items-center gap-1">
+                                                            <AlertCircle className="h-4 w-4" />
+                                                            {errors.last_name}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label htmlFor="middle_name">Middle Name (Optional)</Label>
+                                                <Input
+                                                    id="middle_name"
+                                                    name="middle_name"
+                                                    value={data.middle_name}
+                                                    autoComplete="additional-name"
+                                                    placeholder="Optional"
+                                                    onChange={(e) => setData('middle_name', e.target.value)}
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label htmlFor="suffix">Suffix (Optional)</Label>
+                                                <Select value={data.suffix} onValueChange={(value) => setData('suffix', value)}>
+                                                    <SelectTrigger>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">None</SelectItem>
+                                                        <SelectItem value="Jr.">Jr.</SelectItem>
+                                                        <SelectItem value="Sr.">Sr.</SelectItem>
+                                                        <SelectItem value="II">II</SelectItem>
+                                                        <SelectItem value="III">III</SelectItem>
+                                                        <SelectItem value="IV">IV</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
 
                                             <div className="p-4 bg-blue-50 rounded-lg">
@@ -335,7 +392,7 @@ export default function Register() {
                                                 <Button 
                                                     type="button"
                                                     onClick={nextStep}
-                                                    disabled={!data.name}
+                                                    disabled={!data.first_name || !data.last_name}
                                                     className="flex-1 bg-blue-600 hover:bg-blue-700"
                                                 >
                                                     Continue
@@ -404,13 +461,13 @@ export default function Register() {
                                                 <div className="space-y-2 text-sm">
                                                     <div className="flex items-center gap-2">
                                                         <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                                        <span className="text-green-800 font-medium">Email:</span>
-                                                        <span className="text-green-700 font-mono text-xs">{data.email}</span>
+                                                        <span className="text-green-800 font-medium">Name:</span>
+                                                        <span className="text-green-700">{getFullName()}</span>
                                                     </div>
                                                     <div className="flex items-center gap-2">
                                                         <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                                        <span className="text-green-800 font-medium">Name:</span>
-                                                        <span className="text-green-700">{data.name}</span>
+                                                        <span className="text-green-800 font-medium">Email:</span>
+                                                        <span className="text-green-700 font-mono text-xs">{data.email}</span>
                                                     </div>
                                                 </div>
                                             </div>
