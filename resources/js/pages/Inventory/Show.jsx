@@ -5,6 +5,9 @@ import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Badge } from '@/Components/ui/badge';
+import { Alert, AlertDescription } from '@/Components/ui/alert';
+import { Checkbox } from '@/Components/ui/checkbox';
+import { Label } from '@/Components/ui/label';
 import DeleteConfirmationModal from '@/Components/DeleteConfirmationModal';
 
 import {
@@ -26,10 +29,21 @@ import {
     Laptop,
     Barcode,
     UserPlus,
+    Lock,
+    AlertCircle,
+    X,
 } from 'lucide-react';
 
 export default function Show({ auth, item }) {
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [selectedAssets, setSelectedAssets] = useState([]);
+    const [deleteSelectedModalOpen, setDeleteSelectedModalOpen] = useState(false);
+
+    // Get list of assets that CAN be deleted (NOT assigned to users)
+    // Assets with serial numbers or barcodes can be deleted if unassigned
+    const selectableAssets = item.assets?.filter(asset => 
+        asset.status !== 'Assigned'
+    ) || [];
 
     const handleDelete = () => {
         setDeleteModalOpen(true);
@@ -37,6 +51,34 @@ export default function Show({ auth, item }) {
 
     const confirmDelete = () => {
         router.delete(route('inventory.destroy', item.id));
+    };
+
+    const handleAssetToggle = (assetId) => {
+        setSelectedAssets(prev => 
+            prev.includes(assetId) 
+                ? prev.filter(id => id !== assetId)
+                : [...prev, assetId]
+        );
+    };
+
+    const handleSelectAll = (checked) => {
+        if (checked) {
+            setSelectedAssets(selectableAssets.map(a => a.id));
+        } else {
+            setSelectedAssets([]);
+        }
+    };
+
+    const handleDeleteSelected = () => {
+        router.post(route('inventory.delete-assets'), {
+            asset_ids: selectedAssets
+        }, {
+            onSuccess: () => {
+                setSelectedAssets([]);
+                setDeleteSelectedModalOpen(false);
+            },
+            preserveScroll: true,
+        });
     };
 
     const getStatusBadge = (status) => {
@@ -219,77 +261,174 @@ export default function Show({ auth, item }) {
                         </CardContent>
                     </Card>
 
-                    {/* Individual Assets - NEW SECTION */}
+                    {/* Individual Assets - UPDATED: Allow deleting any unassigned asset */}
                     {item.asset_type === 'asset' && item.assets && item.assets.length > 0 && (
                         <Card className="animate-fade-in animation-delay-150">
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <CardTitle className="flex items-center gap-2">
                                         <Laptop className="h-5 w-5" />
-                                        Individual Assets
+                                        Individual Assets ({item.assets.length})
                                     </CardTitle>
-                                    <Button asChild size="sm" variant="outline">
-                                        <Link href={route('individual-assets.index', { inventory_item_id: item.id })}>
-                                            View All ({item.assets.length})
-                                        </Link>
-                                    </Button>
+                                    <div className="flex items-center gap-2">
+                                        {selectedAssets.length > 0 && (
+                                            <>
+                                                <span className="text-sm text-gray-600 font-medium">
+                                                    {selectedAssets.length} selected
+                                                </span>
+                                                <Button 
+                                                    size="sm" 
+                                                    variant="destructive"
+                                                    onClick={() => setDeleteSelectedModalOpen(true)}
+                                                >
+                                                    <Trash2 className="h-4 w-4 mr-2" />
+                                                    Delete ({selectedAssets.length})
+                                                </Button>
+                                            </>
+                                        )}
+                                        <Button asChild size="sm" variant="outline">
+                                            <Link href={route('individual-assets.index', { inventory_item_id: item.id })}>
+                                                View All
+                                            </Link>
+                                        </Button>
+                                    </div>
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-3">
-                                    {item.assets.slice(0, 5).map((asset) => (
-                                        <div key={asset.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
-                                            <div className="flex items-center gap-4 flex-1">
-                                                <div className="p-2 bg-blue-100 rounded-lg">
-                                                    <Hash className="h-5 w-5 text-blue-600" />
+                                    {/* Select All Checkbox */}
+                                    {selectableAssets.length > 0 && (
+                                        <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                            <Checkbox
+                                                id="select-all"
+                                                checked={selectedAssets.length === selectableAssets.length && selectableAssets.length > 0}
+                                                onCheckedChange={handleSelectAll}
+                                            />
+                                            <Label htmlFor="select-all" className="text-sm font-medium cursor-pointer flex-1">
+                                                Select All Unassigned Assets ({selectableAssets.length})
+                                            </Label>
+                                        </div>
+                                    )}
+
+                                    {/* Asset List */}
+                                    {item.assets.map((asset) => {
+                                        const isAssigned = asset.status === 'Assigned';
+                                        const isDeletable = !isAssigned;
+
+                                        return (
+                                            <div 
+                                                key={asset.id} 
+                                                className={`flex items-center gap-4 p-4 rounded-lg border transition-all ${
+                                                    isDeletable 
+                                                        ? 'bg-white hover:bg-gray-50 border-gray-200' 
+                                                        : 'bg-gray-50 border-gray-300'
+                                                }`}
+                                            >
+                                                {/* Checkbox or Lock Icon */}
+                                                <div className="flex items-center justify-center w-5">
+                                                    {isDeletable ? (
+                                                        <Checkbox
+                                                            id={`asset-${asset.id}`}
+                                                            checked={selectedAssets.includes(asset.id)}
+                                                            onCheckedChange={() => handleAssetToggle(asset.id)}
+                                                        />
+                                                    ) : (
+                                                        <Lock className="h-4 w-4 text-gray-400" />
+                                                    )}
                                                 </div>
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-3 mb-1">
-                                                        <p className="font-mono font-medium text-gray-900">{asset.asset_tag}</p>
-                                                        <Badge className={asset.status === 'Available' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}>
-                                                            {asset.status}
-                                                        </Badge>
+
+                                                {/* Asset Info */}
+                                                <div className="flex items-center gap-4 flex-1">
+                                                    <div className="p-2 bg-blue-100 rounded-lg">
+                                                        <Hash className="h-5 w-5 text-blue-600" />
                                                     </div>
-                                                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                                                        {asset.serial_number && (
-                                                            <span className="font-mono">SN: {asset.serial_number}</span>
-                                                        )}
-                                                        <span className="font-mono flex items-center gap-1">
-                                                            <Barcode className="h-3.5 w-3.5" />
-                                                            {asset.barcode}
-                                                        </span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-3 mb-1 flex-wrap">
+                                                            <p className="font-mono font-medium text-gray-900">
+                                                                {asset.asset_tag}
+                                                            </p>
+                                                            <Badge className={
+                                                                asset.status === 'Available' 
+                                                                    ? 'bg-green-100 text-green-700 border-green-200' 
+                                                                    : 'bg-blue-100 text-blue-700 border-blue-200'
+                                                            }>
+                                                                {asset.status}
+                                                            </Badge>
+                                                            
+                                                            {/* Show lock badge only if assigned */}
+                                                            {isAssigned && (
+                                                                <Badge className="bg-red-100 text-red-700 border-red-300 border">
+                                                                    <Lock className="h-3 w-3 mr-1" />
+                                                                    Assigned - Cannot Delete
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        
+                                                        <div className="flex items-center gap-4 text-sm text-gray-600 flex-wrap">
+                                                            {asset.serial_number ? (
+                                                                <span className="font-mono">SN: {asset.serial_number}</span>
+                                                            ) : (
+                                                                <span className="text-orange-600 font-medium text-xs">⚠️ No Serial</span>
+                                                            )}
+                                                            
+                                                            {asset.barcode ? (
+                                                                <span className="font-mono flex items-center gap-1">
+                                                                    <Barcode className="h-3.5 w-3.5" />
+                                                                    {asset.barcode}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-orange-600 font-medium text-xs">⚠️ No Barcode</span>
+                                                            )}
+                                                        </div>
                                                     </div>
+                                                </div>
+
+                                                {/* Assignment Status */}
+                                                <div className="text-right flex-shrink-0">
+                                                    {asset.current_assignment?.user ? (
+                                                        <div className="text-sm">
+                                                            <p className="font-medium text-gray-900">
+                                                                {asset.current_assignment.user.name}
+                                                            </p>
+                                                            <p className="text-xs text-gray-500">Assigned</p>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-sm">
+                                                            <p className="text-gray-500 mb-1">Unassigned</p>
+                                                            <Button asChild size="sm" variant="outline">
+                                                                <Link href={route('individual-assets.assign', asset.id)}>
+                                                                    <UserPlus className="h-3 w-3 mr-1" />
+                                                                    Assign
+                                                                </Link>
+                                                            </Button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
-                                            <div className="text-right">
-                                                {asset.current_assignment?.user ? (
-                                                    <div className="text-sm">
-                                                        <p className="font-medium text-gray-900">{asset.current_assignment.user.name}</p>
-                                                        <p className="text-xs text-gray-500">Assigned</p>
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-sm">
-                                                        <p className="text-gray-500 mb-1">Unassigned</p>
-                                                        <Button asChild size="sm" variant="outline">
-                                                            <Link href={route('individual-assets.assign', asset.id)}>
-                                                                <UserPlus className="h-3 w-3 mr-1" />
-                                                                Assign
-                                                            </Link>
-                                                        </Button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {item.assets.length > 5 && (
-                                        <div className="text-center pt-2">
-                                            <Button asChild variant="outline" size="sm">
-                                                <Link href={route('individual-assets.index', { inventory_item_id: item.id })}>
-                                                    <Laptop className="h-4 w-4 mr-2" />
-                                                    View All {item.assets.length} Assets
-                                                </Link>
-                                            </Button>
-                                        </div>
+                                        );
+                                    })}
+
+                                    {/* Info Alert */}
+                                    {selectableAssets.length > 0 && (
+                                        <Alert className="bg-blue-50 border-blue-200">
+                                            <AlertCircle className="h-4 w-4 text-blue-600" />
+                                            <AlertDescription className="text-blue-800 text-sm">
+                                                <strong>Tip:</strong> You can delete any unassigned asset, even if it has a serial number or barcode. 
+                                                Select assets above and click "Delete" to remove them. 
+                                                The inventory quantity will automatically decrease from <strong>{item.quantity}</strong> to{' '}
+                                                <strong>{item.quantity - selectedAssets.length}</strong> when you delete {selectedAssets.length || 'selected'} asset(s).
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
+
+                                    {/* No Deletable Assets Info */}
+                                    {selectableAssets.length === 0 && item.assets.length > 0 && (
+                                        <Alert className="bg-gray-50 border-gray-200">
+                                            <Lock className="h-4 w-4 text-gray-600" />
+                                            <AlertDescription className="text-gray-700 text-sm">
+                                                All assets are currently assigned to users. Please return them before deleting.
+                                            </AlertDescription>
+                                        </Alert>
                                     )}
                                 </div>
                             </CardContent>
@@ -475,13 +614,72 @@ export default function Show({ auth, item }) {
                 </div>
             </div>
 
-            {/* Delete Confirmation Modal */}
+            {/* Delete Inventory Item Modal */}
             <DeleteConfirmationModal
                 isOpen={deleteModalOpen}
                 onClose={() => setDeleteModalOpen(false)}
                 onConfirm={confirmDelete}
                 itemName={item.name}
             />
+
+            {/* Delete Selected Assets Modal */}
+            {deleteSelectedModalOpen && (
+                <>
+                    <div 
+                        className="fixed inset-0 bg-black/50 z-50 animate-fade-in"
+                        onClick={() => setDeleteSelectedModalOpen(false)}
+                    />
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md animate-scale-in">
+                            <div className="flex items-start gap-3 mb-4">
+                                <div className="p-2 bg-red-100 rounded-full">
+                                    <AlertTriangle className="h-6 w-6 text-red-600" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-lg font-semibold text-gray-900">
+                                        Delete {selectedAssets.length} Asset{selectedAssets.length !== 1 ? 's' : ''}?
+                                    </h3>
+                                    <p className="text-sm text-gray-600 mt-1">
+                                        This will permanently delete the selected unassigned assets (including those with serial numbers or barcodes).
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setDeleteSelectedModalOpen(false)}
+                                    className="p-1 hover:bg-gray-100 rounded-md transition-colors"
+                                >
+                                    <X className="h-5 w-5 text-gray-500" />
+                                </button>
+                            </div>
+
+                            <Alert className="bg-blue-50 border-blue-200 mb-4">
+                                <AlertCircle className="h-4 w-4 text-blue-600" />
+                                <AlertDescription className="text-blue-800 text-sm">
+                                    <strong>Auto-Update:</strong> Inventory quantity will automatically decrease from{' '}
+                                    <strong>{item.quantity}</strong> to{' '}
+                                    <strong>{item.quantity - selectedAssets.length}</strong>
+                                </AlertDescription>
+                            </Alert>
+
+                            <div className="flex gap-3">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setDeleteSelectedModalOpen(false)}
+                                    className="flex-1"
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    className="flex-1 bg-red-600 hover:bg-red-700"
+                                    onClick={handleDeleteSelected}
+                                >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete Assets
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
         </AuthenticatedLayout>
     );
 }

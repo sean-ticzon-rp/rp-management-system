@@ -1,11 +1,13 @@
 // resources/js/Pages/Assets/IndividualAssets/Index.jsx
 import { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import { Card, CardContent } from '@/Components/ui/card';
 import { Badge } from '@/Components/ui/badge';
+import { Alert, AlertDescription } from '@/Components/ui/alert';
+import DeleteConfirmationModal from '@/Components/DeleteConfirmationModal';
 import {
     Table,
     TableBody,
@@ -25,6 +27,7 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/Components/ui/dropdown-menu';
 import {
@@ -45,12 +48,17 @@ import {
     User,
     AlertCircle,
     Edit,
+    Trash2,
+    CheckCircle2,
 } from 'lucide-react';
 
 export default function Index({ auth, assets, inventoryItems, filters }) {
     const [search, setSearch] = useState(filters.search || '');
     const [status, setStatus] = useState(filters.status || 'all');
     const [inventoryItemId, setInventoryItemId] = useState(filters.inventory_item_id || 'all');
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [assetToDelete, setAssetToDelete] = useState(null);
+    const { flash } = usePage().props;
 
     const handleSearch = (e) => {
         e.preventDefault();
@@ -69,6 +77,26 @@ export default function Index({ auth, assets, inventoryItems, filters }) {
         setStatus('all');
         setInventoryItemId('all');
         router.get(route('individual-assets.index'));
+    };
+
+    const handleDelete = (asset) => {
+        setAssetToDelete(asset);
+        setDeleteModalOpen(true);
+    };
+
+    const confirmDelete = () => {
+        if (assetToDelete) {
+            // Delete via the selective delete endpoint (will auto-update inventory quantity)
+            router.post(route('inventory.delete-assets'), {
+                asset_ids: [assetToDelete.id]
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setDeleteModalOpen(false);
+                    setAssetToDelete(null);
+                }
+            });
+        }
     };
 
     const getStatusBadge = (status) => {
@@ -120,6 +148,24 @@ export default function Index({ auth, assets, inventoryItems, filters }) {
             <Head title="Individual Assets" />
 
             <div className="space-y-6">
+                {/* Flash Messages */}
+                {flash?.success && (
+                    <Alert className="bg-green-50 border-green-200 animate-fade-in">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        <AlertDescription className="text-green-800 font-medium">
+                            {flash.success}
+                        </AlertDescription>
+                    </Alert>
+                )}
+                {flash?.error && (
+                    <Alert className="bg-red-50 border-red-200 animate-fade-in">
+                        <AlertCircle className="h-4 w-4 text-red-600" />
+                        <AlertDescription className="text-red-800 font-medium">
+                            {flash.error}
+                        </AlertDescription>
+                    </Alert>
+                )}
+
                 {/* Summary Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-fade-in">
                     <Card>
@@ -359,18 +405,18 @@ export default function Index({ auth, assets, inventoryItems, filters }) {
                                                             <MoreVertical className="h-4 w-4" />
                                                         </button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-40">
+                                                    <DropdownMenuContent align="end" className="w-48">
                                                         <DropdownMenuItem asChild>
                                                             <Link href={route('individual-assets.edit', asset.id)} className="cursor-pointer flex items-center">
                                                                 <Edit className="h-4 w-4 mr-2" />
-                                                                Edit
+                                                                Edit Asset
                                                             </Link>
                                                         </DropdownMenuItem>
                                                         {asset.status === 'Available' && (
                                                             <DropdownMenuItem asChild>
                                                                 <Link href={route('individual-assets.assign', asset.id)} className="cursor-pointer flex items-center">
                                                                     <UserPlus className="h-4 w-4 mr-2" />
-                                                                    Assign
+                                                                    Assign to User
                                                                 </Link>
                                                             </DropdownMenuItem>
                                                         )}
@@ -384,8 +430,22 @@ export default function Index({ auth, assets, inventoryItems, filters }) {
                                                                 className="cursor-pointer"
                                                             >
                                                                 <RotateCcw className="h-4 w-4 mr-2" />
-                                                                Return
+                                                                Return Asset
                                                             </DropdownMenuItem>
+                                                        )}
+                                                        
+                                                        {/* Delete Option - Only for unassigned assets */}
+                                                        {asset.status !== 'Assigned' && (
+                                                            <>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuItem
+                                                                    onClick={() => handleDelete(asset)}
+                                                                    className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4 mr-2" />
+                                                                    Delete Asset
+                                                                </DropdownMenuItem>
+                                                            </>
                                                         )}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
@@ -451,6 +511,19 @@ export default function Index({ auth, assets, inventoryItems, filters }) {
                     )}
                 </Card>
             </div>
+
+            {/* Delete Confirmation Modal */}
+            <DeleteConfirmationModal
+                isOpen={deleteModalOpen}
+                onClose={() => {
+                    setDeleteModalOpen(false);
+                    setAssetToDelete(null);
+                }}
+                onConfirm={confirmDelete}
+                title="Delete Asset"
+                description={`This will permanently delete ${assetToDelete?.asset_tag} and automatically update the inventory quantity.`}
+                itemName={assetToDelete?.asset_tag}
+            />
         </AuthenticatedLayout>
     );
 }
