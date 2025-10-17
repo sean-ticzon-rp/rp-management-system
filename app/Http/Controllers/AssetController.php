@@ -45,7 +45,7 @@ class AssetController extends Controller
         
         $inventoryItems = InventoryItem::where('asset_type', 'asset')->get();
 
-        return Inertia::render('Assets/IndividualAssets/Index', [
+        return Inertia::render('Admin/Assets/Index', [
             'assets' => $assets,
             'inventoryItems' => $inventoryItems,
             'filters' => $request->only(['search', 'status', 'inventory_item_id']),
@@ -71,8 +71,8 @@ class AssetController extends Controller
     public function edit(Asset $asset)
     {
         $asset->load('inventoryItem.category');
-        
-        return Inertia::render('Assets/IndividualAssets/Edit', [
+
+        return Inertia::render('Admin/Assets/Edit', [
             'asset' => [
                 ...$asset->toArray(),
                 'purchase_date' => $asset->purchase_date?->format('Y-m-d'),
@@ -148,7 +148,7 @@ class AssetController extends Controller
 
         $users = User::where('employment_status', 'active')->orderBy('name')->get();
 
-        return Inertia::render('Assets/IndividualAssets/Assign', [
+        return Inertia::render('Admin/Assets/Assign', [
             'preselectedAsset' => $asset,
             'availableAssets' => $availableAssets,
             'users' => $users,

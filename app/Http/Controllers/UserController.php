@@ -47,7 +47,7 @@ class UserController extends Controller
         
         $roles = Role::all();
 
-        return Inertia::render('Users/Index', [
+        return Inertia::render('Admin/Users/Index', [
             'users' => $users,
             'roles' => $roles,
             'filters' => $request->only(['search', 'role', 'account_status']),
@@ -59,7 +59,7 @@ class UserController extends Controller
     {
         $roles = Role::all();
         
-        return Inertia::render('Users/Create', [
+        return Inertia::render('Admin/Users/Create', [
             'roles' => $roles,
         ]);
     }
@@ -175,7 +175,7 @@ class UserController extends Controller
             'assignedTasks.project'
         ]);
 
-        return Inertia::render('Users/Show', [
+        return Inertia::render('Admin/Users/Show', [
             'user' => $user,
         ]);
     }
@@ -186,7 +186,7 @@ class UserController extends Controller
         $user->load('roles');
         $roles = Role::all();
         
-        return Inertia::render('Users/Edit', [
+        return Inertia::render('Admin/Users/Edit', [
             'user' => $user,
             'roles' => $roles,
         ]);
