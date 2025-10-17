@@ -20,18 +20,18 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     protected $fillable = [
         'name',
-        'profile_picture',  // Add after 'name'
+        'profile_picture',
         'first_name',
         'middle_name',
         'last_name',
         'suffix',
         'email',
         'phone_number',
-        'personal_mobile',  // Add
+        'personal_mobile',
         'work_email',
         'personal_email',
         'gender',
-        'civil_status',  // Add this after 'gender'
+        'civil_status',
         'birthday',
         'address_line_1',
         'address_line_2',
@@ -41,22 +41,20 @@ class User extends Authenticatable implements MustVerifyEmail
         'country',
         'emergency_contact_name',
         'emergency_contact_phone',
-        'emergency_contact_mobile',  // Add
+        'emergency_contact_mobile',
         'emergency_contact_relationship',
-        'sss_number',  // Add
-        'tin_number',  // Add
-        'hdmf_number',  // Add
-        'philhealth_number',  // Add
-        'payroll_account',  // Add
+        'sss_number',
+        'tin_number',
+        'hdmf_number',
+        'philhealth_number',
+        'payroll_account',
         'employee_id',
         'department',
         'position',
+        'manager_id',        // ✅ NEW - For leave approval workflow
         'hire_date',
         'employment_status',
-        'employment_type',  // Add
-        'account_status',    // ✅ ADD THIS
-        'approved_by',       // ✅ ADD THIS
-        'approved_at',       // ✅ ADD THIS
+        'employment_type',
         'account_status',
         'approved_by',
         'approved_at',
@@ -95,7 +93,10 @@ class User extends Authenticatable implements MustVerifyEmail
         ];
     }
 
-    // Roles & Permissions
+    // ============================================
+    // ROLES & PERMISSIONS
+    // ============================================
+
     public function roles()
     {
         return $this->belongsToMany(Role::class);
@@ -113,7 +114,10 @@ class User extends Authenticatable implements MustVerifyEmail
         })->exists();
     }
 
-    // Projects & Tasks
+    // ============================================
+    // PROJECTS & TASKS
+    // ============================================
+
     public function ownedProjects()
     {
         return $this->hasMany(Project::class, 'owner_id');
@@ -129,7 +133,10 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Task::class, 'created_by');
     }
 
-    // OLD SYSTEM: Asset Assignments (inventory_item based)
+    // ============================================
+    // ASSET ASSIGNMENTS - OLD SYSTEM
+    // ============================================
+
     public function assetAssignments()
     {
         return $this->hasMany(AssetAssignment::class);
@@ -140,7 +147,10 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(AssetAssignment::class)->where('status', 'active');
     }
 
-    // NEW SYSTEM: Individual Asset Assignments (asset based)
+    // ============================================
+    // ASSET ASSIGNMENTS - NEW SYSTEM
+    // ============================================
+
     public function individualAssetAssignments()
     {
         return $this->hasMany(IndividualAssetAssignment::class);
@@ -159,11 +169,112 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasManyThrough(
             Asset::class,
             IndividualAssetAssignment::class,
-            'user_id',      // Foreign key on individual_asset_assignments
-            'id',           // Foreign key on assets
-            'id',           // Local key on users
-            'asset_id'      // Local key on individual_asset_assignments
+            'user_id',
+            'id',
+            'id',
+            'asset_id'
         )->where('individual_asset_assignments.status', 'active')
          ->whereNull('individual_asset_assignments.actual_return_date');
+    }
+
+    // ============================================
+    // LEAVE MANAGEMENT RELATIONSHIPS
+    // ============================================
+
+    /**
+     * The manager who approves this user's leaves
+     */
+    public function manager()
+    {
+        return $this->belongsTo(User::class, 'manager_id');
+    }
+
+    /**
+     * Users who report to this user (if this user is a manager)
+     */
+    public function subordinates()
+    {
+        return $this->hasMany(User::class, 'manager_id');
+    }
+
+    /**
+     * This user's leave balances
+     */
+    public function leaveBalances()
+    {
+        return $this->hasMany(LeaveBalance::class);
+    }
+
+    /**
+     * This user's leave balances for current year
+     */
+    public function currentYearLeaveBalances()
+    {
+        return $this->hasMany(LeaveBalance::class)
+                    ->where('year', now()->year)
+                    ->with('leaveType');
+    }
+
+    /**
+     * This user's leave requests
+     */
+    public function leaveRequests()
+    {
+        return $this->hasMany(LeaveRequest::class);
+    }
+
+    /**
+     * This user's pending leave requests
+     */
+    public function pendingLeaveRequests()
+    {
+        return $this->hasMany(LeaveRequest::class)
+                    ->whereIn('status', ['pending_manager', 'pending_hr']);
+    }
+
+    /**
+     * This user's approved leave requests
+     */
+    public function approvedLeaveRequests()
+    {
+        return $this->hasMany(LeaveRequest::class)
+                    ->where('status', 'approved');
+    }
+
+    /**
+     * Leave requests waiting for this user's approval (if they're a manager)
+     */
+    public function leaveRequestsToApprove()
+    {
+        return $this->hasMany(LeaveRequest::class, 'manager_id')
+                    ->where('status', 'pending_manager')
+                    ->with(['user', 'leaveType']);
+    }
+
+    /**
+     * Get total available leave days for a specific leave type this year
+     */
+    public function getLeaveBalance($leaveTypeId)
+    {
+        return $this->leaveBalances()
+                    ->where('leave_type_id', $leaveTypeId)
+                    ->where('year', now()->year)
+                    ->first();
+    }
+
+    /**
+     * Check if this user is a manager (has subordinates)
+     */
+    public function isManager()
+    {
+        return $this->subordinates()->exists();
+    }
+
+    /**
+     * Get count of pending leave approvals (if this user is a manager)
+     */
+    public function getPendingLeaveApprovalsCountAttribute()
+    {
+        return $this->leaveRequestsToApprove()->count();
     }
 }

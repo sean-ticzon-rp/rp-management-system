@@ -47,7 +47,7 @@ class TaskController extends Controller
         $projects = Project::orderBy('name')->get();
         $users = User::orderBy('name')->get();
 
-        return Inertia::render('Tasks/Index', [
+        return Inertia::render('Admin/Tasks/Index', [
             'tasks' => $tasks,
             'projects' => $projects,
             'users' => $users,
@@ -83,7 +83,7 @@ class TaskController extends Controller
         $projects = Project::orderBy('name')->get();
         $users = User::orderBy('name')->get();
 
-        return Inertia::render('Tasks/Kanban', [
+        return Inertia::render('Admin/Tasks/Kanban', [
             'kanbanTasks' => $kanbanTasks,
             'projects' => $projects,
             'users' => $users,
@@ -95,8 +95,8 @@ class TaskController extends Controller
     {
         $projects = Project::where('status', '!=', 'completed')->orderBy('name')->get();
         $users = User::orderBy('name')->get();
-        
-        return Inertia::render('Tasks/Create', [
+
+        return Inertia::render('Admin/Tasks/Create', [
             'projects' => $projects,
             'users' => $users,
         ]);

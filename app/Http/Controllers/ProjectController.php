@@ -42,7 +42,7 @@ class ProjectController extends Controller
         $projects = $query->latest()->paginate(15)->withQueryString();
         $categories = Category::where('type', 'project')->get();
 
-        return Inertia::render('Projects/Index', [
+        return Inertia::render('Admin/Projects/Index', [
             'projects' => $projects,
             'categories' => $categories,
             'filters' => $request->only(['search', 'category', 'status', 'priority']),
@@ -54,7 +54,7 @@ class ProjectController extends Controller
         $categories = Category::where('type', 'project')->get();
         $users = User::orderBy('name')->get();
         
-        return Inertia::render('Projects/Create', [
+        return Inertia::render('Admin/Projects/Create', [
             'categories' => $categories,
             'users' => $users,
         ]);
@@ -99,8 +99,8 @@ class ProjectController extends Controller
     {
         $categories = Category::where('type', 'project')->get();
         $users = User::orderBy('name')->get();
-        
-        return Inertia::render('Projects/Edit', [
+
+        return Inertia::render('Admin/Projects/Edit', [
             'project' => $project,
             'categories' => $categories,
             'users' => $users,

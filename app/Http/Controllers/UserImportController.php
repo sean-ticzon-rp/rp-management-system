@@ -12,7 +12,7 @@ class UserImportController extends Controller
 {
     public function show()
     {
-        return Inertia::render('Users/Import');
+        return Inertia::render('Admin/Users/Import');
     }
 
     public function import(Request $request)

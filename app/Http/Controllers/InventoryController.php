@@ -49,7 +49,7 @@ class InventoryController extends Controller
         
         $categories = Category::where('type', 'inventory')->get();
 
-        return Inertia::render('Inventory/Index', [
+        return Inertia::render('Admin/Inventory/Index', [
             'items' => $items,
             'categories' => $categories,
             'filters' => $request->only(['search', 'category', 'status', 'asset_type', 'filter']),
@@ -59,8 +59,8 @@ class InventoryController extends Controller
     public function create()
     {
         $categories = Category::where('type', 'inventory')->get();
-        
-        return Inertia::render('Inventory/Create', [
+
+        return Inertia::render('Admin/Inventory/Create', [
             'categories' => $categories,
         ]);
     }
@@ -128,7 +128,7 @@ class InventoryController extends Controller
             'assets.currentAssignment.user'  // NEW: Load individual assets
         ]);
 
-        return Inertia::render('Inventory/Show', [
+        return Inertia::render('Admin/Inventory/Show', [
             'item' => $inventory,
         ]);
     }
@@ -137,7 +137,7 @@ class InventoryController extends Controller
     {
         $categories = Category::where('type', 'inventory')->get();
         
-        return Inertia::render('Inventory/Edit', [
+        return Inertia::render('Admin/Inventory/Edit', [
             'item' => [
                 ...$inventory->toArray(),
                 'purchase_date' => $inventory->purchase_date?->format('Y-m-d'),
