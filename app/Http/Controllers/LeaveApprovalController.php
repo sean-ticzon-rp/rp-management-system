@@ -13,6 +13,13 @@ class LeaveApprovalController extends Controller
      */
     public function hrApprove(Request $request, LeaveRequest $leave)
     {
+        // ✅ NEW: Check if user has permission to approve
+        $canApprove = auth()->user()->roles()->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->exists();
+        
+        if (!$canApprove) {
+            return back()->with('error', 'You do not have permission to approve leave requests.');
+        }
+
         // Validate that request is in correct status
         if ($leave->status !== 'pending_hr') {
             return back()->with('error', 'This leave request is not pending HR approval.');
@@ -32,12 +39,18 @@ class LeaveApprovalController extends Controller
             "Leave request for {$leave->user->name} has been approved! Balance updated."
         );
     }
-
     /**
      * HR rejects a leave request
      */
     public function hrReject(Request $request, LeaveRequest $leave)
     {
+        // ✅ NEW: Check if user has permission to reject
+        $canApprove = auth()->user()->roles()->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->exists();
+        
+        if (!$canApprove) {
+            return back()->with('error', 'You do not have permission to reject leave requests.');
+        }
+
         // Validate that request is in correct status
         if ($leave->status !== 'pending_hr') {
             return back()->with('error', 'This leave request is not pending HR approval.');

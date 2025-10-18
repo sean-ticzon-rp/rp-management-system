@@ -33,7 +33,7 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'auth' => [
                 // ✅ FIX: Load roles relationship with the user
-                'user' => $request->user() ? $request->user()->load('roles') : null,
+            'user' => $request->user() ? $request->user()->load('roles') : null,
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

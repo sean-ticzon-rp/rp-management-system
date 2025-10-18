@@ -65,7 +65,8 @@ class LeaveRequestController extends Controller
             ->get()
             ->filter(function($leaveType) use ($user) {
                 return $leaveType->isEligibleForUser($user);
-            });
+            })
+            ->values(); // ✅ ADD THIS LINE
 
         // Get current year balances
         $leaveBalances = LeaveBalance::where('user_id', $user->id)
@@ -96,7 +97,7 @@ class LeaveRequestController extends Controller
             'custom_start_time' => 'nullable|required_if:duration,custom_hours|date_format:H:i',
             'custom_end_time' => 'nullable|required_if:duration,custom_hours|date_format:H:i|after:custom_start_time',
             'reason' => 'required|string|max:1000',
-            'attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120', // 5MB max
+            'attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
             'emergency_contact_name' => 'nullable|required_if:use_default_emergency_contact,false|string|max:255',
             'emergency_contact_phone' => 'nullable|required_if:use_default_emergency_contact,false|string|max:20',
             'use_default_emergency_contact' => 'boolean',
@@ -135,20 +136,41 @@ class LeaveRequestController extends Controller
             $validated['emergency_contact_phone'] = $user->emergency_contact_phone;
         }
 
+        // ✅ NEW: Get the leave type to check approval rules
+        $leaveType = LeaveType::findOrFail($validated['leave_type_id']);
+        
+        // ✅ NEW: Determine initial status based on user's roles and manager
+        $initialStatus = 'pending_manager'; // Default
+        $managerComments = null;
+        $managerApprovedAt = null;
+        
+        // Check if user should skip manager approval
+        if (!$user->manager_id || $leaveType->shouldSkipManagerApproval($user)) {
+            $initialStatus = 'pending_hr';
+            $managerApprovedAt = now();
+            $managerComments = $user->manager_id 
+                ? 'Auto-approved (User has admin/HR role)' 
+                : 'Auto-approved (No manager assigned)';
+        }
+
         // Create leave request
         $leaveRequest = LeaveRequest::create([
             ...$validated,
             'user_id' => $user->id,
             'manager_id' => $user->manager_id,
             'total_days' => $totalDays,
-            'status' => 'pending_manager',
+            'status' => $initialStatus,
+            'manager_approved_at' => $managerApprovedAt,
+            'manager_comments' => $managerComments,
         ]);
 
-        // TODO: Send email to manager
+        // TODO: Send email to manager or HR depending on status
 
-        return redirect()->route('leaves.index')->with('success', 
-            'Leave request submitted successfully! Your manager will review it.'
-        );
+        $successMessage = $initialStatus === 'pending_manager'
+            ? 'Leave request submitted successfully! Your manager will review it.'
+            : 'Leave request submitted successfully! HR will review it directly.';
+
+        return redirect()->route('leaves.index')->with('success', $successMessage);
     }
 
     /**
@@ -162,6 +184,7 @@ class LeaveRequestController extends Controller
         }
 
         $leave->load([
+            'user.roles',
             'leaveType',
             'manager',
             'managerApprover',

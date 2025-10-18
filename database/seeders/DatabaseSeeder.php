@@ -27,6 +27,8 @@ class DatabaseSeeder extends Seeder
             InventoryItemSeeder::class,
             AssetSeeder::class,  // ADD THIS LINE
             ProjectSeeder::class,
+            LeaveTypeSeeder::class,
+            LeaveRequestSeeder::class,
         ]);
     }
 }

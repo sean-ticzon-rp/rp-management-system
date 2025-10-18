@@ -7,6 +7,7 @@ import { Textarea } from '@/Components/ui/textarea';
 import { Label } from '@/Components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/Components/ui/card';
 import { Badge } from '@/Components/ui/badge';
+import { Alert, AlertDescription } from '@/Components/ui/alert';
 import {
     Calendar,
     ArrowLeft,
@@ -24,9 +25,17 @@ import {
     Send,
     Loader2,
     X as XIcon,
+    Info,
+    Shield,
 } from 'lucide-react';
 
 export default function Show({ auth, leaveRequest }) {
+    console.log('Auth user:', auth.user);
+    console.log('Auth user roles:', auth.user?.roles);
+    console.log('Can approve check:', auth.user?.roles?.some(role => 
+        ['super-admin', 'admin', 'hr-manager'].includes(role.slug)
+    ));
+    
     const [showApproveModal, setShowApproveModal] = useState(false);
     const [showRejectModal, setShowRejectModal] = useState(false);
 
@@ -57,6 +66,7 @@ export default function Show({ auth, leaveRequest }) {
             }
         });
     };
+
     const getStatusBadge = (status) => {
         const styles = {
             'pending_manager': { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-200', icon: Clock },
@@ -73,6 +83,14 @@ export default function Show({ auth, leaveRequest }) {
     const statusStyle = getStatusBadge(leaveRequest.status);
     const StatusIcon = statusStyle.icon;
     const isPendingHR = leaveRequest.status === 'pending_hr';
+
+    // ✅ NEW: Check if current user has HR approval permissions
+    const canApproveAsHR = auth.user?.roles?.some(role => 
+        ['super-admin', 'admin', 'hr-manager'].includes(role.slug)
+    );
+
+    // ✅ NEW: Check if manager step was auto-approved
+    const wasAutoApproved = leaveRequest.manager_comments?.includes('Auto-approved');
 
     return (
         <AuthenticatedLayout
@@ -106,7 +124,8 @@ export default function Show({ auth, leaveRequest }) {
                             </div>
                         </div>
                     </div>
-                    {isPendingHR && (
+                    {/* ✅ UPDATED: Only show approve/reject buttons if user has HR permission */}
+                    {isPendingHR && canApproveAsHR && (
                         <div className="flex gap-3">
                             <Button 
                                 className="bg-green-600 hover:bg-green-700"
@@ -132,6 +151,17 @@ export default function Show({ auth, leaveRequest }) {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Content */}
                 <div className="lg:col-span-2 space-y-6">
+                    {/* ✅ NEW: Permission Warning (if user doesn't have HR role) */}
+                    {isPendingHR && !canApproveAsHR && (
+                        <Alert className="bg-yellow-50 border-yellow-300 animate-fade-in">
+                            <AlertCircle className="h-5 w-5 text-yellow-600" />
+                            <AlertDescription className="text-yellow-800">
+                                <strong>View Only:</strong> You don't have permission to approve this leave request. 
+                                Only Super Admin, Admin, or HR Manager roles can approve leaves.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
                     {/* Employee Info */}
                     <Card className="animate-fade-in">
                         <CardHeader>
@@ -238,23 +268,13 @@ export default function Show({ auth, leaveRequest }) {
                             {/* Attachment */}
                             {leaveRequest.attachment && (
                                 <div className="pt-4 border-t">
-                                    <p className="text-sm text-gray-600 mb-2">Attached Document</p>
+                                    <p className="text-sm text-gray-600 mb-2">Supporting Document</p>
                                     <Button variant="outline" size="sm" asChild>
                                         <a href={`/storage/${leaveRequest.attachment}`} download target="_blank">
                                             <Download className="h-4 w-4 mr-2" />
-                                            Download Medical Certificate
+                                            Download Attachment
                                         </a>
                                     </Button>
-                                </div>
-                            )}
-
-                            {/* Availability */}
-                            {leaveRequest.availability && (
-                                <div className="pt-4 border-t">
-                                    <p className="text-sm text-gray-600 mb-2">Availability During Leave</p>
-                                    <Badge variant="outline" className="capitalize">
-                                        {leaveRequest.availability.replace(/_/g, ' ')}
-                                    </Badge>
                                 </div>
                             )}
                         </CardContent>
@@ -281,30 +301,42 @@ export default function Show({ auth, leaveRequest }) {
                                     <CheckCircle2 className="h-5 w-5 text-green-600" />
                                 </div>
 
-                                {/* Manager Approval */}
+                                {/* Manager Approval - Show different UI if auto-approved */}
                                 <div className="flex items-start gap-4">
                                     <div className={`flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 ${
                                         leaveRequest.manager_approved_at ? 'bg-green-100' : 'bg-gray-100'
                                     }`}>
-                                        <User className={`h-5 w-5 ${
-                                            leaveRequest.manager_approved_at ? 'text-green-600' : 'text-gray-400'
-                                        }`} />
+                                        {wasAutoApproved ? (
+                                            <Shield className={`h-5 w-5 text-green-600`} />
+                                        ) : (
+                                            <User className={`h-5 w-5 ${
+                                                leaveRequest.manager_approved_at ? 'text-green-600' : 'text-gray-400'
+                                            }`} />
+                                        )}
                                     </div>
                                     <div className="flex-1">
-                                        <p className="font-medium text-gray-900">Manager Approval</p>
-                                        {leaveRequest.manager && (
+                                        <p className="font-medium text-gray-900">
+                                            {wasAutoApproved ? 'Manager Approval (Auto)' : 'Manager Approval'}
+                                        </p>
+                                        {leaveRequest.manager ? (
                                             <p className="text-sm text-gray-600">{leaveRequest.manager.name}</p>
+                                        ) : (
+                                            <p className="text-sm text-gray-500 italic">No manager assigned</p>
                                         )}
                                         {leaveRequest.manager_approved_at && (
                                             <>
                                                 <p className="text-sm text-gray-600 mt-1">
-                                                    Approved by {leaveRequest.manager_approver?.name || 'Manager'} on{' '}
+                                                    {wasAutoApproved ? 'Auto-approved on' : 'Approved by ' + (leaveRequest.manager_approver?.name || 'Manager') + ' on'}{' '}
                                                     {new Date(leaveRequest.manager_approved_at).toLocaleString()}
                                                 </p>
                                                 {leaveRequest.manager_comments && (
-                                                    <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                                                        <p className="text-xs text-gray-500 mb-1">Manager's Comment:</p>
-                                                        <p className="text-sm text-gray-700">{leaveRequest.manager_comments}</p>
+                                                    <div className={`mt-2 p-3 rounded-lg ${wasAutoApproved ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'}`}>
+                                                        <p className="text-xs text-gray-500 mb-1">
+                                                            {wasAutoApproved ? 'System Note:' : 'Manager\'s Comment:'}
+                                                        </p>
+                                                        <p className={`text-sm ${wasAutoApproved ? 'text-blue-700' : 'text-gray-700'}`}>
+                                                            {leaveRequest.manager_comments}
+                                                        </p>
                                                     </div>
                                                 )}
                                             </>
@@ -360,7 +392,7 @@ export default function Show({ auth, leaveRequest }) {
                                             {leaveRequest.status === 'pending_hr' && (
                                                 <Badge className="mt-2 bg-blue-100 text-blue-700 border border-blue-200">
                                                     <Clock className="h-3 w-3 mr-1" />
-                                                    Awaiting Your Approval
+                                                    {canApproveAsHR ? 'Awaiting Your Approval' : 'Awaiting HR Approval'}
                                                 </Badge>
                                             )}
                                             {leaveRequest.status === 'rejected_by_hr' && leaveRequest.hr_comments && (
@@ -544,8 +576,8 @@ export default function Show({ auth, leaveRequest }) {
                         </CardContent>
                     </Card>
 
-                    {/* HR Actions (if pending HR approval) */}
-                    {isPendingHR && (
+                    {/* HR Actions (if pending HR approval AND user has permission) */}
+                    {isPendingHR && canApproveAsHR && (
                         <Card className="animate-fade-in animation-delay-400 border-blue-200">
                             <CardHeader>
                                 <CardTitle className="text-blue-700">HR Actions Required</CardTitle>

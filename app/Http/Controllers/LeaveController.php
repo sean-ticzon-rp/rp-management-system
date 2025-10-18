@@ -82,7 +82,7 @@ class LeaveController extends Controller
     public function show(LeaveRequest $leave)
     {
         $leave->load([
-            'user',
+            'user.roles',
             'leaveType',
             'manager',
             'managerApprover',
@@ -107,7 +107,8 @@ class LeaveController extends Controller
             ->get()
             ->filter(function($leaveType) use ($user) {
                 return $leaveType->isEligibleForUser($user);
-            });
+            })
+            ->values(); // ✅ ADD THIS LINE
 
         // Get current year balances
         $leaveBalances = \App\Models\LeaveBalance::where('user_id', $user->id)

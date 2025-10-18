@@ -26,6 +26,8 @@ class LeaveType extends Model
         'sort_order',
         'gender_specific',
         'is_active',
+        'can_approve_roles',        // ✅ ADD THIS
+        'skip_manager_for_roles',   // ✅ ADD THIS
     ];
 
     protected $casts = [
@@ -35,6 +37,8 @@ class LeaveType extends Model
         'requires_manager_approval' => 'boolean',
         'requires_hr_approval' => 'boolean',
         'is_active' => 'boolean',
+        'can_approve_roles' => 'array',        // ✅ ADD THIS
+        'skip_manager_for_roles' => 'boolean', // ✅ ADD THIS
     ];
 
     // ============================================
@@ -151,5 +155,33 @@ class LeaveType extends Model
             ->filter(function($leaveType) use ($user) {
                 return $leaveType->isEligibleForUser($user);
             });
+    }
+
+    /**
+     * Check if a user can approve leaves of this type (based on their roles)
+     */
+    public function userCanApprove($user)
+    {
+        // If no specific roles defined, anyone can approve (backward compatibility)
+        if (empty($this->can_approve_roles)) {
+            return true;
+        }
+        
+        // Check if user has any of the allowed roles
+        return $user->roles()->whereIn('slug', $this->can_approve_roles)->exists();
+    }
+
+    /**
+     * Check if user should skip manager approval (e.g., Super Admin)
+     */
+    public function shouldSkipManagerApproval($user)
+    {
+        if (!$this->skip_manager_for_roles) {
+            return false;
+        }
+        
+        // Check if user has admin/HR roles that skip manager approval
+        $adminRoles = ['super-admin', 'admin', 'hr-manager'];
+        return $user->roles()->whereIn('slug', $adminRoles)->exists();
     }
 }

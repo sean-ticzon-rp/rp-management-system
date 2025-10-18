@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
 import { Checkbox } from '@/Components/ui/checkbox';
 import { Alert, AlertDescription } from '@/Components/ui/alert';
+import { Progress } from '@/Components/ui/progress';
 import {
     Calendar,
     ArrowLeft,
@@ -23,6 +24,8 @@ import {
     CheckCircle2,
     Info,
     FileText,
+    XCircle,
+    Shield,
 } from 'lucide-react';
 
 export default function Apply({ auth, leaveTypes, leaveBalances, user }) {
@@ -105,6 +108,11 @@ export default function Apply({ auth, leaveTypes, leaveBalances, user }) {
     const requiresMedicalCert = selectedLeaveType?.requires_medical_cert && 
         (selectedLeaveType.medical_cert_days_threshold === null || 
          calculatedDays > selectedLeaveType.medical_cert_days_threshold);
+
+    // ✅ NEW: Check if user has admin/HR role
+    const hasAdminRole = auth.user?.roles?.some(role => 
+        ['super-admin', 'admin', 'hr-manager'].includes(role.slug)
+    );
 
     return (
         <AuthenticatedLayout
@@ -487,8 +495,9 @@ export default function Apply({ auth, leaveTypes, leaveBalances, user }) {
                         </Card>
                     )}
 
-                    {/* Approval Workflow Info */}
-                    {user.manager && (
+                    {/* ✅ UPDATED: Approval Workflow Info - Conditional Display */}
+                    {user.manager && !hasAdminRole ? (
+                        // Regular employee with manager - Standard 2-step workflow
                         <Card className="animate-fade-in animation-delay-200">
                             <CardHeader>
                                 <CardTitle className="text-lg">Approval Workflow</CardTitle>
@@ -519,6 +528,68 @@ export default function Apply({ auth, leaveTypes, leaveBalances, user }) {
                                         <div className="flex-1">
                                             <p className="font-medium text-gray-900">HR Approval</p>
                                             <p className="text-sm text-gray-600 mt-1">Final approval step</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex items-center justify-center w-8 h-8 bg-green-100 rounded-full flex-shrink-0">
+                                            <CheckCircle2 className="h-4 w-4 text-green-700" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-medium text-gray-900">Approved</p>
+                                            <p className="text-sm text-gray-600 mt-1">Leave days deducted</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        // Admin/HR role OR no manager - Direct HR workflow
+                        <Card className="animate-fade-in animation-delay-200 border-blue-300">
+                            <CardHeader>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    {hasAdminRole ? (
+                                        <>
+                                            <Shield className="h-5 w-5 text-blue-600" />
+                                            Fast-Track Approval
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Info className="h-5 w-5 text-blue-600" />
+                                            Simplified Workflow
+                                        </>
+                                    )}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <Alert className="bg-blue-50 border-blue-200 mb-4">
+                                    <Info className="h-4 w-4 text-blue-600" />
+                                    <AlertDescription className="text-blue-800">
+                                        {hasAdminRole ? (
+                                            <>
+                                                <strong>Admin Fast-Track:</strong> As an admin/HR user, your request will skip manager approval and go directly to HR for processing.
+                                            </>
+                                        ) : (
+                                            <>
+                                                <strong>No Manager Assigned:</strong> Your request will go directly to HR for approval since you don't have a manager assigned.
+                                            </>
+                                        )}
+                                    </AlertDescription>
+                                </Alert>
+                                
+                                <div className="space-y-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full flex-shrink-0">
+                                            <span className="text-sm font-bold text-blue-700">1</span>
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-medium text-gray-900">Direct HR Review</p>
+                                            <p className="text-sm text-gray-600 mt-1">
+                                                {hasAdminRole 
+                                                    ? 'Your request goes directly to HR (manager step skipped)'
+                                                    : 'Your request will be reviewed directly by HR'
+                                                }
+                                            </p>
                                         </div>
                                     </div>
 
