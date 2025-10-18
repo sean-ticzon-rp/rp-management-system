@@ -148,6 +148,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{assignment}/return', [AssetController::class, 'return'])->name('return');
         Route::get('/{asset}', [AssetController::class, 'show'])->name('show');
     });
+
+    // Leave Management Routes
+    Route::prefix('leaves')->name('leaves.')->group(function () {
+        Route::get('/', [App\Http\Controllers\LeaveController::class, 'index'])->name('index');
+        Route::get('/apply', [App\Http\Controllers\LeaveController::class, 'create'])->name('apply');
+        Route::post('/', [App\Http\Controllers\LeaveController::class, 'store'])->name('store');
+        Route::get('/{leave}', [App\Http\Controllers\LeaveController::class, 'show'])->name('show');
+        
+        // HR Approval Routes
+        Route::post('/{leave}/hr-approve', [App\Http\Controllers\LeaveApprovalController::class, 'hrApprove'])->name('hr-approve');
+        Route::post('/{leave}/hr-reject', [App\Http\Controllers\LeaveApprovalController::class, 'hrReject'])->name('hr-reject');
+        
+        // Manager Approval Routes
+        Route::post('/{leave}/manager-approve', [App\Http\Controllers\LeaveApprovalController::class, 'managerApprove'])->name('manager-approve');
+        Route::post('/{leave}/manager-reject', [App\Http\Controllers\LeaveApprovalController::class, 'managerReject'])->name('manager-reject');
+    });
 });
 
 require __DIR__.'/auth.php';
