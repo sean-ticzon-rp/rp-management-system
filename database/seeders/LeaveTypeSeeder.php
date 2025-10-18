@@ -28,8 +28,6 @@ class LeaveTypeSeeder extends Seeder
                 'max_carry_over_days' => 5,
                 'requires_manager_approval' => true,
                 'requires_hr_approval' => true,
-                'can_approve_roles' => ['super-admin', 'admin', 'hr-manager'], // ✅ NEW
-                'skip_manager_for_roles' => true, // ✅ NEW - Admins skip manager approval
                 'color' => '#3B82F6', // Blue
                 'icon' => 'Palmtree',
                 'sort_order' => 1,
@@ -52,8 +50,6 @@ class LeaveTypeSeeder extends Seeder
                 'max_carry_over_days' => null,
                 'requires_manager_approval' => false, // Auto-approve for emergencies
                 'requires_hr_approval' => true,
-                'can_approve_roles' => ['super-admin', 'admin', 'hr-manager'], // ✅ NEW
-                'skip_manager_for_roles' => true, // ✅ NEW
                 'color' => '#EF4444', // Red
                 'icon' => 'Heart',
                 'sort_order' => 2,
@@ -76,8 +72,6 @@ class LeaveTypeSeeder extends Seeder
                 'max_carry_over_days' => null,
                 'requires_manager_approval' => false, // Auto-approve for emergencies
                 'requires_hr_approval' => true,
-                'can_approve_roles' => ['super-admin', 'admin', 'hr-manager'], // ✅ NEW
-                'skip_manager_for_roles' => true, // ✅ NEW
                 'color' => '#F59E0B', // Orange
                 'icon' => 'AlertTriangle',
                 'sort_order' => 3,
@@ -100,8 +94,6 @@ class LeaveTypeSeeder extends Seeder
                 'max_carry_over_days' => null,
                 'requires_manager_approval' => false, // Auto-approve
                 'requires_hr_approval' => true,
-                'can_approve_roles' => ['super-admin', 'admin', 'hr-manager'], // ✅ NEW
-                'skip_manager_for_roles' => true, // ✅ NEW
                 'color' => '#6B7280', // Gray
                 'icon' => 'Heart',
                 'sort_order' => 4,
@@ -124,8 +116,6 @@ class LeaveTypeSeeder extends Seeder
                 'max_carry_over_days' => null,
                 'requires_manager_approval' => false,
                 'requires_hr_approval' => true,
-                'can_approve_roles' => ['super-admin', 'admin', 'hr-manager'], // ✅ NEW
-                'skip_manager_for_roles' => true, // ✅ NEW
                 'color' => '#EC4899', // Pink
                 'icon' => 'Baby',
                 'sort_order' => 5,
@@ -148,8 +138,6 @@ class LeaveTypeSeeder extends Seeder
                 'max_carry_over_days' => null,
                 'requires_manager_approval' => false,
                 'requires_hr_approval' => true,
-                'can_approve_roles' => ['super-admin', 'admin', 'hr-manager'], // ✅ NEW
-                'skip_manager_for_roles' => true, // ✅ NEW
                 'color' => '#3B82F6', // Blue
                 'icon' => 'Baby',
                 'sort_order' => 6,
@@ -172,8 +160,6 @@ class LeaveTypeSeeder extends Seeder
                 'max_carry_over_days' => null,
                 'requires_manager_approval' => false, // Auto-approve
                 'requires_hr_approval' => true,
-                'can_approve_roles' => ['super-admin', 'admin', 'hr-manager'], // ✅ NEW
-                'skip_manager_for_roles' => true, // ✅ NEW
                 'color' => '#8B5CF6', // Purple
                 'icon' => 'Cake',
                 'sort_order' => 7,
@@ -196,8 +182,6 @@ class LeaveTypeSeeder extends Seeder
                 'max_carry_over_days' => null,
                 'requires_manager_approval' => true,
                 'requires_hr_approval' => true,
-                'can_approve_roles' => ['super-admin', 'admin', 'hr-manager'], // ✅ NEW
-                'skip_manager_for_roles' => true, // ✅ NEW - Even LWOP can skip manager for admins
                 'color' => '#6B7280', // Gray
                 'icon' => 'AlertCircle',
                 'sort_order' => 8,
@@ -207,12 +191,9 @@ class LeaveTypeSeeder extends Seeder
         ];
 
         foreach ($leaveTypes as $leaveType) {
-            LeaveType::updateOrCreate(
-                ['code' => $leaveType['code']], // ✅ CHANGED: Use updateOrCreate to avoid duplicates
-                $leaveType
-            );
+            LeaveType::create($leaveType);
         }
 
-        $this->command->info('✅ Created/Updated ' . count($leaveTypes) . ' leave types!');
+        $this->command->info('✅ Created ' . count($leaveTypes) . ' leave types!');
     }
 }
