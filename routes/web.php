@@ -12,6 +12,8 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\LeaveApprovalController;
+use App\Http\Controllers\EmployeeDashboardController;
+use App\Http\Controllers\EmployeeAssetController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -61,8 +63,28 @@ Route::middleware('auth')->get('/account/pending', function () {
 })->name('account.pending');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    // Dashboard
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    
+    // ============================================
+    // 🏠 SMART DASHBOARD ROUTER
+    // ============================================
+    // Redirects to appropriate dashboard based on user role
+    Route::get('/dashboard', function () {
+        $user = auth()->user();
+        
+        // Check if user has admin/HR roles
+        $isAdmin = $user->roles->whereIn('slug', [
+            'super-admin', 
+            'admin', 
+            'hr-manager'
+        ])->count() > 0;
+        
+        // Redirect based on role
+        if ($isAdmin) {
+            return app(DashboardController::class)->index();
+        } else {
+            return app(EmployeeDashboardController::class)->index();
+        }
+    })->name('dashboard');
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -77,6 +99,30 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/account', [SettingsController::class, 'destroy'])->name('destroy');
     });
 
+    // ============================================
+    // 👤 EMPLOYEE SELF-SERVICE ROUTES
+    // ============================================
+    Route::prefix('employees')->name('employees.')->group(function () {
+        Route::get('/assets', [EmployeeAssetController::class, 'index'])->name('assets');
+        // Add more employee routes here later (profile, payslips, etc.)
+    });
+
+    // ============================================
+    // 👤 EMPLOYEE LEAVE ROUTES (Self-Service)
+    // ============================================
+    Route::prefix('my-leaves')->name('my-leaves.')->group(function () {
+        Route::get('/', [LeaveRequestController::class, 'index'])->name('index');
+        Route::get('/apply', [LeaveRequestController::class, 'create'])->name('apply');
+        Route::post('/', [LeaveRequestController::class, 'store'])->name('store');
+        Route::get('/{leave}', [LeaveRequestController::class, 'show'])->name('show');
+        Route::post('/{leave}/cancel', [LeaveRequestController::class, 'cancel'])->name('cancel');
+        Route::post('/{leave}/appeal', [LeaveRequestController::class, 'appeal'])->name('appeal');
+    });
+
+    // ============================================
+    // 👔 ADMIN/HR ROUTES (Manage All)
+    // ============================================
+    
     // Inventory
     Route::post('/inventory/delete-assets', [InventoryController::class, 'deleteSelectedAssets'])->name('inventory.delete-assets');
     Route::resource('inventory', InventoryController::class);
@@ -105,7 +151,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/{task}', [TaskController::class, 'destroy'])->name('destroy');
     });
 
-    // Individual Assets (NEW system - tracks specific physical items)
+    // Individual Assets (Admin - tracks ALL specific physical items)
     // ✅ IMPORTANT: Specific routes MUST come BEFORE dynamic {asset} routes
     Route::prefix('individual-assets')->name('individual-assets.')->group(function () {
         Route::get('/', [AssetController::class, 'index'])->name('index');
@@ -122,21 +168,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{asset}', [AssetController::class, 'show'])->name('show');
     });
 
-    // ============================================
-    // 👤 EMPLOYEE LEAVE ROUTES (Self-Service - My Leaves Only)
-    // ============================================
-    Route::prefix('my-leaves')->name('my-leaves.')->group(function () {
-        Route::get('/', [LeaveRequestController::class, 'index'])->name('index');
-        Route::get('/apply', [LeaveRequestController::class, 'create'])->name('apply');
-        Route::post('/', [LeaveRequestController::class, 'store'])->name('store');
-        Route::get('/{leave}', [LeaveRequestController::class, 'show'])->name('show');
-        Route::post('/{leave}/cancel', [LeaveRequestController::class, 'cancel'])->name('cancel');
-        Route::post('/{leave}/appeal', [LeaveRequestController::class, 'appeal'])->name('appeal');
-    });
-
-    // ============================================
-    // 👔 ADMIN/HR LEAVE ROUTES (Manage All Employees)
-    // ============================================
+    // Admin Leave Management (Manage All Employees)
     Route::prefix('leaves')->name('leaves.')->group(function () {
         Route::get('/', [LeaveController::class, 'index'])->name('index');
         Route::get('/apply', [LeaveController::class, 'create'])->name('apply');
