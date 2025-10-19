@@ -44,7 +44,7 @@ class LeaveRequestController extends Controller
             ->orderBy('year', 'desc')
             ->pluck('year');
 
-        return Inertia::render('Leaves/MyLeaves', [
+        return Inertia::render('Employees/Leaves/MyLeaves', [  // ✅ Changed
             'leaveRequests' => $leaveRequests,
             'leaveBalances' => $leaveBalances,
             'availableYears' => $availableYears,
@@ -80,7 +80,7 @@ class LeaveRequestController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'position', 'department']);
 
-        return Inertia::render('Leaves/Apply', [
+        return Inertia::render('Employees/Leaves/Apply', [  // ✅ Changed
             'leaveTypes' => $leaveTypes,
             'leaveBalances' => $leaveBalances,
             'user' => $user->load('manager'),
@@ -108,6 +108,7 @@ class LeaveRequestController extends Controller
             'emergency_contact_phone' => 'nullable|required_if:use_default_emergency_contact,false|string|max:20',
             'use_default_emergency_contact' => 'boolean',
             'availability' => 'nullable|in:reachable,offline,emergency_only',
+            'manager_id' => 'required|exists:users,id', // ✅ ADD THIS - Manager is now required
             'manager_id' => 'required|exists:users,id', // ✅ ADD THIS - Manager is now required
         ]);
 
@@ -175,7 +176,7 @@ class LeaveRequestController extends Controller
             'hrApprover'
         ]);
 
-        return Inertia::render('Leaves/Show', [
+        return Inertia::render('Employees/Leaves/Show', [  // ✅ Changed
             'leaveRequest' => $leave,
         ]);
     }

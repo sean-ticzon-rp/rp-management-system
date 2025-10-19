@@ -36,13 +36,21 @@ export default function AuthenticatedLayout({ header, children }) {
     
     const navigation = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'Users', href: '/users', icon: Users },
-        { name: 'Inventory', href: '/inventory', icon: Package },
-        { name: 'Assets', href: '/individual-assets', icon: Laptop },
-        { name: 'My Leaves', href: '/my-leaves', icon: Calendar }, // 👤 Employee self-service
-        { name: 'Leave Management', href: '/leaves', icon: ClipboardList }, // 👔 Admin/HR view
-        { name: 'Projects', href: '/projects', icon: FolderKanban },
-        { name: 'Tasks', href: '/tasks', icon: ClipboardList },
+        
+        // Employee-only items (show to everyone)
+        { name: 'My Leaves', href: '/my-leaves', icon: Calendar },
+        { name: 'My Assets', href: '/employees/assets', icon: Laptop },
+        
+        // Admin-only items (conditional)
+        ...(auth.user.roles?.some(r => ['super-admin', 'admin', 'hr-manager'].includes(r.slug)) ? [
+            { name: 'Users', href: '/users', icon: Users },
+            { name: 'Inventory', href: '/inventory', icon: Package },
+            { name: 'Assets', href: '/individual-assets', icon: Laptop },
+            { name: 'Leave Management', href: '/leaves', icon: ClipboardList },
+            { name: 'Projects', href: '/projects', icon: FolderKanban },
+            { name: 'Tasks', href: '/tasks', icon: ClipboardList },
+        ] : []),
+        
         { name: 'Settings', href: '/settings', icon: Settings },
     ];
 
