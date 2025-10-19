@@ -67,6 +67,8 @@ class LeaveRequestController extends Controller
                 return $leaveType->isEligibleForUser($user);
             })
             ->values();
+            })
+            ->values();
 
         $leaveBalances = LeaveBalance::where('user_id', $user->id)
             ->where('year', now()->year)
@@ -84,6 +86,7 @@ class LeaveRequestController extends Controller
             'leaveTypes' => $leaveTypes,
             'leaveBalances' => $leaveBalances,
             'user' => $user->load('manager'),
+            'managers' => $managers,
             'managers' => $managers,
         ]);
     }
@@ -108,6 +111,7 @@ class LeaveRequestController extends Controller
             'emergency_contact_phone' => 'nullable|required_if:use_default_emergency_contact,false|string|max:20',
             'use_default_emergency_contact' => 'boolean',
             'availability' => 'nullable|in:reachable,offline,emergency_only',
+            'manager_id' => 'required|exists:users,id', // ✅ ADD THIS - Manager is now required
             'manager_id' => 'required|exists:users,id', // ✅ ADD THIS - Manager is now required
         ]);
 
