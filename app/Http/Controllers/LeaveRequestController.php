@@ -67,8 +67,6 @@ class LeaveRequestController extends Controller
                 return $leaveType->isEligibleForUser($user);
             })
             ->values();
-            })
-            ->values();
 
         $leaveBalances = LeaveBalance::where('user_id', $user->id)
             ->where('year', now()->year)
@@ -86,7 +84,6 @@ class LeaveRequestController extends Controller
             'leaveTypes' => $leaveTypes,
             'leaveBalances' => $leaveBalances,
             'user' => $user->load('manager'),
-            'managers' => $managers,
             'managers' => $managers,
         ]);
     }
