@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\User;
+use App\Models\LeaveBalance; // ✅ ADD THIS LINE
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -89,8 +90,15 @@ class LeaveController extends Controller
             'hrApprover'
         ]);
 
+        // Get the employee's current balance for this leave type
+        $leaveBalance = LeaveBalance::where('user_id', $leave->user_id)
+            ->where('leave_type_id', $leave->leave_type_id)
+            ->where('year', now()->year)
+            ->first();
+
         return Inertia::render('Admin/Leaves/Show', [
             'leaveRequest' => $leave,
+            'leaveBalance' => $leaveBalance,
         ]);
     }
 
@@ -107,19 +115,27 @@ class LeaveController extends Controller
             ->get()
             ->filter(function($leaveType) use ($user) {
                 return $leaveType->isEligibleForUser($user);
-            });
+            })
+            ->values(); // Reset array keys
 
         // Get current year balances
-        $leaveBalances = \App\Models\LeaveBalance::where('user_id', $user->id)
+        $leaveBalances = LeaveBalance::where('user_id', $user->id)
             ->where('year', now()->year)
             ->with('leaveType')
             ->get()
             ->keyBy('leave_type_id');
 
+        // Get all active users as potential managers (exclude current user)
+        $managers = User::where('employment_status', 'active')
+            ->where('id', '!=', $user->id)
+            ->orderBy('name')
+            ->get(['id', 'name', 'position', 'department']);
+
         return Inertia::render('Admin/Leaves/Apply', [
             'leaveTypes' => $leaveTypes,
             'leaveBalances' => $leaveBalances,
             'user' => $user->load('manager'),
+            'managers' => $managers,
         ]);
     }
 
@@ -138,11 +154,12 @@ class LeaveController extends Controller
             'custom_start_time' => 'nullable|required_if:duration,custom_hours|date_format:H:i',
             'custom_end_time' => 'nullable|required_if:duration,custom_hours|date_format:H:i|after:custom_start_time',
             'reason' => 'required|string|max:1000',
-            'attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120', // 5MB max
-            'emergency_contact_name' => 'nullable|string|max:255',
-            'emergency_contact_phone' => 'nullable|string|max:20',
+            'attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'emergency_contact_name' => 'nullable|required_if:use_default_emergency_contact,false|string|max:255',
+            'emergency_contact_phone' => 'nullable|required_if:use_default_emergency_contact,false|string|max:20',
             'use_default_emergency_contact' => 'boolean',
             'availability' => 'nullable|in:reachable,offline,emergency_only',
+            'manager_id' => 'required|exists:users,id', // Manager selection
         ]);
 
         // Calculate total days
@@ -153,7 +170,7 @@ class LeaveController extends Controller
         );
 
         // Check if user has sufficient balance
-        $balance = \App\Models\LeaveBalance::where('user_id', $user->id)
+        $balance = LeaveBalance::where('user_id', $user->id)
             ->where('leave_type_id', $validated['leave_type_id'])
             ->where('year', now()->year)
             ->first();
@@ -168,7 +185,7 @@ class LeaveController extends Controller
 
         // Handle file upload
         if ($request->hasFile('attachment')) {
-            $validated['attachment'] = $request->file('attachment')->store('leave-attachments', 'public');
+            $validated['attachment'] = $request->file('attachment')->store('leave-attachments', 'private');
         }
 
         // Set default emergency contact if requested
@@ -181,12 +198,9 @@ class LeaveController extends Controller
         LeaveRequest::create([
             ...$validated,
             'user_id' => $user->id,
-            'manager_id' => $user->manager_id,
             'total_days' => $totalDays,
             'status' => 'pending_manager',
         ]);
-
-        // TODO: Send email to manager
 
         return redirect()->route('leaves.index')->with('success', 
             'Leave request submitted successfully! Your manager will review it.'
@@ -208,10 +222,9 @@ class LeaveController extends Controller
         switch ($duration) {
             case 'half_day_am':
             case 'half_day_pm':
-                return 0.5; // Always 0.5 days for half-day
+                return 0.5;
             
             case 'custom_hours':
-                // For custom hours, default to half day
                 return 0.5;
             
             case 'full_day':

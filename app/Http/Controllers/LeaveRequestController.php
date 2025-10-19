@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\LeaveBalance;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -59,25 +60,31 @@ class LeaveRequestController extends Controller
     {
         $user = auth()->user();
         
-        // Get available leave types for this user (considering gender)
         $leaveTypes = LeaveType::active()
             ->ordered()
             ->get()
             ->filter(function($leaveType) use ($user) {
                 return $leaveType->isEligibleForUser($user);
-            });
+            })
+            ->values();
 
-        // Get current year balances
         $leaveBalances = LeaveBalance::where('user_id', $user->id)
             ->where('year', now()->year)
             ->with('leaveType')
             ->get()
             ->keyBy('leave_type_id');
 
+        // ✅ SIMPLE: Just get all active users except current user
+        $managers = User::where('employment_status', 'active')
+            ->where('id', '!=', $user->id)
+            ->orderBy('name')
+            ->get(['id', 'name', 'position', 'department']);
+
         return Inertia::render('Leaves/Apply', [
             'leaveTypes' => $leaveTypes,
             'leaveBalances' => $leaveBalances,
             'user' => $user->load('manager'),
+            'managers' => $managers,
         ]);
     }
 
@@ -101,6 +108,7 @@ class LeaveRequestController extends Controller
             'emergency_contact_phone' => 'nullable|required_if:use_default_emergency_contact,false|string|max:20',
             'use_default_emergency_contact' => 'boolean',
             'availability' => 'nullable|in:reachable,offline,emergency_only',
+            'manager_id' => 'required|exists:users,id', // ✅ ADD THIS - Manager is now required
         ]);
 
         // Calculate total days
@@ -139,7 +147,6 @@ class LeaveRequestController extends Controller
         $leaveRequest = LeaveRequest::create([
             ...$validated,
             'user_id' => $user->id,
-            'manager_id' => $user->manager_id,
             'total_days' => $totalDays,
             'status' => 'pending_manager',
         ]);
