@@ -39,7 +39,8 @@ export default function AuthenticatedLayout({ header, children }) {
         { name: 'Users', href: '/users', icon: Users },
         { name: 'Inventory', href: '/inventory', icon: Package },
         { name: 'Assets', href: '/individual-assets', icon: Laptop },
-        { name: 'My Leaves', href: '/leaves', icon: Calendar }, // ✅ ADD THIS
+        { name: 'My Leaves', href: '/my-leaves', icon: Calendar }, // 👤 Employee self-service
+        { name: 'Leave Management', href: '/leaves', icon: ClipboardList }, // 👔 Admin/HR view
         { name: 'Projects', href: '/projects', icon: FolderKanban },
         { name: 'Tasks', href: '/tasks', icon: ClipboardList },
         { name: 'Settings', href: '/settings', icon: Settings },

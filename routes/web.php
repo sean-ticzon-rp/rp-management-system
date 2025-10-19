@@ -9,39 +9,12 @@ use App\Http\Controllers\UserImportController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\LeaveController;
+use App\Http\Controllers\LeaveRequestController;
+use App\Http\Controllers\LeaveApprovalController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-
-// ============================================
-// API Routes for Postman Testing (JSON Responses)
-// ============================================
-Route::prefix('api')->name('api.')->group(function () {
-    
-    // Get all inventory items
-    Route::get('/inventory', function () {
-        $items = \App\Models\InventoryItem::with(['category', 'creator', 'assets'])
-            ->get();
-        
-        return response()->json([
-            'success' => true,
-            'count' => $items->count(),
-            'data' => $items
-        ]);
-    })->name('inventory.index');
-    
-    // Get single inventory item by ID
-    Route::get('/inventory/{id}', function ($id) {
-        $item = \App\Models\InventoryItem::with(['category', 'creator', 'assets.currentAssignment.user'])
-            ->findOrFail($id);
-        
-        return response()->json([
-            'success' => true,
-            'data' => $item
-        ]);
-    })->name('inventory.show');
-    
-});
 
 // ============================================
 // API Routes for Postman Testing (JSON Responses)
@@ -112,7 +85,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/users/import', [UserImportController::class, 'show'])->name('users.import');
     Route::post('/users/import', [UserImportController::class, 'import'])->name('users.import.store');
     
-    // ✅ NEW: User Approval Routes (BEFORE resource routes)
+    // User Approval Routes (BEFORE resource routes)
     Route::post('/users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
     Route::post('/users/{user}/reject', [UserController::class, 'reject'])->name('users.reject');
     
@@ -149,20 +122,34 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{asset}', [AssetController::class, 'show'])->name('show');
     });
 
-    // Leave Management Routes
+    // ============================================
+    // 👤 EMPLOYEE LEAVE ROUTES (Self-Service - My Leaves Only)
+    // ============================================
+    Route::prefix('my-leaves')->name('my-leaves.')->group(function () {
+        Route::get('/', [LeaveRequestController::class, 'index'])->name('index');
+        Route::get('/apply', [LeaveRequestController::class, 'create'])->name('apply');
+        Route::post('/', [LeaveRequestController::class, 'store'])->name('store');
+        Route::get('/{leave}', [LeaveRequestController::class, 'show'])->name('show');
+        Route::post('/{leave}/cancel', [LeaveRequestController::class, 'cancel'])->name('cancel');
+        Route::post('/{leave}/appeal', [LeaveRequestController::class, 'appeal'])->name('appeal');
+    });
+
+    // ============================================
+    // 👔 ADMIN/HR LEAVE ROUTES (Manage All Employees)
+    // ============================================
     Route::prefix('leaves')->name('leaves.')->group(function () {
-        Route::get('/', [App\Http\Controllers\LeaveController::class, 'index'])->name('index');
-        Route::get('/apply', [App\Http\Controllers\LeaveController::class, 'create'])->name('apply');
-        Route::post('/', [App\Http\Controllers\LeaveController::class, 'store'])->name('store');
-        Route::get('/{leave}', [App\Http\Controllers\LeaveController::class, 'show'])->name('show');
+        Route::get('/', [LeaveController::class, 'index'])->name('index');
+        Route::get('/apply', [LeaveController::class, 'create'])->name('apply');
+        Route::post('/', [LeaveController::class, 'store'])->name('store');
+        Route::get('/{leave}', [LeaveController::class, 'show'])->name('show');
         
         // HR Approval Routes
-        Route::post('/{leave}/hr-approve', [App\Http\Controllers\LeaveApprovalController::class, 'hrApprove'])->name('hr-approve');
-        Route::post('/{leave}/hr-reject', [App\Http\Controllers\LeaveApprovalController::class, 'hrReject'])->name('hr-reject');
+        Route::post('/{leave}/hr-approve', [LeaveApprovalController::class, 'hrApprove'])->name('hr-approve');
+        Route::post('/{leave}/hr-reject', [LeaveApprovalController::class, 'hrReject'])->name('hr-reject');
         
         // Manager Approval Routes
-        Route::post('/{leave}/manager-approve', [App\Http\Controllers\LeaveApprovalController::class, 'managerApprove'])->name('manager-approve');
-        Route::post('/{leave}/manager-reject', [App\Http\Controllers\LeaveApprovalController::class, 'managerReject'])->name('manager-reject');
+        Route::post('/{leave}/manager-approve', [LeaveApprovalController::class, 'managerApprove'])->name('manager-approve');
+        Route::post('/{leave}/manager-reject', [LeaveApprovalController::class, 'managerReject'])->name('manager-reject');
     });
 });
 

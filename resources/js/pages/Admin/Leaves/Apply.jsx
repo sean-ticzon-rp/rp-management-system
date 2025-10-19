@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
 import { Checkbox } from '@/Components/ui/checkbox';
 import { Alert, AlertDescription } from '@/Components/ui/alert';
+import { Progress } from '@/Components/ui/progress'; // ✅ ADD THIS
 import {
     Calendar,
     ArrowLeft,
@@ -21,11 +22,13 @@ import {
     User,
     Phone,
     CheckCircle2,
+    XCircle, // ✅ ADD THIS
     Info,
     FileText,
+    UserCheck,
 } from 'lucide-react';
 
-export default function Apply({ auth, leaveTypes, leaveBalances, user }) {
+export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user, managers = [] }) {
     const { data, setData, post, processing, errors } = useForm({
         leave_type_id: '',
         start_date: '',
@@ -35,10 +38,11 @@ export default function Apply({ auth, leaveTypes, leaveBalances, user }) {
         custom_end_time: '',
         reason: '',
         attachment: null,
-        emergency_contact_name: user.emergency_contact_name || '',
-        emergency_contact_phone: user.emergency_contact_phone || '',
+        emergency_contact_name: user?.emergency_contact_name || '',
+        emergency_contact_phone: user?.emergency_contact_phone || '',
         use_default_emergency_contact: true,
         availability: 'reachable',
+        manager_id: user?.manager_id?.toString() || '',
     });
 
     const [selectedLeaveType, setSelectedLeaveType] = useState(null);
@@ -47,16 +51,18 @@ export default function Apply({ auth, leaveTypes, leaveBalances, user }) {
 
     // Update selected leave type when leave_type_id changes
     useEffect(() => {
-        if (data.leave_type_id) {
+        if (data.leave_type_id && Array.isArray(leaveTypes) && leaveTypes.length > 0) {
             const leaveType = leaveTypes.find(lt => lt.id === parseInt(data.leave_type_id));
-            setSelectedLeaveType(leaveType);
+            setSelectedLeaveType(leaveType || null);
         }
-    }, [data.leave_type_id]);
+    }, [data.leave_type_id, leaveTypes]);
 
     // Calculate days whenever dates or duration changes
     useEffect(() => {
         if (data.start_date && data.end_date) {
             calculateDays();
+        } else {
+            setCalculatedDays(0);
         }
     }, [data.start_date, data.end_date, data.duration]);
 
@@ -132,6 +138,34 @@ export default function Apply({ auth, leaveTypes, leaveBalances, user }) {
         >
             <Head title="Apply for Leave" />
 
+            {/* 🔍 DEBUG: Show what data we're receiving */}
+            <Alert className="mb-6 bg-blue-50 border-blue-200 animate-fade-in">
+                <Info className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                    <strong>Debug Info:</strong>
+                    <br />• Leave Types: {Array.isArray(leaveTypes) ? `${leaveTypes.length} found` : 'Not an array'}
+                    <br />• Managers: {Array.isArray(managers) ? `${managers.length} found` : 'Not an array'}
+                    <br />• Leave Balances: {typeof leaveBalances === 'object' ? `${Object.keys(leaveBalances).length} found` : 'Not an object'}
+                    <br />• Current User: {user?.name} (ID: {user?.id})
+                    {Array.isArray(managers) && managers.length > 0 && (
+                        <>
+                            <br />• Available Managers: {managers.map(m => m.name).join(', ')}
+                        </>
+                    )}
+                </AlertDescription>
+            </Alert>
+
+            {/* ⚠️ MISSING LEAVE BALANCES WARNING */}
+            {leaveTypes.length > 0 && Object.keys(leaveBalances).length === 0 && (
+                <Alert className="mb-6 bg-yellow-50 border-yellow-300 animate-fade-in">
+                    <AlertCircle className="h-4 w-4 text-yellow-600" />
+                    <AlertDescription className="text-yellow-800">
+                        <strong>Action Required:</strong> Your leave balances haven't been initialized yet.
+                        <br />Please contact HR or run: <code className="bg-yellow-100 px-2 py-1 rounded text-xs">php artisan leaves:initialize-balances</code>
+                    </AlertDescription>
+                </Alert>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
                     <form onSubmit={handleSubmit} className="space-y-6">
@@ -152,21 +186,25 @@ export default function Apply({ auth, leaveTypes, leaveBalances, user }) {
                                             <SelectValue placeholder="Select leave type" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {leaveTypes.map((leaveType) => {
-                                                const balance = leaveBalances[leaveType.id];
-                                                return (
-                                                    <SelectItem key={leaveType.id} value={leaveType.id.toString()}>
-                                                        <div className="flex items-center justify-between w-full">
-                                                            <span>{leaveType.name} ({leaveType.code})</span>
-                                                            {balance && (
-                                                                <span className="ml-2 text-xs text-gray-500">
-                                                                    {balance.remaining_days} days left
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </SelectItem>
-                                                );
-                                            })}
+                                            {Array.isArray(leaveTypes) && leaveTypes.length > 0 ? (
+                                                leaveTypes.map((leaveType) => {
+                                                    const balance = leaveBalances[leaveType.id];
+                                                    return (
+                                                        <SelectItem key={leaveType.id} value={leaveType.id.toString()}>
+                                                            <div className="flex items-center justify-between w-full">
+                                                                <span>{leaveType.name} ({leaveType.code})</span>
+                                                                {balance && (
+                                                                    <span className="ml-2 text-xs text-gray-500">
+                                                                        {balance.remaining_days} days left
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </SelectItem>
+                                                    );
+                                                })
+                                            ) : (
+                                                <SelectItem value="none" disabled>No leave types available</SelectItem>
+                                            )}
                                         </SelectContent>
                                     </Select>
                                     {errors.leave_type_id && (
@@ -265,10 +303,73 @@ export default function Apply({ auth, leaveTypes, leaveBalances, user }) {
                                     <Alert className="bg-red-50 border-red-200">
                                         <AlertCircle className="h-4 w-4 text-red-600" />
                                         <AlertDescription className="text-red-800">
-                                            <strong>Insufficient balance!</strong> You only have {selectedBalance.remaining_days} days remaining.
+                                            <strong>Insufficient balance!</strong> You only have {selectedBalance.remaining_days} days remaining but requested {calculatedDays} days.
                                         </AlertDescription>
                                     </Alert>
                                 )}
+                            </CardContent>
+                        </Card>
+
+                        {/* ✅ NEW: Manager Selection */}
+                        <Card className="animate-fade-in animation-delay-50">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <UserCheck className="h-5 w-5" />
+                                    Select Manager for Approval
+                                </CardTitle>
+                                <CardDescription>
+                                    Choose the manager who will review your leave request
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="manager_id">Manager *</Label>
+                                    <Select 
+                                        value={data.manager_id.toString()} 
+                                        onValueChange={(value) => setData('manager_id', value)}
+                                    >
+                                        <SelectTrigger className={errors.manager_id ? 'border-red-500' : ''}>
+                                            <SelectValue placeholder="Select your manager" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Array.isArray(managers) && managers.length > 0 ? (
+                                                managers.map((manager) => (
+                                                    <SelectItem key={manager.id} value={manager.id.toString()}>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="flex items-center justify-center w-6 h-6 bg-blue-600 rounded-full">
+                                                                <span className="text-xs font-medium text-white">
+                                                                    {manager.name.charAt(0).toUpperCase()}
+                                                                </span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="font-medium">{manager.name}</span>
+                                                                {manager.position && (
+                                                                    <span className="text-xs text-gray-500 ml-2">
+                                                                        - {manager.position}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </SelectItem>
+                                                ))
+                                            ) : (
+                                                <SelectItem value="none" disabled>No managers available</SelectItem>
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.manager_id && (
+                                        <p className="text-sm text-red-500 flex items-center gap-1">
+                                            <AlertCircle className="h-4 w-4" />
+                                            {errors.manager_id}
+                                        </p>
+                                    )}
+                                    {user?.manager && data.manager_id === user.manager_id?.toString() && (
+                                        <p className="text-xs text-blue-600 flex items-center gap-1">
+                                            <Info className="h-3 w-3" />
+                                            This is your assigned manager from your profile
+                                        </p>
+                                    )}
+                                </div>
                             </CardContent>
                         </Card>
 
@@ -364,14 +465,14 @@ export default function Apply({ auth, leaveTypes, leaveBalances, user }) {
                                         onCheckedChange={(checked) => {
                                             setData('use_default_emergency_contact', checked);
                                             if (checked) {
-                                                setData('emergency_contact_name', user.emergency_contact_name || '');
-                                                setData('emergency_contact_phone', user.emergency_contact_phone || '');
+                                                setData('emergency_contact_name', user?.emergency_contact_name || '');
+                                                setData('emergency_contact_phone', user?.emergency_contact_phone || '');
                                             }
                                         }}
                                     />
                                     <Label htmlFor="use_default" className="cursor-pointer flex-1">
                                         Use my default emergency contact from profile
-                                        {user.emergency_contact_name && (
+                                        {user?.emergency_contact_name && (
                                             <span className="block text-sm text-gray-600 mt-1">
                                                 {user.emergency_contact_name} - {user.emergency_contact_phone}
                                             </span>
@@ -488,7 +589,7 @@ export default function Apply({ auth, leaveTypes, leaveBalances, user }) {
                     )}
 
                     {/* Approval Workflow Info */}
-                    {user.manager && (
+                    {data.manager_id && (
                         <Card className="animate-fade-in animation-delay-200">
                             <CardHeader>
                                 <CardTitle className="text-lg">Approval Workflow</CardTitle>
@@ -501,14 +602,23 @@ export default function Apply({ auth, leaveTypes, leaveBalances, user }) {
                                         </div>
                                         <div className="flex-1">
                                             <p className="font-medium text-gray-900">Manager Approval</p>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <div className="flex items-center justify-center w-6 h-6 bg-blue-600 rounded-full">
-                                                    <span className="text-xs font-medium text-white">
-                                                        {user.manager.name.charAt(0).toUpperCase()}
-                                                    </span>
-                                                </div>
-                                                <span className="text-sm text-gray-600">{user.manager.name}</span>
-                                            </div>
+                                            {(() => {
+                                                const selectedManager = Array.isArray(managers) 
+                                                    ? managers.find(m => m.id === parseInt(data.manager_id))
+                                                    : null;
+                                                return selectedManager ? (
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <div className="flex items-center justify-center w-6 h-6 bg-blue-600 rounded-full">
+                                                            <span className="text-xs font-medium text-white">
+                                                                {selectedManager.name.charAt(0).toUpperCase()}
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-sm text-gray-600">{selectedManager.name}</span>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-sm text-gray-500 mt-1">Select a manager above</p>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
 
