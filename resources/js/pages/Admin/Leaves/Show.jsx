@@ -1,13 +1,14 @@
 // resources/js/Pages/Admin/Leaves/Show.jsx
 import { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm, router } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Textarea } from '@/Components/ui/textarea';
 import { Label } from '@/Components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/Components/ui/card';
 import { Badge } from '@/Components/ui/badge';
 import { Alert, AlertDescription } from '@/Components/ui/alert';
+import { SearchableManagerSelect } from '@/Components/SearchableManagerSelect';
 import {
     Calendar,
     ArrowLeft,
@@ -24,11 +25,55 @@ import {
     Loader2,
     X as XIcon,
     Shield,
+    Edit2,
 } from 'lucide-react';
 
 export default function Show({ auth, leaveRequest }) {
     const [showApproveModal, setShowApproveModal] = useState(false);
     const [showRejectModal, setShowRejectModal] = useState(false);
+    const [showEditManagerModal, setShowEditManagerModal] = useState(false);
+
+    // ✅ Form for editing manager
+    const { data: editManagerData, setData: setEditManagerData, put: updateManager, processing: updatingManager } = useForm({
+        manager_id: leaveRequest.manager_id?.toString() || '',
+    });
+
+    // ✅ Check if user is the assigned manager
+    const isAssignedManager = auth.user?.id === leaveRequest.manager_id;
+
+    // ✅ Check if user has HR approval permissions
+    const canApproveAsHR = auth.user?.roles?.some(role => 
+        ['super-admin', 'admin', 'hr-manager'].includes(role.slug)
+    );
+
+    // ✅ Determine which approval step user can perform
+    const isPendingManager = leaveRequest.status === 'pending_manager';
+    const isPendingHR = leaveRequest.status === 'pending_hr';
+    const isAppealed = leaveRequest.status === 'appealed';
+
+    // ✅ User can approve as manager if they're the assigned manager OR have HR roles (HR can override)
+    const canApproveAsManager = isPendingManager && (isAssignedManager || canApproveAsHR);
+
+    // ✅ User can approve as HR if status is pending_hr AND they have HR role
+    const canApproveAsHRFinal = isPendingHR && canApproveAsHR;
+
+    // ✅ User can handle appeals if they have HR role and status is appealed
+    const canHandleAppeal = isAppealed && canApproveAsHR;
+
+    // ✅ Combined permission check
+    const canTakeAction = canApproveAsManager || canApproveAsHRFinal || canHandleAppeal;
+    
+    // ✅ Determine approval type based on status
+    const approvalType = isPendingManager ? 'manager' : (isPendingHR || isAppealed) ? 'hr' : 'manager';
+
+    // Forms for manager approval
+    const { data: managerApproveData, setData: setManagerApproveData, post: postManagerApprove, processing: managerApproveProcessing } = useForm({
+        manager_comments: '',
+    });
+
+    const { data: managerRejectData, setData: setManagerRejectData, post: postManagerReject, processing: managerRejectProcessing } = useForm({
+        manager_comments: '',
+    });
 
     // ✅ Check if user is the assigned manager
     const isAssignedManager = auth.user?.id === leaveRequest.manager_id;
@@ -108,6 +153,60 @@ export default function Show({ auth, leaveRequest }) {
             preserveScroll: true,
             onSuccess: () => {
                 setShowRejectModal(false);
+            }
+        });
+    };
+
+    // ✅ Handle HR approval - NOW WITH APPEAL ROUTE SUPPORT!
+    const handleHrApprove = (e) => {
+        e.preventDefault();
+        
+        // ✅ Use different route for appeals vs normal HR approval
+        const routeName = leaveRequest.status === 'appealed' 
+            ? 'leaves.approve-appeal' 
+            : 'leaves.hr-approve';
+        
+        console.log('HR Approve clicked - Status:', leaveRequest.status, 'Route:', routeName);
+        
+        postHrApprove(route(routeName, leaveRequest.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowApproveModal(false);
+            },
+            onError: (errors) => {
+                console.error('Approval error:', errors);
+            }
+        });
+    };
+
+    const handleHrReject = (e) => {
+        e.preventDefault();
+        
+        // ✅ Use different route for appeals vs normal HR rejection
+        const routeName = leaveRequest.status === 'appealed' 
+            ? 'leaves.reject-appeal' 
+            : 'leaves.hr-reject';
+        
+        console.log('HR Reject clicked - Status:', leaveRequest.status, 'Route:', routeName);
+        
+        postHrReject(route(routeName, leaveRequest.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowRejectModal(false);
+            },
+            onError: (errors) => {
+                console.error('Rejection error:', errors);
+            }
+        });
+    };
+
+    // ✅ Handle manager update
+    const handleUpdateManager = (e) => {
+        e.preventDefault();
+        updateManager(route('leaves.update-manager', leaveRequest.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowEditManagerModal(false);
             }
         });
     };
@@ -210,7 +309,16 @@ export default function Show({ auth, leaveRequest }) {
                         </Alert>
                     )}
 
-                    {/* Employee Info */}
+                    {isAppealed && !canHandleAppeal && (
+                        <Alert className="bg-orange-50 border-orange-300 animate-fade-in">
+                            <AlertCircle className="h-5 w-5 text-orange-600" />
+                            <AlertDescription className="text-orange-800">
+                                <strong>View Only:</strong> Only HR roles can review and approve/reject appeals.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                    {/* Employee Info - keeping it short for character limit */}
                     <Card className="animate-fade-in">
                         <CardHeader>
                             <CardTitle>Employee Information</CardTitle>

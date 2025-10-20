@@ -171,6 +171,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Admin Leave Management (Manage All Employees)
     Route::prefix('leaves')->name('leaves.')->group(function () {
+        // Basic CRUD
         Route::get('/', [LeaveController::class, 'index'])->name('index');
         Route::get('/apply', [LeaveController::class, 'create'])->name('apply');
         Route::post('/', [LeaveController::class, 'store'])->name('store');
@@ -179,6 +180,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/apply', [LeaveController::class, 'create'])->name('apply');
         Route::post('/', [LeaveController::class, 'store'])->name('store');
         Route::get('/{leave}', [LeaveController::class, 'show'])->name('show');
+        
+        // Manager Approval Routes
+        Route::post('/{leave}/manager-approve', [LeaveApprovalController::class, 'managerApprove'])->name('manager-approve');
+        Route::post('/{leave}/manager-reject', [LeaveApprovalController::class, 'managerReject'])->name('manager-reject');
         
         // HR Approval Routes
         Route::post('/{leave}/hr-approve', [LeaveApprovalController::class, 'hrApprove'])->name('hr-approve');

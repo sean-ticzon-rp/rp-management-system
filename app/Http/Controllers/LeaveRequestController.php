@@ -74,7 +74,7 @@ class LeaveRequestController extends Controller
             ->get()
             ->keyBy('leave_type_id');
 
-        // ✅ SIMPLE: Just get all active users except current user
+        // Get all active users except current user as potential managers
         $managers = User::where('employment_status', 'active')
             ->where('id', '!=', $user->id)
             ->orderBy('name')
@@ -103,12 +103,11 @@ class LeaveRequestController extends Controller
             'custom_start_time' => 'nullable|required_if:duration,custom_hours|date_format:H:i',
             'custom_end_time' => 'nullable|required_if:duration,custom_hours|date_format:H:i|after:custom_start_time',
             'reason' => 'required|string|max:1000',
-            'attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120', // 5MB max
+            'attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
             'emergency_contact_name' => 'nullable|required_if:use_default_emergency_contact,false|string|max:255',
             'emergency_contact_phone' => 'nullable|required_if:use_default_emergency_contact,false|string|max:20',
             'use_default_emergency_contact' => 'boolean',
             'availability' => 'nullable|in:reachable,offline,emergency_only',
-            'manager_id' => 'required|exists:users,id', // ✅ ADD THIS - Manager is now required
             'manager_id' => 'required|exists:users,id', // ✅ ADD THIS - Manager is now required
         ]);
 
@@ -145,16 +144,15 @@ class LeaveRequestController extends Controller
         }
 
         // Create leave request
-        $leaveRequest = LeaveRequest::create([
+        LeaveRequest::create([
             ...$validated,
             'user_id' => $user->id,
             'total_days' => $totalDays,
             'status' => 'pending_manager',
         ]);
 
-        // TODO: Send email to manager
-
-        return redirect()->route('leaves.index')->with('success', 
+        // ✅ FIXED: Redirect to employee's own leave page
+        return redirect()->route('my-leaves.index')->with('success', 
             'Leave request submitted successfully! Your manager will review it.'
         );
     }
@@ -240,12 +238,10 @@ class LeaveRequestController extends Controller
         switch ($duration) {
             case 'half_day_am':
             case 'half_day_pm':
-                return 0.5; // Always 0.5 days for half-day
+                return 0.5;
             
             case 'custom_hours':
-                // For custom hours, we'll calculate based on 8-hour workday
-                // This is simplified - you may want more complex logic
-                return 0.5; // Default to half day for custom hours
+                return 0.5;
             
             case 'full_day':
             default:
