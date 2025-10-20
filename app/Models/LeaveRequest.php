@@ -51,41 +51,26 @@ class LeaveRequest extends Model
     // RELATIONSHIPS
     // ============================================
 
-    /**
-     * The employee who filed the leave request
-     */
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * The type of leave requested
-     */
     public function leaveType()
     {
         return $this->belongsTo(LeaveType::class);
     }
 
-    /**
-     * The manager who should approve (auto-assigned from user.manager_id)
-     */
     public function manager()
     {
         return $this->belongsTo(User::class, 'manager_id');
     }
 
-    /**
-     * The manager who actually approved (could be different if manager changed)
-     */
     public function managerApprover()
     {
         return $this->belongsTo(User::class, 'manager_approved_by');
     }
 
-    /**
-     * The HR person who approved
-     */
     public function hrApprover()
     {
         return $this->belongsTo(User::class, 'hr_approved_by');
@@ -95,65 +80,41 @@ class LeaveRequest extends Model
     // SCOPES
     // ============================================
 
-    /**
-     * Scope: Pending manager approval
-     */
     public function scopePendingManager($query)
     {
         return $query->where('status', 'pending_manager');
     }
 
-    /**
-     * Scope: Pending HR approval
-     */
     public function scopePendingHr($query)
     {
         return $query->where('status', 'pending_hr');
     }
 
-    /**
-     * Scope: Approved requests
-     */
     public function scopeApproved($query)
     {
         return $query->where('status', 'approved');
     }
 
-    /**
-     * Scope: Rejected requests
-     */
     public function scopeRejected($query)
     {
         return $query->whereIn('status', ['rejected_by_manager', 'rejected_by_hr']);
     }
 
-    /**
-     * Scope: Appealed requests
-     */
     public function scopeAppealed($query)
     {
         return $query->where('status', 'appealed');
     }
 
-    /**
-     * Scope: For a specific manager
-     */
     public function scopeForManager($query, $managerId)
     {
         return $query->where('manager_id', $managerId);
     }
 
-    /**
-     * Scope: Current year requests
-     */
     public function scopeCurrentYear($query)
     {
         return $query->whereYear('start_date', now()->year);
     }
 
-    /**
-     * Scope: Upcoming leaves (future dates)
-     */
     public function scopeUpcoming($query)
     {
         return $query->where('start_date', '>=', now())
@@ -199,9 +160,6 @@ class LeaveRequest extends Model
     // APPROVAL WORKFLOW METHODS
     // ============================================
 
-    /**
-     * Manager approves the request
-     */
     public function approveByManager($managerId, $comments = null)
     {
         $this->update([
@@ -215,9 +173,6 @@ class LeaveRequest extends Model
         // TODO: Send update email to employee
     }
 
-    /**
-     * Manager rejects the request
-     */
     public function rejectByManager($managerId, $reason)
     {
         $this->update([
@@ -231,9 +186,6 @@ class LeaveRequest extends Model
         // TODO: Send FYI email to HR
     }
 
-    /**
-     * HR approves the request (final approval)
-     */
     public function approveByHr($hrUserId, $comments = null)
     {
         $this->update([
@@ -251,9 +203,6 @@ class LeaveRequest extends Model
         // TODO: Add to team calendar
     }
 
-    /**
-     * HR rejects the request
-     */
     public function rejectByHr($hrUserId, $reason)
     {
         $this->update([
@@ -268,7 +217,7 @@ class LeaveRequest extends Model
     }
 
     /**
-     * Employee appeals a rejection
+     * ✅ NEW: Employee appeals a manager rejection
      */
     public function appeal($reason)
     {
@@ -283,11 +232,9 @@ class LeaveRequest extends Model
         ]);
 
         // TODO: Send escalation email to HR
+        // TODO: Send confirmation email to employee
     }
 
-    /**
-     * Employee cancels their request
-     */
     public function cancel()
     {
         if (!$this->canBeCancelled()) {
@@ -298,11 +245,6 @@ class LeaveRequest extends Model
             'status' => 'cancelled',
         ]);
 
-        // If it was already pending_hr (manager approved), restore balance
-        if ($this->status === 'cancelled' && $this->manager_approved_at) {
-            // Balance wasn't deducted yet, no need to restore
-        }
-
         // TODO: Send cancellation email to manager and HR
     }
 
@@ -310,9 +252,6 @@ class LeaveRequest extends Model
     // HELPER METHODS
     // ============================================
 
-    /**
-     * Deduct leave days from user's balance
-     */
     protected function deductFromBalance()
     {
         $balance = LeaveBalance::where('user_id', $this->user_id)
@@ -325,17 +264,11 @@ class LeaveRequest extends Model
         }
     }
 
-    /**
-     * Check if leave requires medical certificate
-     */
     public function requiresMedicalCertificate()
     {
         return $this->leaveType->requiresMedicalCertForDays($this->total_days);
     }
 
-    /**
-     * Get status badge color for UI
-     */
     public function getStatusColorAttribute()
     {
         return match($this->status) {
@@ -349,9 +282,6 @@ class LeaveRequest extends Model
         };
     }
 
-    /**
-     * Get human-readable status
-     */
     public function getStatusLabelAttribute()
     {
         return match($this->status) {

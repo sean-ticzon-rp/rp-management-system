@@ -1,13 +1,14 @@
 // resources/js/Pages/Admin/Leaves/Show.jsx
 import { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm, router } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Textarea } from '@/Components/ui/textarea';
 import { Label } from '@/Components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/Components/ui/card';
 import { Badge } from '@/Components/ui/badge';
 import { Alert, AlertDescription } from '@/Components/ui/alert';
+import { SearchableManagerSelect } from '@/Components/SearchableManagerSelect';
 import {
     Calendar,
     ArrowLeft,
@@ -16,7 +17,6 @@ import {
     XCircle,
     AlertCircle,
     User,
-    Phone,
     Download,
     UserCheck,
     UserX,
@@ -24,11 +24,18 @@ import {
     Loader2,
     X as XIcon,
     Shield,
+    Edit2,
 } from 'lucide-react';
 
-export default function Show({ auth, leaveRequest }) {
+export default function Show({ auth, leaveRequest, managers = [] }) {
     const [showApproveModal, setShowApproveModal] = useState(false);
     const [showRejectModal, setShowRejectModal] = useState(false);
+    const [showEditManagerModal, setShowEditManagerModal] = useState(false);
+
+    // ✅ Form for editing manager
+    const { data: editManagerData, setData: setEditManagerData, put: updateManager, processing: updatingManager } = useForm({
+        manager_id: leaveRequest.manager_id?.toString() || '',
+    });
 
     // ✅ Check if user is the assigned manager
     const isAssignedManager = auth.user?.id === leaveRequest.manager_id;
@@ -41,6 +48,7 @@ export default function Show({ auth, leaveRequest }) {
     // ✅ Determine which approval step user can perform
     const isPendingManager = leaveRequest.status === 'pending_manager';
     const isPendingHR = leaveRequest.status === 'pending_hr';
+    const isAppealed = leaveRequest.status === 'appealed';
 
     // ✅ User can approve as manager if they're the assigned manager OR have HR roles (HR can override)
     const canApproveAsManager = isPendingManager && (isAssignedManager || canApproveAsHR);
@@ -48,9 +56,14 @@ export default function Show({ auth, leaveRequest }) {
     // ✅ User can approve as HR if status is pending_hr AND they have HR role
     const canApproveAsHRFinal = isPendingHR && canApproveAsHR;
 
+    // ✅ User can handle appeals if they have HR role and status is appealed
+    const canHandleAppeal = isAppealed && canApproveAsHR;
+
     // ✅ Combined permission check
-    const canTakeAction = canApproveAsManager || canApproveAsHRFinal;
-    const approvalType = isPendingManager ? 'manager' : 'hr';
+    const canTakeAction = canApproveAsManager || canApproveAsHRFinal || canHandleAppeal;
+    
+    // ✅ Determine approval type based on status
+    const approvalType = isPendingManager ? 'manager' : (isPendingHR || isAppealed) ? 'hr' : 'manager';
 
     // Forms for manager approval
     const { data: managerApproveData, setData: setManagerApproveData, post: postManagerApprove, processing: managerApproveProcessing } = useForm({
@@ -91,23 +104,56 @@ export default function Show({ auth, leaveRequest }) {
         });
     };
 
-    // ✅ Handle HR approval
+    // ✅ Handle HR approval - NOW WITH APPEAL ROUTE SUPPORT!
     const handleHrApprove = (e) => {
         e.preventDefault();
-        postHrApprove(route('leaves.hr-approve', leaveRequest.id), {
+        
+        // ✅ Use different route for appeals vs normal HR approval
+        const routeName = leaveRequest.status === 'appealed' 
+            ? 'leaves.approve-appeal' 
+            : 'leaves.hr-approve';
+        
+        console.log('HR Approve clicked - Status:', leaveRequest.status, 'Route:', routeName);
+        
+        postHrApprove(route(routeName, leaveRequest.id), {
             preserveScroll: true,
             onSuccess: () => {
                 setShowApproveModal(false);
+            },
+            onError: (errors) => {
+                console.error('Approval error:', errors);
             }
         });
     };
 
     const handleHrReject = (e) => {
         e.preventDefault();
-        postHrReject(route('leaves.hr-reject', leaveRequest.id), {
+        
+        // ✅ Use different route for appeals vs normal HR rejection
+        const routeName = leaveRequest.status === 'appealed' 
+            ? 'leaves.reject-appeal' 
+            : 'leaves.hr-reject';
+        
+        console.log('HR Reject clicked - Status:', leaveRequest.status, 'Route:', routeName);
+        
+        postHrReject(route(routeName, leaveRequest.id), {
             preserveScroll: true,
             onSuccess: () => {
                 setShowRejectModal(false);
+            },
+            onError: (errors) => {
+                console.error('Rejection error:', errors);
+            }
+        });
+    };
+
+    // ✅ Handle manager update
+    const handleUpdateManager = (e) => {
+        e.preventDefault();
+        updateManager(route('leaves.update-manager', leaveRequest.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowEditManagerModal(false);
             }
         });
     };
@@ -172,14 +218,14 @@ export default function Show({ auth, leaveRequest }) {
                                 onClick={() => setShowApproveModal(true)}
                             >
                                 <UserCheck className="h-4 w-4 mr-2" />
-                                Approve {isPendingManager ? '(Manager)' : '(HR)'}
+                                {isAppealed ? 'Approve Appeal' : `Approve ${isPendingManager ? '(Manager)' : '(HR)'}`}
                             </Button>
                             <Button 
                                 variant="destructive"
                                 onClick={() => setShowRejectModal(true)}
                             >
                                 <UserX className="h-4 w-4 mr-2" />
-                                Reject {isPendingManager ? '(Manager)' : '(HR)'}
+                                {isAppealed ? 'Deny Appeal' : `Reject ${isPendingManager ? '(Manager)' : '(HR)'}`}
                             </Button>
                         </div>
                     )}
@@ -210,7 +256,16 @@ export default function Show({ auth, leaveRequest }) {
                         </Alert>
                     )}
 
-                    {/* Employee Info */}
+                    {isAppealed && !canHandleAppeal && (
+                        <Alert className="bg-orange-50 border-orange-300 animate-fade-in">
+                            <AlertCircle className="h-5 w-5 text-orange-600" />
+                            <AlertDescription className="text-orange-800">
+                                <strong>View Only:</strong> Only HR roles can review and approve/reject appeals.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                    {/* Employee Info - keeping it short for character limit */}
                     <Card className="animate-fade-in">
                         <CardHeader>
                             <CardTitle>Employee Information</CardTitle>
@@ -464,24 +519,98 @@ export default function Show({ auth, leaveRequest }) {
                                         )}
                                     </div>
                                 )}
+
+                                {/* Appeal Status */}
+                                {leaveRequest.status === 'appealed' && (
+                                    <div className="flex items-start gap-4 pt-4 border-t-2 border-orange-200">
+                                        <div className="flex items-center justify-center w-10 h-10 bg-orange-100 rounded-full flex-shrink-0">
+                                            <AlertCircle className="h-5 w-5 text-orange-600" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-medium text-gray-900">Appeal Submitted</p>
+                                            <p className="text-sm text-gray-600">
+                                                Employee has appealed the rejection
+                                            </p>
+                                            {leaveRequest.appealed_at && (
+                                                <p className="text-sm text-gray-600 mt-1">
+                                                    Appealed on {new Date(leaveRequest.appealed_at).toLocaleString()}
+                                                </p>
+                                            )}
+                                            <Badge className="mt-2 bg-orange-100 text-orange-700 border border-orange-200">
+                                                <AlertCircle className="h-3 w-3 mr-1" />
+                                                Awaiting HR Review
+                                            </Badge>
+                                        </div>
+                                        <Clock className="h-5 w-5 text-orange-600" />
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* Leave Information Card - Same as before */}
-                    <Card className="animate-fade-in animation-delay-300">
-                        <CardHeader>
-                            <CardTitle>Leave Information</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="pt-4 border-t">
-                                <p className="text-sm text-gray-600 mb-2">Reason</p>
-                                <div className="p-4 bg-gray-50 rounded-lg">
-                                    <p className="text-gray-900 whitespace-pre-wrap">{leaveRequest.reason}</p>
+                    {/* Appeal Details Card */}
+                    {leaveRequest.status === 'appealed' && leaveRequest.appeal_reason && (
+                        <Card className="animate-fade-in animation-delay-300 border-orange-300 border-2">
+                            <CardHeader>
+                                <CardTitle className="text-orange-700 flex items-center gap-2">
+                                    <AlertCircle className="h-5 w-5" />
+                                    Appeal Details
+                                </CardTitle>
+                                <CardDescription>
+                                    Employee has appealed the rejection decision
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {/* Original Rejection Info */}
+                                <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                                    <p className="text-xs text-red-600 font-semibold mb-2">
+                                        Original Rejection by {leaveRequest.status === 'rejected_by_manager' ? 'Manager' : 'HR'}
+                                    </p>
+                                    {leaveRequest.manager_comments && !leaveRequest.hr_comments && (
+                                        <p className="text-sm text-red-700">{leaveRequest.manager_comments}</p>
+                                    )}
+                                    {leaveRequest.hr_comments && (
+                                        <p className="text-sm text-red-700">{leaveRequest.hr_comments}</p>
+                                    )}
                                 </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+
+                                {/* Appeal Reason */}
+                                <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                                    <p className="text-xs text-orange-600 font-semibold mb-2">Appeal Reason:</p>
+                                    <p className="text-sm text-gray-900 whitespace-pre-wrap">
+                                        {leaveRequest.appeal_reason}
+                                    </p>
+                                    {leaveRequest.appealed_at && (
+                                        <p className="text-xs text-gray-500 mt-2">
+                                            Submitted on {new Date(leaveRequest.appealed_at).toLocaleString()}
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Supporting Appeal Document */}
+                                {leaveRequest.appeal_attachment && (
+                                    <div className="pt-2">
+                                        <p className="text-sm text-gray-600 mb-2">Additional Supporting Document:</p>
+                                        <Button variant="outline" size="sm" asChild className="w-full">
+                                            <a href={`/storage/${leaveRequest.appeal_attachment}`} download target="_blank">
+                                                <Download className="h-4 w-4 mr-2" />
+                                                Download Appeal Attachment
+                                            </a>
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {/* Action Alert for HR */}
+                                {canApproveAsHR && (
+                                    <div className="p-3 bg-yellow-50 border border-yellow-300 rounded-lg">
+                                        <p className="text-sm text-yellow-800">
+                                            <strong>Action Required:</strong> Review the appeal and make a final decision on this leave request.
+                                        </p>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
 
                 {/* Sidebar */}
@@ -550,7 +679,37 @@ export default function Show({ auth, leaveRequest }) {
                         </Card>
                     )}
 
-                    {/* Emergency Contact & Leave Type cards remain the same */}
+                    {/* Appeal Action Card for HR */}
+                    {leaveRequest.status === 'appealed' && canApproveAsHR && (
+                        <Card className="animate-fade-in border-orange-300 border-2">
+                            <CardHeader>
+                                <CardTitle className="text-orange-700 flex items-center gap-2">
+                                    <AlertCircle className="h-5 w-5" />
+                                    Appeal Review Required
+                                </CardTitle>
+                                <CardDescription>
+                                    Review the employee's appeal and make a decision
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                <Button 
+                                    className="w-full bg-green-600 hover:bg-green-700 justify-start"
+                                    onClick={() => setShowApproveModal(true)}
+                                >
+                                    <UserCheck className="h-5 w-5 mr-2" />
+                                    Approve Appeal
+                                </Button>
+                                <Button 
+                                    variant="destructive" 
+                                    className="w-full justify-start"
+                                    onClick={() => setShowRejectModal(true)}
+                                >
+                                    <UserX className="h-5 w-5 mr-2" />
+                                    Deny Appeal
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
             </div>
 
@@ -646,7 +805,9 @@ export default function Show({ auth, leaveRequest }) {
                                         <UserCheck className="h-6 w-6 text-green-600" />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-semibold text-gray-900">Final HR Approval</h3>
+                                        <h3 className="text-lg font-semibold text-gray-900">
+                                            {leaveRequest.status === 'appealed' ? 'Approve Appeal' : 'Final HR Approval'}
+                                        </h3>
                                         <p className="text-sm text-gray-600 mt-0.5">
                                             {leaveRequest.user.name} - {leaveRequest.total_days} {leaveRequest.total_days === 1 ? 'day' : 'days'}
                                         </p>
@@ -786,7 +947,7 @@ export default function Show({ auth, leaveRequest }) {
                 </>
             )}
 
-            {/* ✅ HR REJECT MODAL - Same structure as manager but calls HR route */}
+            {/* ✅ HR REJECT MODAL */}
             {showRejectModal && approvalType === 'hr' && (
                 <>
                     <div 
@@ -801,7 +962,9 @@ export default function Show({ auth, leaveRequest }) {
                                         <UserX className="h-6 w-6 text-red-600" />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-semibold text-gray-900">Final HR Rejection</h3>
+                                        <h3 className="text-lg font-semibold text-gray-900">
+                                            {leaveRequest.status === 'appealed' ? 'Deny Appeal' : 'Final HR Rejection'}
+                                        </h3>
                                         <p className="text-sm text-gray-600 mt-0.5">
                                             {leaveRequest.user.name} - {leaveRequest.total_days} {leaveRequest.total_days === 1 ? 'day' : 'days'}
                                         </p>

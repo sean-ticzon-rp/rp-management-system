@@ -117,4 +117,78 @@ class LeaveApprovalController extends Controller
             "Leave request has been rejected. Employee can appeal this decision."
         );
     }
+
+    /**
+     * ✅ NEW: HR approves an appealed leave request (FINAL)
+     */
+    public function approveAppeal(Request $request, LeaveRequest $leave)
+    {
+        // ✅ Check if user has HR permissions
+        $user = auth()->user();
+        $canApproveAsHR = $user->roles->whereIn('slug', [
+            'super-admin', 
+            'admin', 
+            'hr-manager'
+        ])->count() > 0;
+
+        if (!$canApproveAsHR) {
+            abort(403, 'Only HR can approve appeals.');
+        }
+
+        // ✅ Validate that request is in appealed status
+        if ($leave->status !== 'appealed') {
+            return back()->with('error', 'This leave request is not in appealed status.');
+        }
+
+        $validated = $request->validate([
+            'hr_comments' => 'nullable|string|max:1000',
+        ]);
+
+        // ✅ Approve the appeal (uses existing approveByHr method)
+        $leave->approveByHr(
+            auth()->id(),
+            $validated['hr_comments'] ?? 'Appeal approved by HR.'
+        );
+
+        return redirect()->route('leaves.show', $leave->id)->with('success', 
+            "Appeal approved! Leave request for {$leave->user->name} has been approved and balance updated."
+        );
+    }
+
+    /**
+     * ✅ NEW: HR rejects an appealed leave request (FINAL)
+     */
+    public function rejectAppeal(Request $request, LeaveRequest $leave)
+    {
+        // ✅ Check if user has HR permissions
+        $user = auth()->user();
+        $canApproveAsHR = $user->roles->whereIn('slug', [
+            'super-admin', 
+            'admin', 
+            'hr-manager'
+        ])->count() > 0;
+
+        if (!$canApproveAsHR) {
+            abort(403, 'Only HR can reject appeals.');
+        }
+
+        // ✅ Validate that request is in appealed status
+        if ($leave->status !== 'appealed') {
+            return back()->with('error', 'This leave request is not in appealed status.');
+        }
+
+        $validated = $request->validate([
+            'hr_comments' => 'required|string|max:1000',
+        ]);
+
+        // ✅ Reject the appeal (uses existing rejectByHr method)
+        $leave->rejectByHr(
+            auth()->id(),
+            $validated['hr_comments']
+        );
+
+        return redirect()->route('leaves.show', $leave->id)->with('success', 
+            "Appeal rejected. Final decision has been communicated to {$leave->user->name}."
+        );
+    }
 }
