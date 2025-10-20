@@ -132,6 +132,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/users/import', [UserImportController::class, 'import'])->name('users.import.store');
     
     // User Approval Routes (BEFORE resource routes)
+    // User Approval Routes (BEFORE resource routes)
     Route::post('/users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
     Route::post('/users/{user}/reject', [UserController::class, 'reject'])->name('users.reject');
     
@@ -168,11 +169,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{asset}', [AssetController::class, 'show'])->name('show');
     });
 
-    // ============================================
-    // 📋 ADMIN LEAVE MANAGEMENT (Manage All Employees)
-    // ============================================
+    // Admin Leave Management (Manage All Employees)
     Route::prefix('leaves')->name('leaves.')->group(function () {
         // Basic CRUD
+        Route::get('/', [LeaveController::class, 'index'])->name('index');
+        Route::get('/apply', [LeaveController::class, 'create'])->name('apply');
+        Route::post('/', [LeaveController::class, 'store'])->name('store');
+        Route::get('/{leave}', [LeaveController::class, 'show'])->name('show');
         Route::get('/', [LeaveController::class, 'index'])->name('index');
         Route::get('/apply', [LeaveController::class, 'create'])->name('apply');
         Route::post('/', [LeaveController::class, 'store'])->name('store');
@@ -185,10 +188,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // HR Approval Routes
         Route::post('/{leave}/hr-approve', [LeaveApprovalController::class, 'hrApprove'])->name('hr-approve');
         Route::post('/{leave}/hr-reject', [LeaveApprovalController::class, 'hrReject'])->name('hr-reject');
+        Route::post('/{leave}/hr-approve', [LeaveApprovalController::class, 'hrApprove'])->name('hr-approve');
+        Route::post('/{leave}/hr-reject', [LeaveApprovalController::class, 'hrReject'])->name('hr-reject');
         
-        // ✅ Appeal Approval Routes (HR only)
-        Route::post('/{leave}/approve-appeal', [LeaveApprovalController::class, 'approveAppeal'])->name('approve-appeal');
-        Route::post('/{leave}/reject-appeal', [LeaveApprovalController::class, 'rejectAppeal'])->name('reject-appeal');
+        // Manager Approval Routes
+        Route::post('/{leave}/manager-approve', [LeaveApprovalController::class, 'managerApprove'])->name('manager-approve');
+        Route::post('/{leave}/manager-reject', [LeaveApprovalController::class, 'managerReject'])->name('manager-reject');
+        Route::post('/{leave}/manager-approve', [LeaveApprovalController::class, 'managerApprove'])->name('manager-approve');
+        Route::post('/{leave}/manager-reject', [LeaveApprovalController::class, 'managerReject'])->name('manager-reject');
     });
 });
 

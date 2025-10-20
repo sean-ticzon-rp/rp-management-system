@@ -1,4 +1,4 @@
-// resources/js/Pages/Employees/Leaves/Apply.jsx
+// resources/js/Pages/Leaves/Apply.jsx
 import { useState, useEffect } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
@@ -10,8 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
 import { Checkbox } from '@/Components/ui/checkbox';
 import { Alert, AlertDescription } from '@/Components/ui/alert';
-import { Progress } from '@/Components/ui/progress';
-import { SearchableManagerSelect } from '@/Components/SearchableManagerSelect';
+import { Progress } from '@/Components/ui/progress'; // ✅ ADD THIS
 import {
     Calendar,
     ArrowLeft,
@@ -20,9 +19,10 @@ import {
     AlertCircle,
     Clock,
     Upload,
+    User,
     Phone,
     CheckCircle2,
-    XCircle,
+    XCircle, // ✅ ADD THIS
     Info,
     FileText,
     UserCheck,
@@ -49,6 +49,7 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
     const [calculatedDays, setCalculatedDays] = useState(0);
     const [filePreview, setFilePreview] = useState(null);
 
+    // Update selected leave type when leave_type_id changes
     useEffect(() => {
         if (data.leave_type_id && Array.isArray(leaveTypes) && leaveTypes.length > 0) {
             const leaveType = leaveTypes.find(lt => lt.id === parseInt(data.leave_type_id));
@@ -56,6 +57,7 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
         }
     }, [data.leave_type_id, leaveTypes]);
 
+    // Calculate days whenever dates or duration changes
     useEffect(() => {
         if (data.start_date && data.end_date) {
             calculateDays();
@@ -95,7 +97,7 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        post(route('my-leaves.store'));
+        post(route('leaves.store'));
     };
 
     const selectedBalance = data.leave_type_id 
@@ -116,7 +118,7 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <Button asChild variant="ghost" size="sm">
-                            <Link href={route('my-leaves.index')}>
+                            <Link href={route('leaves.index')}>
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back
                             </Link>
@@ -127,7 +129,7 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                             </div>
                             <div>
                                 <h2 className="text-3xl font-bold text-gray-900">Apply for Leave</h2>
-                                <p className="text-gray-600 mt-1">Submit your leave request</p>
+                                <p className="text-gray-600 mt-1">Submit a new leave request</p>
                             </div>
                         </div>
                     </div>
@@ -136,10 +138,38 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
         >
             <Head title="Apply for Leave" />
 
+            {/* 🔍 DEBUG: Show what data we're receiving */}
+            <Alert className="mb-6 bg-blue-50 border-blue-200 animate-fade-in">
+                <Info className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                    <strong>Debug Info:</strong>
+                    <br />• Leave Types: {Array.isArray(leaveTypes) ? `${leaveTypes.length} found` : 'Not an array'}
+                    <br />• Managers: {Array.isArray(managers) ? `${managers.length} found` : 'Not an array'}
+                    <br />• Leave Balances: {typeof leaveBalances === 'object' ? `${Object.keys(leaveBalances).length} found` : 'Not an object'}
+                    <br />• Current User: {user?.name} (ID: {user?.id})
+                    {Array.isArray(managers) && managers.length > 0 && (
+                        <>
+                            <br />• Available Managers: {managers.map(m => m.name).join(', ')}
+                        </>
+                    )}
+                </AlertDescription>
+            </Alert>
+
+            {/* ⚠️ MISSING LEAVE BALANCES WARNING */}
+            {leaveTypes.length > 0 && Object.keys(leaveBalances).length === 0 && (
+                <Alert className="mb-6 bg-yellow-50 border-yellow-300 animate-fade-in">
+                    <AlertCircle className="h-4 w-4 text-yellow-600" />
+                    <AlertDescription className="text-yellow-800">
+                        <strong>Action Required:</strong> Your leave balances haven't been initialized yet.
+                        <br />Please contact HR or run: <code className="bg-yellow-100 px-2 py-1 rounded text-xs">php artisan leaves:initialize-balances</code>
+                    </AlertDescription>
+                </Alert>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        {/* Leave Type & Dates - keeping existing code */}
+                        {/* Leave Type & Dates */}
                         <Card className="animate-fade-in">
                             <CardHeader>
                                 <CardTitle>Leave Details</CardTitle>
@@ -255,53 +285,78 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                                     </div>
                                 )}
 
+                                {/* Days Calculation Display */}
                                 {calculatedDays > 0 && (
-                                    <Alert className={hasSufficientBalance ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200'}>
-                                        {hasSufficientBalance ? (
-                                            <Info className="h-4 w-4 text-blue-600" />
-                                        ) : (
-                                            <AlertCircle className="h-4 w-4 text-red-600" />
-                                        )}
-                                        <AlertDescription className={hasSufficientBalance ? 'text-blue-800' : 'text-red-800'}>
-                                            {hasSufficientBalance ? (
-                                                <>
-                                                    <strong>Total:</strong> {calculatedDays} {calculatedDays === 1 ? 'day' : 'days'}
-                                                    {selectedBalance && (
-                                                        <> · <strong>Remaining after:</strong> {selectedBalance.remaining_days - calculatedDays} days</>
-                                                    )}
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <strong>Insufficient balance!</strong> You have {selectedBalance.remaining_days} days but requested {calculatedDays} days.
-                                                </>
+                                    <Alert className="bg-blue-50 border-blue-200">
+                                        <Info className="h-4 w-4 text-blue-600" />
+                                        <AlertDescription className="text-blue-800">
+                                            <strong>Total:</strong> {calculatedDays} {calculatedDays === 1 ? 'day' : 'days'}
+                                            {selectedBalance && (
+                                                <> · <strong>Remaining after:</strong> {selectedBalance.remaining_days - calculatedDays} days</>
                                             )}
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+
+                                {/* Insufficient Balance Warning */}
+                                {!hasSufficientBalance && selectedBalance && (
+                                    <Alert className="bg-red-50 border-red-200">
+                                        <AlertCircle className="h-4 w-4 text-red-600" />
+                                        <AlertDescription className="text-red-800">
+                                            <strong>Insufficient balance!</strong> You only have {selectedBalance.remaining_days} days remaining but requested {calculatedDays} days.
                                         </AlertDescription>
                                     </Alert>
                                 )}
                             </CardContent>
                         </Card>
 
-                        {/* ✅ UPDATED: Manager Selection with Searchable Dropdown */}
+                        {/* ✅ NEW: Manager Selection */}
                         <Card className="animate-fade-in animation-delay-50">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <UserCheck className="h-5 w-5" />
-                                    Manager Approval
+                                    Select Manager for Approval
                                 </CardTitle>
                                 <CardDescription>
-                                    Search and select the manager who will review your leave request
+                                    Choose the manager who will review your leave request
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="manager_id">Select Manager *</Label>
-                                    <SearchableManagerSelect
-                                        managers={managers}
-                                        value={data.manager_id}
-                                        onChange={(value) => setData('manager_id', value)}
-                                        error={errors.manager_id}
-                                        currentManagerId={user?.manager_id}
-                                    />
+                                    <Label htmlFor="manager_id">Manager *</Label>
+                                    <Select 
+                                        value={data.manager_id.toString()} 
+                                        onValueChange={(value) => setData('manager_id', value)}
+                                    >
+                                        <SelectTrigger className={errors.manager_id ? 'border-red-500' : ''}>
+                                            <SelectValue placeholder="Select your manager" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Array.isArray(managers) && managers.length > 0 ? (
+                                                managers.map((manager) => (
+                                                    <SelectItem key={manager.id} value={manager.id.toString()}>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="flex items-center justify-center w-6 h-6 bg-blue-600 rounded-full">
+                                                                <span className="text-xs font-medium text-white">
+                                                                    {manager.name.charAt(0).toUpperCase()}
+                                                                </span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="font-medium">{manager.name}</span>
+                                                                {manager.position && (
+                                                                    <span className="text-xs text-gray-500 ml-2">
+                                                                        - {manager.position}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </SelectItem>
+                                                ))
+                                            ) : (
+                                                <SelectItem value="none" disabled>No managers available</SelectItem>
+                                            )}
+                                        </SelectContent>
+                                    </Select>
                                     {errors.manager_id && (
                                         <p className="text-sm text-red-500 flex items-center gap-1">
                                             <AlertCircle className="h-4 w-4" />
@@ -311,7 +366,7 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                                     {user?.manager && data.manager_id === user.manager_id?.toString() && (
                                         <p className="text-xs text-blue-600 flex items-center gap-1">
                                             <Info className="h-3 w-3" />
-                                            Your assigned manager
+                                            This is your assigned manager from your profile
                                         </p>
                                     )}
                                 </div>
@@ -322,7 +377,7 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                         <Card className="animate-fade-in animation-delay-100">
                             <CardHeader>
                                 <CardTitle>Request Details</CardTitle>
-                                <CardDescription>Why do you need this leave?</CardDescription>
+                                <CardDescription>Provide reason and supporting documents</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="space-y-2">
@@ -416,7 +471,7 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                                         }}
                                     />
                                     <Label htmlFor="use_default" className="cursor-pointer flex-1">
-                                        Use my default emergency contact
+                                        Use my default emergency contact from profile
                                         {user?.emergency_contact_name && (
                                             <span className="block text-sm text-gray-600 mt-1">
                                                 {user.emergency_contact_name} - {user.emergency_contact_phone}
@@ -460,7 +515,7 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                                     </p>
                                     <div className="flex gap-3">
                                         <Button type="button" variant="outline" asChild>
-                                            <Link href={route('my-leaves.index')}>Cancel</Link>
+                                            <Link href={route('leaves.index')}>Cancel</Link>
                                         </Button>
                                         <Button 
                                             type="submit" 
@@ -480,7 +535,7 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                     </form>
                 </div>
 
-                {/* Sidebar - Balance Preview */}
+                {/* Sidebar - Summary */}
                 <div className="space-y-6">
                     {/* Leave Balance Preview */}
                     {selectedBalance && (
@@ -533,60 +588,69 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                         </Card>
                     )}
 
-                    {/* Approval Process Info */}
-                    <Card className="animate-fade-in animation-delay-200">
-                        <CardHeader>
-                            <CardTitle className="text-lg">Approval Process</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                <div className="flex items-start gap-3">
-                                    <div className="flex items-center justify-center w-8 h-8 bg-yellow-100 rounded-full flex-shrink-0">
-                                        <span className="text-sm font-bold text-yellow-700">1</span>
+                    {/* Approval Workflow Info */}
+                    {data.manager_id && (
+                        <Card className="animate-fade-in animation-delay-200">
+                            <CardHeader>
+                                <CardTitle className="text-lg">Approval Workflow</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex items-center justify-center w-8 h-8 bg-yellow-100 rounded-full flex-shrink-0">
+                                            <span className="text-sm font-bold text-yellow-700">1</span>
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-medium text-gray-900">Manager Approval</p>
+                                            {(() => {
+                                                const selectedManager = Array.isArray(managers) 
+                                                    ? managers.find(m => m.id === parseInt(data.manager_id))
+                                                    : null;
+                                                return selectedManager ? (
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <div className="flex items-center justify-center w-6 h-6 bg-blue-600 rounded-full">
+                                                            <span className="text-xs font-medium text-white">
+                                                                {selectedManager.name.charAt(0).toUpperCase()}
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-sm text-gray-600">{selectedManager.name}</span>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-sm text-gray-500 mt-1">Select a manager above</p>
+                                                );
+                                            })()}
+                                        </div>
                                     </div>
-                                    <div className="flex-1">
-                                        <p className="font-medium text-gray-900">Manager Review</p>
-                                        {data.manager_id && (() => {
-                                            const selectedManager = Array.isArray(managers) 
-                                                ? managers.find(m => m.id === parseInt(data.manager_id))
-                                                : null;
-                                            return selectedManager ? (
-                                                <p className="text-sm text-gray-600 mt-1">{selectedManager.name}</p>
-                                            ) : (
-                                                <p className="text-sm text-gray-500 mt-1">Select manager above</p>
-                                            );
-                                        })()}
-                                    </div>
-                                </div>
 
-                                <div className="flex items-start gap-3">
-                                    <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full flex-shrink-0">
-                                        <span className="text-sm font-bold text-blue-700">2</span>
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full flex-shrink-0">
+                                            <span className="text-sm font-bold text-blue-700">2</span>
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-medium text-gray-900">HR Approval</p>
+                                            <p className="text-sm text-gray-600 mt-1">Final approval step</p>
+                                        </div>
                                     </div>
-                                    <div className="flex-1">
-                                        <p className="font-medium text-gray-900">HR Final Approval</p>
-                                        <p className="text-sm text-gray-600 mt-1">HR department review</p>
-                                    </div>
-                                </div>
 
-                                <div className="flex items-start gap-3">
-                                    <div className="flex items-center justify-center w-8 h-8 bg-green-100 rounded-full flex-shrink-0">
-                                        <CheckCircle2 className="h-4 w-4 text-green-700" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="font-medium text-gray-900">Approved!</p>
-                                        <p className="text-sm text-gray-600 mt-1">Balance deducted</p>
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex items-center justify-center w-8 h-8 bg-green-100 rounded-full flex-shrink-0">
+                                            <CheckCircle2 className="h-4 w-4 text-green-700" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-medium text-gray-900">Approved</p>
+                                            <p className="text-sm text-gray-600 mt-1">Leave days deducted</p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     {/* Leave Type Info */}
                     {selectedLeaveType && (
                         <Card className="animate-fade-in animation-delay-300">
                             <CardHeader>
-                                <CardTitle className="text-lg">{selectedLeaveType.name}</CardTitle>
+                                <CardTitle className="text-lg">Leave Type Information</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3 text-sm">
                                 <div className="flex items-center gap-2">

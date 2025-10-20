@@ -44,7 +44,6 @@ export default function AuthenticatedLayout({ header, children }) {
         // Admin-only items (conditional)
         ...(auth.user.roles?.some(r => ['super-admin', 'admin', 'hr-manager'].includes(r.slug)) ? [
             { name: 'Users', href: '/users', icon: Users },
-            { name: 'Announcements', href: '/announcements', icon: Bell },
             { name: 'Inventory', href: '/inventory', icon: Package },
             { name: 'Assets', href: '/individual-assets', icon: Laptop },
             { name: 'Leave Management', href: '/leaves', icon: ClipboardList },
