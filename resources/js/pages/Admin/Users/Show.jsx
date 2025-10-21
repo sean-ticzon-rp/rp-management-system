@@ -61,9 +61,8 @@ export default function Show({ auth, user }) {
     const isPending = user.account_status === 'pending';
     
     // Check if current user can approve
-    const canApprove = auth.user.roles?.some(role => 
-        ['super-admin', 'admin', 'hr-manager'].includes(role.slug)
-    );
+    const canApprove = auth.user?.can_approve_users === true;
+
 
     const getAccountStatusBadge = (status) => {
         const styles = {
@@ -574,6 +573,8 @@ export default function Show({ auth, user }) {
                                 </Alert>
                             </CardContent>
                         </Card>
+
+                        
                     )}
 
                     {/* Employment Info */}
@@ -650,6 +651,92 @@ export default function Show({ auth, user }) {
                             ) : (
                                 <p className="text-gray-500 text-sm">No roles assigned</p>
                             )}
+                        </CardContent>
+                    </Card>
+
+                                        {/* ✅ NEW: Permissions Card */}
+                    <Card className="animate-fade-in animation-delay-250 border-2 border-blue-200">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Shield className="h-5 w-5 text-blue-600" />
+                                Permissions
+                            </CardTitle>
+                            <CardDescription>What this user can do</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-2">
+                                {/* From Role Permissions */}
+                                {user.roles && user.roles.length > 0 && (
+                                    <div className="space-y-3">
+                                        {user.roles.map(role => (
+                                            role.permissions && role.permissions.length > 0 && (
+                                                <div key={role.id}>
+                                                    <p className="text-xs font-semibold text-gray-600 mb-2">
+                                                        From "{role.name}":
+                                                    </p>
+                                                    <div className="space-y-1">
+                                                        {role.permissions.map(perm => (
+                                                            <div key={perm.id} className="flex items-center gap-2 p-2 bg-blue-50 rounded">
+                                                                <CheckCircle2 className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                                                                <span className="text-sm text-gray-900">{perm.name}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Direct User Permission Overrides */}
+                                {user.permissions && user.permissions.length > 0 && (
+                                    <div className="pt-3 border-t border-orange-200">
+                                        <p className="text-xs font-semibold text-orange-600 mb-2">
+                                            ⚠️ Special Overrides:
+                                        </p>
+                                        <div className="space-y-1">
+                                            {user.permissions.map(perm => (
+                                                <div 
+                                                    key={perm.id} 
+                                                    className={`flex items-center gap-2 p-2 rounded ${
+                                                        perm.pivot.granted 
+                                                            ? 'bg-green-50' 
+                                                            : 'bg-red-50'
+                                                    }`}
+                                                >
+                                                    {perm.pivot.granted ? (
+                                                        <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                                                    ) : (
+                                                        <XCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <span className={`text-sm ${
+                                                            perm.pivot.granted ? 'text-green-900' : 'text-red-900'
+                                                        }`}>
+                                                            {perm.name}
+                                                        </span>
+                                                        {perm.pivot.reason && (
+                                                            <p className="text-xs text-gray-600 mt-0.5">
+                                                                Reason: {perm.pivot.reason}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* No permissions */}
+                                {(!user.roles || user.roles.length === 0 || 
+                                !user.roles.some(r => r.permissions && r.permissions.length > 0)) && 
+                                (!user.permissions || user.permissions.length === 0) && (
+                                    <div className="text-center py-4 text-gray-500">
+                                        <Shield className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                                        <p className="text-sm">No permissions assigned</p>
+                                    </div>
+                                )}
+                            </div>
                         </CardContent>
                     </Card>
 

@@ -29,11 +29,19 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user();
+
         return [
             ...parent::share($request),
             'auth' => [
-                // ✅ FIX: Load roles relationship with the user
-            'user' => $request->user() ? $request->user()->load('roles') : null,
+                'user' => $user ? [
+                    ...$user->load('roles')->toArray(),
+                    // ✅ Add permissions to auth.user
+                    'can_approve_users' => $user->canApproveUsers(),
+                    'can_approve_leaves' => $user->canApproveLeaves(),
+                    'can_manage_inventory' => $user->canManageInventory(),
+                    'can_manage_projects' => $user->canManageProjects(),
+                ] : null,
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

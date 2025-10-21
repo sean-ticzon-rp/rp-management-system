@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Role;
+use App\Models\Permission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -12,9 +13,16 @@ use Inertia\Inertia;
 
 class UserController extends Controller
 {
+    /**
+     * ✅ Full User Management - HR/Admin/Super Admin ONLY
+     */
     public function index(Request $request)
     {
-        // ✅ FIX: Load Individual Assets instead of old Asset Assignments
+        // ✅ Check if user can MANAGE users (not just approve)
+        if (!auth()->user()->can_manage_users) {
+            abort(403, 'You do not have permission to access user management.');
+        }
+
         $query = User::with('roles', 'currentIndividualAssets.asset.inventoryItem');
 
         // Search
@@ -22,10 +30,10 @@ class UserController extends Controller
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                ->orWhere('email', 'like', "%{$search}%");
+                ->orWhere('email', 'like', "%{$search}%")
+                ->orWhere('employee_id', 'like', "%{$search}%");
             });
         }
-
 
         // Filter by role
         if ($request->has('role') && $request->role !== 'all') {
@@ -34,12 +42,12 @@ class UserController extends Controller
             });
         }
         
-        // ✅ Filter by account status
+        // Filter by account status
         if ($request->has('account_status') && $request->account_status !== 'all') {
             $query->where('account_status', $request->account_status);
         }
 
-        // ✅ Order by pending first, then by newest
+        // Order by pending first, then by newest
         $users = $query->orderByRaw("FIELD(account_status, 'pending', 'active', 'suspended', 'rejected')")
                     ->latest()
                     ->paginate(15)
@@ -51,13 +59,50 @@ class UserController extends Controller
             'users' => $users,
             'roles' => $roles,
             'filters' => $request->only(['search', 'role', 'account_status']),
-            'filters' => $request->only(['search', 'role', 'account_status']),
+        ]);
+    }
+
+    /**
+     * ✅ NEW: Pending Approvals Only - For Senior/Lead/PM
+     */
+    public function pendingApprovals(Request $request)
+    {
+        // ✅ Check if user can approve users
+        if (!auth()->user()->can_approve_users) {
+            abort(403, 'You do not have permission to approve users.');
+        }
+
+        $query = User::with('roles')
+            ->where('account_status', 'pending');
+
+        // Search
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                ->orWhere('email', 'like', "%{$search}%")
+                ->orWhere('employee_id', 'like', "%{$search}%");
+            });
+        }
+
+        $users = $query->latest()
+                    ->paginate(15)
+                    ->withQueryString();
+
+        return Inertia::render('Admin/Users/PendingApprovals', [
+            'users' => $users,
+            'filters' => $request->only(['search']),
         ]);
     }
 
     public function create()
     {
-        $roles = Role::all();
+        // ✅ Check permission
+        if (!auth()->user()->can_manage_users) {
+            abort(403, 'You do not have permission to create users.');
+        }
+
+        $roles = Role::with('permissions')->get();
         
         return Inertia::render('Admin/Users/Create', [
             'roles' => $roles,
@@ -66,6 +111,11 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
+        // ✅ Check permission
+        if (!auth()->user()->can_manage_users) {
+            abort(403, 'You do not have permission to create users.');
+        }
+
         $validated = $request->validate([
             'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
             'first_name' => 'required|string|max:255',
@@ -104,6 +154,7 @@ class UserController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'roles' => 'nullable|array',
             'roles.*' => 'exists:roles,id',
+            'can_approve_users_override' => 'nullable|boolean',
         ]);
 
         // Handle profile picture upload
@@ -154,6 +205,7 @@ class UserController extends Controller
             'hire_date' => $validated['hire_date'],
             'employment_status' => $validated['employment_status'] ?? 'active',
             'employment_type' => $validated['employment_type'],
+            'can_approve_users_override' => $validated['can_approve_users_override'] ?? null,
             'password' => Hash::make($validated['password']),
         ]);
 
@@ -166,9 +218,9 @@ class UserController extends Controller
 
     public function show(User $user)
     {
-        // ✅ FIX: Load Individual Assets instead of old Asset Assignments
         $user->load([
-            'roles', 
+            'roles.permissions',
+            'permissions',
             'currentIndividualAssets.asset.inventoryItem.category',
             'individualAssetAssignments.asset.inventoryItem',
             'ownedProjects',
@@ -182,18 +234,29 @@ class UserController extends Controller
 
     public function edit(User $user)
     {
-        // ✅ FIX: Load roles relationship
-        $user->load('roles');
-        $roles = Role::all();
+        // ✅ Check permission
+        if (!auth()->user()->can_manage_users) {
+            abort(403, 'You do not have permission to edit users.');
+        }
+
+        $user->load('roles.permissions', 'permissions');
+        $roles = Role::with('permissions')->get();
+        $allPermissions = Permission::all();
         
         return Inertia::render('Admin/Users/Edit', [
             'user' => $user,
             'roles' => $roles,
+            'allPermissions' => $allPermissions,
         ]);
     }
 
     public function update(Request $request, User $user)
     {
+        // ✅ Check permission
+        if (!auth()->user()->can_manage_users) {
+            abort(403, 'You do not have permission to update users.');
+        }
+
         $validated = $request->validate([
             'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
             'first_name' => 'required|string|max:255',
@@ -232,6 +295,7 @@ class UserController extends Controller
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
             'roles' => 'nullable|array',
             'roles.*' => 'exists:roles,id',
+            'can_approve_users_override' => 'nullable|boolean',
         ]);
 
         // Handle profile picture upload
@@ -284,8 +348,13 @@ class UserController extends Controller
             'hire_date' => $validated['hire_date'],
             'employment_status' => $validated['employment_status'],
             'employment_type' => $validated['employment_type'] ?? null,
-            'password' => $validated['password'] ? Hash::make($validated['password']) : $user->password,
+            'can_approve_users_override' => $validated['can_approve_users_override'] ?? null,
         ];
+
+        // Only update password if provided
+        if (isset($validated['password']) && !empty($validated['password'])) {
+            $updateData['password'] = Hash::make($validated['password']);
+        }
 
         if (isset($validated['profile_picture'])) {
             $updateData['profile_picture'] = $validated['profile_picture'];
@@ -302,6 +371,11 @@ class UserController extends Controller
 
     public function destroy(User $user)
     {
+        // ✅ Check permission
+        if (!auth()->user()->can_manage_users) {
+            abort(403, 'You do not have permission to delete users.');
+        }
+
         if ($user->id === auth()->id()) {
             return back()->with('error', 'You cannot delete your own account!');
         }
@@ -315,8 +389,16 @@ class UserController extends Controller
         return redirect()->route('users.index')->with('success', 'User deleted successfully!');
     }
 
+    /**
+     * ✅ Approve a pending user account
+     */
     public function approve(User $user)
     {
+        // ✅ Check if current user has permission to approve users
+        if (!auth()->user()->can_approve_users) {
+            abort(403, 'You do not have permission to approve user accounts.');
+        }
+
         if ($user->account_status !== 'pending') {
             return back()->with('error', 'User is not pending approval!');
         }
@@ -325,15 +407,24 @@ class UserController extends Controller
             'account_status' => 'active',
             'approved_by' => auth()->id(),
             'approved_at' => now(),
+            'email_verified_at' => now(),
         ]);
 
-        // TODO: Send email to user notifying approval
+        // TODO: Send welcome email to user
         
-        return back()->with('success', "User {$user->name} has been approved!");
+        return back()->with('success', "User {$user->name} has been approved and can now access the system!");
     }
 
+    /**
+     * ✅ Reject a pending user account
+     */
     public function reject(User $user)
     {
+        // ✅ Check if current user has permission to approve/reject users
+        if (!auth()->user()->can_approve_users) {
+            abort(403, 'You do not have permission to reject user accounts.');
+        }
+
         if ($user->account_status !== 'pending') {
             return back()->with('error', 'User is not pending approval!');
         }
@@ -342,7 +433,7 @@ class UserController extends Controller
             'account_status' => 'rejected',
         ]);
 
-        // TODO: Send email to user notifying rejection
+        // TODO: Send rejection email to user
         
         return back()->with('success', "User {$user->name} has been rejected.");
     }

@@ -10,14 +10,8 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
         'name',
         'profile_picture',
@@ -51,7 +45,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'employee_id',
         'department',
         'position',
-        'manager_id',        // ✅ NEW - For leave approval workflow
+        'manager_id',
         'hire_date',
         'employment_status',
         'employment_type',
@@ -65,14 +59,10 @@ class User extends Authenticatable implements MustVerifyEmail
         'email_verified_at' => 'datetime',
         'birthday' => 'date',
         'hire_date' => 'date',
+        'approved_at' => 'datetime',
         'password' => 'hashed',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
         'password',
         'two_factor_secret',
@@ -80,11 +70,15 @@ class User extends Authenticatable implements MustVerifyEmail
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
+    // ✅ ADD THESE APPENDS
+    protected $appends = [
+        'can_approve_users',
+        'can_manage_users',
+        'can_approve_leaves',
+        'can_manage_inventory',
+        'can_manage_projects',
+    ];
+
     protected function casts(): array
     {
         return [
@@ -94,7 +88,7 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     // ============================================
-    // ROLES & PERMISSIONS
+    // ROLES RELATIONSHIP
     // ============================================
 
     public function roles()
@@ -107,11 +101,201 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->roles()->where('slug', $role)->exists();
     }
 
-    public function hasPermission($permission)
+    // ============================================
+    // PERMISSIONS RELATIONSHIP
+    // ============================================
+
+    /**
+     * Direct permissions assigned to this user (overrides)
+     */
+    public function permissions()
     {
-        return $this->roles()->whereHas('permissions', function ($query) use ($permission) {
-            $query->where('slug', $permission);
-        })->exists();
+        return $this->belongsToMany(Permission::class, 'permission_user')
+                    ->withPivot(['granted', 'granted_by', 'granted_at', 'reason'])
+                    ->withTimestamps();
+    }
+
+    /**
+     * Check if user has a specific permission
+     * Checks: 1) Direct user permission override, 2) Role permissions
+     */
+    public function hasPermission($permissionSlug): bool
+    {
+        // Check if user has direct permission assignment (override)
+        $userPermission = $this->permissions()
+            ->where('slug', $permissionSlug)
+            ->first();
+
+        if ($userPermission) {
+            // If user has direct assignment, use that (granted true/false)
+            return $userPermission->pivot->granted;
+        }
+
+        // Otherwise, check role permissions
+        return $this->roles()
+            ->whereHas('permissions', function ($query) use ($permissionSlug) {
+                $query->where('slug', $permissionSlug);
+            })
+            ->exists();
+    }
+
+    // ============================================
+    // ✅ PERMISSION ACCESSORS (for frontend)
+    // ============================================
+
+    /**
+     * Check if user can approve new user accounts (Senior/PM/Lead/HR/Admin)
+     */
+    public function getCanApproveUsersAttribute(): bool
+    {
+        return $this->hasPermission('approve-users');
+    }
+
+    /**
+     * Check if user can manage users (view all, edit, delete) - HR/Admin ONLY
+     */
+    public function getCanManageUsersAttribute(): bool
+    {
+        return $this->roles()->whereIn('slug', [
+            'super-admin',
+            'admin',
+            'hr-manager'
+        ])->exists();
+    }
+
+    /**
+     * Check if user can approve leave requests
+     */
+    public function getCanApproveLeavesAttribute(): bool
+    {
+        return $this->hasPermission('approve-leaves');
+    }
+
+    /**
+     * Check if user can manage inventory
+     */
+    public function getCanManageInventoryAttribute(): bool
+    {
+        return $this->hasPermission('manage-inventory');
+    }
+
+    /**
+     * Check if user can manage projects
+     */
+    public function getCanManageProjectsAttribute(): bool
+    {
+        return $this->hasPermission('manage-projects');
+    }
+
+    // ============================================
+    // ✅ PERMISSION METHODS (for backend logic)
+    // ============================================
+
+    /**
+     * Check if user can approve new user accounts
+     */
+    public function canApproveUsers(): bool
+    {
+        return $this->hasPermission('approve-users');
+    }
+
+    /**
+     * Check if user can approve leave requests
+     */
+    public function canApproveLeaves(): bool
+    {
+        return $this->hasPermission('approve-leaves');
+    }
+
+    /**
+     * Check if user can manage inventory
+     */
+    public function canManageInventory(): bool
+    {
+        return $this->hasPermission('manage-inventory');
+    }
+
+    /**
+     * Check if user can manage projects
+     */
+    public function canManageProjects(): bool
+    {
+        return $this->hasPermission('manage-projects');
+    }
+
+    /**
+     * Grant a permission directly to this user
+     */
+    public function grantPermission($permissionSlug, $grantedBy = null, $reason = null)
+    {
+        $permission = Permission::where('slug', $permissionSlug)->first();
+        
+        if (!$permission) {
+            return false;
+        }
+
+        $this->permissions()->syncWithoutDetaching([
+            $permission->id => [
+                'granted' => true,
+                'granted_by' => $grantedBy ?? auth()->id(),
+                'granted_at' => now(),
+                'reason' => $reason,
+            ]
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Revoke a permission directly from this user
+     */
+    public function revokePermission($permissionSlug, $revokedBy = null, $reason = null)
+    {
+        $permission = Permission::where('slug', $permissionSlug)->first();
+        
+        if (!$permission) {
+            return false;
+        }
+
+        $this->permissions()->syncWithoutDetaching([
+            $permission->id => [
+                'granted' => false,
+                'granted_by' => $revokedBy ?? auth()->id(),
+                'granted_at' => now(),
+                'reason' => $reason,
+            ]
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Remove direct permission assignment (revert to role-based)
+     */
+    public function clearPermissionOverride($permissionSlug)
+    {
+        $permission = Permission::where('slug', $permissionSlug)->first();
+        
+        if ($permission) {
+            $this->permissions()->detach($permission->id);
+        }
+    }
+
+    /**
+     * Get all user permissions (from roles + direct assignments)
+     */
+    public function getAllPermissions()
+    {
+        $rolePermissions = $this->roles()
+            ->with('permissions')
+            ->get()
+            ->pluck('permissions')
+            ->flatten()
+            ->unique('id');
+
+        $userPermissions = $this->permissions;
+
+        return $rolePermissions->merge($userPermissions)->unique('id');
     }
 
     // ============================================
@@ -181,33 +365,21 @@ class User extends Authenticatable implements MustVerifyEmail
     // LEAVE MANAGEMENT RELATIONSHIPS
     // ============================================
 
-    /**
-     * The manager who approves this user's leaves
-     */
     public function manager()
     {
         return $this->belongsTo(User::class, 'manager_id');
     }
 
-    /**
-     * Users who report to this user (if this user is a manager)
-     */
     public function subordinates()
     {
         return $this->hasMany(User::class, 'manager_id');
     }
 
-    /**
-     * This user's leave balances
-     */
     public function leaveBalances()
     {
         return $this->hasMany(LeaveBalance::class);
     }
 
-    /**
-     * This user's leave balances for current year
-     */
     public function currentYearLeaveBalances()
     {
         return $this->hasMany(LeaveBalance::class)
@@ -215,35 +387,23 @@ class User extends Authenticatable implements MustVerifyEmail
                     ->with('leaveType');
     }
 
-    /**
-     * This user's leave requests
-     */
     public function leaveRequests()
     {
         return $this->hasMany(LeaveRequest::class);
     }
 
-    /**
-     * This user's pending leave requests
-     */
     public function pendingLeaveRequests()
     {
         return $this->hasMany(LeaveRequest::class)
                     ->whereIn('status', ['pending_manager', 'pending_hr']);
     }
 
-    /**
-     * This user's approved leave requests
-     */
     public function approvedLeaveRequests()
     {
         return $this->hasMany(LeaveRequest::class)
                     ->where('status', 'approved');
     }
 
-    /**
-     * Leave requests waiting for this user's approval (if they're a manager)
-     */
     public function leaveRequestsToApprove()
     {
         return $this->hasMany(LeaveRequest::class, 'manager_id')
@@ -251,9 +411,6 @@ class User extends Authenticatable implements MustVerifyEmail
                     ->with(['user', 'leaveType']);
     }
 
-    /**
-     * Get total available leave days for a specific leave type this year
-     */
     public function getLeaveBalance($leaveTypeId)
     {
         return $this->leaveBalances()
@@ -262,17 +419,11 @@ class User extends Authenticatable implements MustVerifyEmail
                     ->first();
     }
 
-    /**
-     * Check if this user is a manager (has subordinates)
-     */
     public function isManager()
     {
         return $this->subordinates()->exists();
     }
 
-    /**
-     * Get count of pending leave approvals (if this user is a manager)
-     */
     public function getPendingLeaveApprovalsCountAttribute()
     {
         return $this->leaveRequestsToApprove()->count();

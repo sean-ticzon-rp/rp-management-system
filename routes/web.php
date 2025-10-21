@@ -127,9 +127,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/inventory/delete-assets', [InventoryController::class, 'deleteSelectedAssets'])->name('inventory.delete-assets');
     Route::resource('inventory', InventoryController::class);
 
+    // ============================================
+    // 👥 USER MANAGEMENT ROUTES
+    // ============================================
     // Users - Import routes MUST come BEFORE resource routes
     Route::get('/users/import', [UserImportController::class, 'show'])->name('users.import');
     Route::post('/users/import', [UserImportController::class, 'import'])->name('users.import.store');
+    
+    // ✅ NEW: Pending Approvals (for Senior/Lead/PM)
+    Route::get('/users/pending-approvals', [UserController::class, 'pendingApprovals'])->name('users.pending-approvals');
     
     // User Approval Routes (BEFORE resource routes)
     Route::post('/users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
