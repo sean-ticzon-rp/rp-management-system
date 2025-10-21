@@ -86,6 +86,7 @@ export default function Show({ auth, leaveRequest }) {
     // ✅ Determine which approval step user can perform
     const isPendingManager = leaveRequest.status === 'pending_manager';
     const isPendingHR = leaveRequest.status === 'pending_hr';
+    const isAppealed = leaveRequest.status === 'appealed';
 
     // ✅ User can approve as manager if they're the assigned manager OR have HR roles (HR can override)
     const canApproveAsManager = isPendingManager && (isAssignedManager || canApproveAsHR);
@@ -93,9 +94,14 @@ export default function Show({ auth, leaveRequest }) {
     // ✅ User can approve as HR if status is pending_hr AND they have HR role
     const canApproveAsHRFinal = isPendingHR && canApproveAsHR;
 
+    // ✅ User can handle appeals if they have HR role and status is appealed
+    const canHandleAppeal = isAppealed && canApproveAsHR;
+
     // ✅ Combined permission check
-    const canTakeAction = canApproveAsManager || canApproveAsHRFinal;
-    const approvalType = isPendingManager ? 'manager' : 'hr';
+    const canTakeAction = canApproveAsManager || canApproveAsHRFinal || canHandleAppeal;
+    
+    // ✅ Determine approval type based on status
+    const approvalType = isPendingManager ? 'manager' : (isPendingHR || isAppealed) ? 'hr' : 'manager';
 
     // Forms for manager approval
     const { data: managerApproveData, setData: setManagerApproveData, post: postManagerApprove, processing: managerApproveProcessing } = useForm({
@@ -136,10 +142,16 @@ export default function Show({ auth, leaveRequest }) {
         });
     };
 
-    // ✅ Handle HR approval
+    // ✅ Handle HR approval - WITH APPEAL ROUTE SUPPORT!
     const handleHrApprove = (e) => {
         e.preventDefault();
-        postHrApprove(route('leaves.hr-approve', leaveRequest.id), {
+        
+        // ✅ Use different route for appeals vs normal HR approval
+        const routeName = leaveRequest.status === 'appealed' 
+            ? 'leaves.approve-appeal' 
+            : 'leaves.hr-approve';
+        
+        postHrApprove(route(routeName, leaveRequest.id), {
             preserveScroll: true,
             onSuccess: () => {
                 setShowApproveModal(false);
@@ -149,7 +161,13 @@ export default function Show({ auth, leaveRequest }) {
 
     const handleHrReject = (e) => {
         e.preventDefault();
-        postHrReject(route('leaves.hr-reject', leaveRequest.id), {
+        
+        // ✅ Use different route for appeals vs normal HR rejection
+        const routeName = leaveRequest.status === 'appealed' 
+            ? 'leaves.reject-appeal' 
+            : 'leaves.hr-reject';
+        
+        postHrReject(route(routeName, leaveRequest.id), {
             preserveScroll: true,
             onSuccess: () => {
                 setShowRejectModal(false);
@@ -271,14 +289,14 @@ export default function Show({ auth, leaveRequest }) {
                                 onClick={() => setShowApproveModal(true)}
                             >
                                 <UserCheck className="h-4 w-4 mr-2" />
-                                Approve {isPendingManager ? '(Manager)' : '(HR)'}
+                                Approve {isPendingManager ? '(Manager)' : isAppealed ? '(Appeal)' : '(HR)'}
                             </Button>
                             <Button 
                                 variant="destructive"
                                 onClick={() => setShowRejectModal(true)}
                             >
                                 <UserX className="h-4 w-4 mr-2" />
-                                Reject {isPendingManager ? '(Manager)' : '(HR)'}
+                                Reject {isPendingManager ? '(Manager)' : isAppealed ? '(Appeal)' : '(HR)'}
                             </Button>
                         </div>
                     )}

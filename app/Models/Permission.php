@@ -13,11 +13,69 @@ class Permission extends Model
         'name',
         'slug',
         'description',
+        'category',
+        'is_active',
     ];
 
-    // Relationship: A permission belongs to many roles
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
+
+    // ============================================
+    // RELATIONSHIPS
+    // ============================================
+
+    /**
+     * Roles that have this permission
+     */
     public function roles()
     {
-        return $this->belongsToMany(Role::class);
+        return $this->belongsToMany(Role::class, 'permission_role')
+                    ->withTimestamps();
+    }
+
+    /**
+     * Users who have this permission (direct assignment/override)
+     */
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'permission_user')
+                    ->withPivot(['granted', 'granted_by', 'granted_at', 'reason'])
+                    ->withTimestamps();
+    }
+
+    // ============================================
+    // SCOPES
+    // ============================================
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    public function scopeByCategory($query, $category)
+    {
+        return $query->where('category', $category);
+    }
+
+    // ============================================
+    // HELPER METHODS
+    // ============================================
+
+    /**
+     * Check if a specific role has this permission
+     */
+    public function isGrantedToRole($roleId)
+    {
+        return $this->roles()->where('role_id', $roleId)->exists();
+    }
+
+    /**
+     * Check if a specific user has this permission (override)
+     */
+    public function isGrantedToUser($userId)
+    {
+        $pivot = $this->users()->where('user_id', $userId)->first();
+        return $pivot ? $pivot->pivot->granted : null;
     }
 }

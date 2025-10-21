@@ -40,6 +40,7 @@ class DatabaseSeeder extends Seeder
             AssetSeeder::class,
             ProjectSeeder::class,
             LeaveTypeSeeder::class,
+            TestUsersSeeder::class, // ← ADD THIS LINE
             LeaveRequestSeeder::class,
         ]);
     }

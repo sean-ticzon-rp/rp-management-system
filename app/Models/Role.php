@@ -15,15 +15,63 @@ class Role extends Model
         'description',
     ];
 
-    // Relationship: A role belongs to many users
+    // ============================================
+    // RELATIONSHIPS
+    // ============================================
+
     public function users()
     {
         return $this->belongsToMany(User::class);
     }
 
-    // Relationship: A role has many permissions
+    /**
+     * ✅ NEW: Permissions assigned to this role
+     */
     public function permissions()
     {
-        return $this->belongsToMany(Permission::class);
+        return $this->belongsToMany(Permission::class, 'permission_role')
+                    ->withTimestamps();
+    }
+
+    // ============================================
+    // HELPER METHODS
+    // ============================================
+
+    /**
+     * Check if this role has a specific permission
+     */
+    public function hasPermission($permissionSlug)
+    {
+        return $this->permissions()->where('slug', $permissionSlug)->exists();
+    }
+
+    /**
+     * Grant a permission to this role
+     */
+    public function grantPermission($permissionSlug)
+    {
+        $permission = Permission::where('slug', $permissionSlug)->first();
+        if ($permission && !$this->hasPermission($permissionSlug)) {
+            $this->permissions()->attach($permission->id);
+        }
+    }
+
+    /**
+     * Revoke a permission from this role
+     */
+    public function revokePermission($permissionSlug)
+    {
+        $permission = Permission::where('slug', $permissionSlug)->first();
+        if ($permission) {
+            $this->permissions()->detach($permission->id);
+        }
+    }
+
+    /**
+     * Sync permissions for this role
+     */
+    public function syncPermissions(array $permissionIds)
+    {
+        $this->permissions()->sync($permissionIds);
     }
 }

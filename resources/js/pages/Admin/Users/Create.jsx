@@ -4,10 +4,11 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
-import { Textarea } from '@/Components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Checkbox } from '@/Components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
+import { Badge } from '@/Components/ui/badge';
+import { Alert, AlertDescription } from '@/Components/ui/alert';
 import ProfilePictureUpload from '@/Components/ProfilePictureUpload';
 import { SSSInput, TINInput, PhilHealthInput, HDMFInput, PayrollAccountInput, PhoneInput } from '@/Components/FormattedInput';
 import {
@@ -15,7 +16,6 @@ import {
     ArrowLeft,
     Save,
     Loader2,
-    AlertCircle,
     Mail,
     Lock,
     User,
@@ -23,12 +23,13 @@ import {
     Phone,
     MapPin,
     Briefcase,
-    Calendar,
     Heart,
     CreditCard,
+    CheckCircle2,
+    Info,
 } from 'lucide-react';
 
-export default function Create({ auth, roles }) {
+export default function Create({ auth, roles = [] }) {
     const { data, setData, post, processing, errors } = useForm({
         profile_picture: null,
         first_name: '',
@@ -86,6 +87,14 @@ export default function Create({ auth, roles }) {
         
         setData('roles', currentRoles);
     };
+
+    // ✅ Get selected roles and their permissions
+    const selectedRoles = Array.isArray(roles) ? roles.filter(r => data.roles.includes(r.id)) : [];
+    const rolePermissions = selectedRoles
+        .flatMap(role => role.permissions || [])
+        .filter((perm, index, self) => 
+            index === self.findIndex(p => p.id === perm.id)
+        );
 
     return (
         <AuthenticatedLayout
@@ -641,7 +650,7 @@ export default function Create({ auth, roles }) {
                     </CardContent>
                 </Card>
 
-                {/* Roles */}
+                {/* Roles - UPDATED WITH PERMISSION BADGES */}
                 <Card className="animate-fade-in animation-delay-700">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -650,28 +659,71 @@ export default function Create({ auth, roles }) {
                         </CardTitle>
                         <CardDescription>Assign roles to define user permissions</CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {roles.map((role) => (
                                 <label 
                                     key={role.id} 
                                     htmlFor={`role-${role.id}`}
-                                    className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                                    className={`flex items-start space-x-3 p-4 border-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer ${
+                                        data.roles.includes(role.id) ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                                    }`}
                                 >
                                     <Checkbox
                                         id={`role-${role.id}`}
                                         checked={data.roles.includes(role.id)}
                                         onCheckedChange={() => handleRoleToggle(role.id)}
                                     />
-                                    <div className="flex-1">
-                                        <p className="font-medium">{role.name}</p>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-gray-900">{role.name}</p>
                                         {role.description && (
                                             <p className="text-sm text-gray-500 mt-1">{role.description}</p>
+                                        )}
+                                        {/* ✅ Show permissions from this role */}
+                                        {role.permissions && role.permissions.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 mt-2">
+                                                {role.permissions.slice(0, 3).map(perm => (
+                                                    <Badge key={perm.id} className="bg-blue-100 text-blue-700 text-xs border-blue-200 border">
+                                                        {perm.name}
+                                                    </Badge>
+                                                ))}
+                                                {role.permissions.length > 3 && (
+                                                    <Badge className="bg-gray-100 text-gray-600 text-xs">
+                                                        +{role.permissions.length - 3} more
+                                                    </Badge>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 </label>
                             ))}
                         </div>
+
+                        {/* ✅ Permission Summary */}
+                        {rolePermissions.length > 0 && (
+                            <Alert className="bg-blue-50 border-blue-200">
+                                <Info className="h-4 w-4 text-blue-600" />
+                                <AlertDescription className="text-blue-800">
+                                    <strong>This user will have these permissions:</strong>
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                        {rolePermissions.map(perm => (
+                                            <Badge key={perm.id} className="bg-blue-100 text-blue-700 border-blue-200 border">
+                                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                                {perm.name}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </AlertDescription>
+                            </Alert>
+                        )}
+
+                        {data.roles.length === 0 && (
+                            <Alert className="bg-yellow-50 border-yellow-200">
+                                <AlertDescription className="text-yellow-800 text-sm">
+                                    <strong>No roles selected.</strong> User will have basic employee access only.
+                                </AlertDescription>
+                            </Alert>
+                        )}
                     </CardContent>
                 </Card>
 

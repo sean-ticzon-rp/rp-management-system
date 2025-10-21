@@ -1,4 +1,5 @@
 // resources/js/Pages/Users/Edit.jsx
+import { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
@@ -7,6 +8,7 @@ import { Label } from '@/Components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Checkbox } from '@/Components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
+import { Badge } from '@/Components/ui/badge';
 import ProfilePictureUpload from '@/Components/ProfilePictureUpload';
 import { SSSInput, TINInput, PhilHealthInput, HDMFInput, PayrollAccountInput } from '@/Components/FormattedInput';
 import {
@@ -24,7 +26,7 @@ import {
     CreditCard,
 } from 'lucide-react';
 
-export default function Edit({ auth, user, roles }) {
+export default function Edit({ auth, user, roles = [], allPermissions = [] }) {
     const { data, setData, put, processing, errors } = useForm({
         profile_picture: null,
         first_name: user.first_name || '',
@@ -68,7 +70,6 @@ export default function Edit({ auth, user, roles }) {
     const handleSubmit = (e) => {
         e.preventDefault();
         
-        // Use POST with _method spoofing for file uploads
         router.post(route('users.update', user.id), {
             ...data,
             _method: 'PUT',
@@ -87,6 +88,16 @@ export default function Edit({ auth, user, roles }) {
         
         setData('roles', currentRoles);
     };
+
+    // ✅ Get selected roles with their permissions
+    const selectedRoles = Array.isArray(roles) ? roles.filter(r => data.roles.includes(r.id)) : [];
+    
+    // ✅ Get unique permissions from selected roles
+    const rolePermissions = selectedRoles
+        .flatMap(role => role.permissions || [])
+        .filter((perm, index, self) => 
+            index === self.findIndex(p => p.id === perm.id)
+        );
 
     return (
         <AuthenticatedLayout
@@ -224,7 +235,7 @@ export default function Edit({ auth, user, roles }) {
                     </CardContent>
                 </Card>
 
-                {/* Contact Information - UPDATED */}
+                {/* Contact Information */}
                 <Card className="animate-fade-in animation-delay-100">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -483,7 +494,7 @@ export default function Edit({ auth, user, roles }) {
                     </CardContent>
                 </Card>
 
-                {/* Emergency Contact - UPDATED */}
+                {/* Emergency Contact */}
                 <Card className="animate-fade-in animation-delay-500">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -587,22 +598,55 @@ export default function Edit({ auth, user, roles }) {
                                 <label 
                                     key={role.id} 
                                     htmlFor={`role-${role.id}`}
-                                    className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                                    className={`flex items-start space-x-3 p-4 border-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer ${
+                                        data.roles.includes(role.id) ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                                    }`}
                                 >
                                     <Checkbox
                                         id={`role-${role.id}`}
                                         checked={data.roles.includes(role.id)}
                                         onCheckedChange={() => handleRoleToggle(role.id)}
                                     />
-                                    <div className="flex-1">
+                                    <div className="flex-1 min-w-0">
                                         <p className="font-medium">{role.name}</p>
                                         {role.description && (
                                             <p className="text-sm text-gray-500 mt-1">{role.description}</p>
+                                        )}
+                                        {/* ✅ Show permissions from this role */}
+                                        {role.permissions && role.permissions.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 mt-2">
+                                                {role.permissions.slice(0, 3).map(perm => (
+                                                    <Badge key={perm.id} className="bg-blue-100 text-blue-700 text-xs">
+                                                        {perm.name}
+                                                    </Badge>
+                                                ))}
+                                                {role.permissions.length > 3 && (
+                                                    <Badge className="bg-gray-100 text-gray-600 text-xs">
+                                                        +{role.permissions.length - 3} more
+                                                    </Badge>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 </label>
                             ))}
                         </div>
+
+                        {/* ✅ Show inherited permissions summary */}
+                        {rolePermissions.length > 0 && (
+                            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                <p className="text-sm font-medium text-blue-900 mb-2">
+                                    📋 Permissions from selected roles:
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                    {rolePermissions.map(perm => (
+                                        <Badge key={perm.id} className="bg-blue-100 text-blue-700">
+                                            {perm.name}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
