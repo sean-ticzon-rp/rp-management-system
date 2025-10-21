@@ -1,7 +1,7 @@
-// resources/js/Pages/Employees/Leaves/Show.jsx
+// resources/js/Pages/Admin/Leaves/Show.jsx
 import { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Textarea } from '@/Components/ui/textarea';
 import { Label } from '@/Components/ui/label';
@@ -16,47 +16,100 @@ import {
     XCircle,
     AlertCircle,
     User,
+    Phone,
     Download,
+    UserCheck,
+    UserX,
     Send,
     Loader2,
     X as XIcon,
     Shield,
-    FileText,
 } from 'lucide-react';
 
 export default function Show({ auth, leaveRequest }) {
-    const [showAppealModal, setShowAppealModal] = useState(false);
-    const [showCancelModal, setShowCancelModal] = useState(false);
+    const [showApproveModal, setShowApproveModal] = useState(false);
+    const [showRejectModal, setShowRejectModal] = useState(false);
 
-    // Appeal form
-    const { data: appealData, setData: setAppealData, post: postAppeal, processing: appealProcessing } = useForm({
-        appeal_reason: '',
+    // ✅ Check if user is the assigned manager
+    const isAssignedManager = auth.user?.id === leaveRequest.manager_id;
+
+    // ✅ Check if user has HR approval permissions
+    const canApproveAsHR = auth.user?.roles?.some(role => 
+        ['super-admin', 'admin', 'hr-manager'].includes(role.slug)
+    );
+
+    // ✅ Determine which approval step user can perform
+    const isPendingManager = leaveRequest.status === 'pending_manager';
+    const isPendingHR = leaveRequest.status === 'pending_hr';
+
+    // ✅ User can approve as manager if they're the assigned manager OR have HR roles (HR can override)
+    const canApproveAsManager = isPendingManager && (isAssignedManager || canApproveAsHR);
+
+    // ✅ User can approve as HR if status is pending_hr AND they have HR role
+    const canApproveAsHRFinal = isPendingHR && canApproveAsHR;
+
+    // ✅ Combined permission check
+    const canTakeAction = canApproveAsManager || canApproveAsHRFinal;
+    const approvalType = isPendingManager ? 'manager' : 'hr';
+
+    // Forms for manager approval
+    const { data: managerApproveData, setData: setManagerApproveData, post: postManagerApprove, processing: managerApproveProcessing } = useForm({
+        manager_comments: '',
     });
 
-    // Can appeal if rejected by manager
-    const canAppeal = leaveRequest.status === 'rejected_by_manager';
-    
-    // Can cancel if pending
-    const canCancel = ['pending_manager', 'pending_hr'].includes(leaveRequest.status);
+    const { data: managerRejectData, setData: setManagerRejectData, post: postManagerReject, processing: managerRejectProcessing } = useForm({
+        manager_comments: '',
+    });
 
-    // Handle appeal submission
-    const handleAppeal = (e) => {
+    // Forms for HR approval
+    const { data: hrApproveData, setData: setHrApproveData, post: postHrApprove, processing: hrApproveProcessing } = useForm({
+        hr_comments: '',
+    });
+
+    const { data: hrRejectData, setData: setHrRejectData, post: postHrReject, processing: hrRejectProcessing } = useForm({
+        hr_comments: '',
+    });
+
+    // ✅ Handle manager approval
+    const handleManagerApprove = (e) => {
         e.preventDefault();
-        postAppeal(route('my-leaves.appeal', leaveRequest.id), {
+        postManagerApprove(route('leaves.manager-approve', leaveRequest.id), {
             preserveScroll: true,
             onSuccess: () => {
-                setShowAppealModal(false);
+                setShowApproveModal(false);
             }
         });
     };
 
-    // Handle cancel
-    const handleCancel = () => {
-        if (confirm('Are you sure you want to cancel this leave request?')) {
-            postAppeal(route('my-leaves.cancel', leaveRequest.id), {
-                preserveScroll: true,
-            });
-        }
+    const handleManagerReject = (e) => {
+        e.preventDefault();
+        postManagerReject(route('leaves.manager-reject', leaveRequest.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowRejectModal(false);
+            }
+        });
+    };
+
+    // ✅ Handle HR approval
+    const handleHrApprove = (e) => {
+        e.preventDefault();
+        postHrApprove(route('leaves.hr-approve', leaveRequest.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowApproveModal(false);
+            }
+        });
+    };
+
+    const handleHrReject = (e) => {
+        e.preventDefault();
+        postHrReject(route('leaves.hr-reject', leaveRequest.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowRejectModal(false);
+            }
+        });
     };
 
     const getStatusBadge = (status) => {
@@ -75,6 +128,7 @@ export default function Show({ auth, leaveRequest }) {
     const statusStyle = getStatusBadge(leaveRequest.status);
     const StatusIcon = statusStyle.icon;
 
+    // ✅ Check if manager step was auto-approved
     const wasAutoApproved = leaveRequest.manager_comments?.includes('Auto-approved');
 
     return (
@@ -83,9 +137,9 @@ export default function Show({ auth, leaveRequest }) {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <Button asChild variant="ghost" size="sm">
-                            <Link href={route('my-leaves.index')}>
+                            <Link href={route('leaves.index')}>
                                 <ArrowLeft className="h-4 w-4 mr-2" />
-                                Back to My Leaves
+                                Back
                             </Link>
                         </Button>
                         <div className="flex items-center gap-3">
@@ -98,7 +152,7 @@ export default function Show({ auth, leaveRequest }) {
                             <div>
                                 <div className="flex items-center gap-2">
                                     <h2 className="text-3xl font-bold text-gray-900">
-                                        My Leave Request
+                                        {leaveRequest.user.name}'s Leave Request
                                     </h2>
                                     <Badge className={`${statusStyle.bg} ${statusStyle.text} ${statusStyle.border} border flex items-center gap-1.5`}>
                                         <StatusIcon className="h-3.5 w-3.5" />
@@ -110,371 +164,443 @@ export default function Show({ auth, leaveRequest }) {
                         </div>
                     </div>
                     
-                    {/* Action Buttons */}
-                    <div className="flex gap-3">
-                        {canCancel && (
+                    {/* ✅ UPDATED: Show appropriate buttons based on approval stage */}
+                    {canTakeAction && (
+                        <div className="flex gap-3">
                             <Button 
-                                variant="outline"
-                                onClick={handleCancel}
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => setShowApproveModal(true)}
                             >
-                                <XIcon className="h-4 w-4 mr-2" />
-                                Cancel Request
+                                <UserCheck className="h-4 w-4 mr-2" />
+                                Approve {isPendingManager ? '(Manager)' : '(HR)'}
                             </Button>
-                        )}
-                        {canAppeal && (
                             <Button 
-                                className="bg-orange-600 hover:bg-orange-700"
-                                onClick={() => setShowAppealModal(true)}
+                                variant="destructive"
+                                onClick={() => setShowRejectModal(true)}
                             >
-                                <FileText className="h-4 w-4 mr-2" />
-                                Submit Appeal
+                                <UserX className="h-4 w-4 mr-2" />
+                                Reject {isPendingManager ? '(Manager)' : '(HR)'}
                             </Button>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
             }
         >
-            <Head title="My Leave Request" />
+            <Head title={`Leave Request - ${leaveRequest.user.name}`} />
 
-            <div className="max-w-5xl mx-auto space-y-6">
-                {/* Status Alerts */}
-                {leaveRequest.status === 'rejected_by_manager' && !leaveRequest.appealed_at && (
-                    <Alert className="bg-red-50 border-red-300 animate-fade-in">
-                        <AlertCircle className="h-5 w-5 text-red-600" />
-                        <AlertDescription className="text-red-800">
-                            <strong>Leave Request Rejected:</strong> Your manager has rejected this request. You can submit an appeal if you believe this decision should be reconsidered.
-                        </AlertDescription>
-                    </Alert>
-                )}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Main Content */}
+                <div className="lg:col-span-2 space-y-6">
+                    {/* ✅ Permission Info Alert */}
+                    {isPendingManager && !canApproveAsManager && (
+                        <Alert className="bg-yellow-50 border-yellow-300 animate-fade-in">
+                            <AlertCircle className="h-5 w-5 text-yellow-600" />
+                            <AlertDescription className="text-yellow-800">
+                                <strong>View Only:</strong> Only the assigned manager ({leaveRequest.manager?.name}) or HR can approve this request.
+                            </AlertDescription>
+                        </Alert>
+                    )}
 
-                {leaveRequest.status === 'rejected_by_hr' && (
-                    <Alert className="bg-red-50 border-red-300 animate-fade-in">
-                        <AlertCircle className="h-5 w-5 text-red-600" />
-                        <AlertDescription className="text-red-800">
-                            <strong>Final Decision:</strong> HR has rejected this leave request. This decision is final.
-                        </AlertDescription>
-                    </Alert>
-                )}
+                    {isPendingHR && !canApproveAsHRFinal && (
+                        <Alert className="bg-yellow-50 border-yellow-300 animate-fade-in">
+                            <AlertCircle className="h-5 w-5 text-yellow-600" />
+                            <AlertDescription className="text-yellow-800">
+                                <strong>View Only:</strong> Only HR roles (Super Admin, Admin, HR Manager) can approve this request.
+                            </AlertDescription>
+                        </Alert>
+                    )}
 
-                {leaveRequest.status === 'appealed' && (
-                    <Alert className="bg-orange-50 border-orange-300 animate-fade-in">
-                        <AlertCircle className="h-5 w-5 text-orange-600" />
-                        <AlertDescription className="text-orange-800">
-                            <strong>Appeal Submitted:</strong> Your appeal is being reviewed by HR. You'll be notified once a decision is made.
-                        </AlertDescription>
-                    </Alert>
-                )}
-
-                {leaveRequest.status === 'approved' && (
-                    <Alert className="bg-green-50 border-green-300 animate-fade-in">
-                        <CheckCircle2 className="h-5 w-5 text-green-600" />
-                        <AlertDescription className="text-green-800">
-                            <strong>Approved!</strong> Your leave request has been approved. {leaveRequest.total_days} {leaveRequest.total_days === 1 ? 'day' : 'days'} has been deducted from your balance.
-                        </AlertDescription>
-                    </Alert>
-                )}
-
-                {/* Leave Details */}
-                <Card className="animate-fade-in">
-                    <CardHeader>
-                        <CardTitle>Leave Details</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <p className="text-sm text-gray-600 mb-1">Start Date</p>
-                                <p className="font-medium text-gray-900">
-                                    {new Date(leaveRequest.start_date).toLocaleDateString('en-US', { 
-                                        weekday: 'short',
-                                        month: 'short', 
-                                        day: 'numeric', 
-                                        year: 'numeric' 
-                                    })}
-                                </p>
-                            </div>
-
-                            <div>
-                                <p className="text-sm text-gray-600 mb-1">End Date</p>
-                                <p className="font-medium text-gray-900">
-                                    {new Date(leaveRequest.end_date).toLocaleDateString('en-US', { 
-                                        weekday: 'short',
-                                        month: 'short', 
-                                        day: 'numeric', 
-                                        year: 'numeric' 
-                                    })}
-                                </p>
-                            </div>
-
-                            <div>
-                                <p className="text-sm text-gray-600 mb-1">Total Duration</p>
-                                <div className="flex items-center gap-2">
-                                    <Clock className="h-5 w-5 text-blue-600" />
-                                    <p className="font-bold text-2xl text-gray-900">
-                                        {leaveRequest.total_days}
-                                    </p>
-                                    <span className="text-gray-500">
-                                        {leaveRequest.total_days === 1 ? 'day' : 'days'}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="pt-4 border-t">
-                            <p className="text-sm text-gray-600 mb-2">Reason</p>
-                            <div className="p-4 bg-gray-50 rounded-lg">
-                                <p className="text-gray-900 whitespace-pre-wrap">{leaveRequest.reason}</p>
-                            </div>
-                        </div>
-
-                        {leaveRequest.attachment && (
-                            <div className="pt-4 border-t">
-                                <p className="text-sm text-gray-600 mb-2">Supporting Document</p>
-                                <Button variant="outline" size="sm" asChild>
-                                    <a href={`/storage/${leaveRequest.attachment}`} download target="_blank">
-                                        <Download className="h-4 w-4 mr-2" />
-                                        Download Attachment
-                                    </a>
-                                </Button>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Approval Timeline */}
-                <Card className="animate-fade-in animation-delay-100">
-                    <CardHeader>
-                        <CardTitle>Approval Status</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {/* Submitted */}
-                            <div className="flex items-start gap-4">
-                                <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full flex-shrink-0">
-                                    <Send className="h-5 w-5 text-blue-600" />
-                                </div>
+                    {/* Employee Info */}
+                    <Card className="animate-fade-in">
+                        <CardHeader>
+                            <CardTitle>Employee Information</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-center gap-4">
+                                {leaveRequest.user.profile_picture ? (
+                                    <img
+                                        src={`/storage/${leaveRequest.user.profile_picture}`}
+                                        alt={leaveRequest.user.name}
+                                        className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+                                    />
+                                ) : (
+                                    <div className="flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full border-2 border-gray-200">
+                                        <span className="text-2xl font-medium text-white">
+                                            {leaveRequest.user.name.charAt(0).toUpperCase()}
+                                        </span>
+                                    </div>
+                                )}
                                 <div className="flex-1">
-                                    <p className="font-medium text-gray-900">Request Submitted</p>
-                                    <p className="text-sm text-gray-600">
-                                        {new Date(leaveRequest.created_at).toLocaleString()}
-                                    </p>
-                                </div>
-                                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                            </div>
-
-                            {/* Manager Approval */}
-                            <div className="flex items-start gap-4">
-                                <div className={`flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 ${
-                                    leaveRequest.manager_approved_at ? 'bg-green-100' : 
-                                    leaveRequest.status === 'pending_manager' ? 'bg-yellow-100' : 
-                                    leaveRequest.status === 'rejected_by_manager' ? 'bg-red-100' : 'bg-gray-100'
-                                }`}>
-                                    {wasAutoApproved ? (
-                                        <Shield className="h-5 w-5 text-green-600" />
-                                    ) : (
-                                        <User className={`h-5 w-5 ${
-                                            leaveRequest.manager_approved_at ? 'text-green-600' : 
-                                            leaveRequest.status === 'pending_manager' ? 'text-yellow-600' : 
-                                            leaveRequest.status === 'rejected_by_manager' ? 'text-red-600' : 'text-gray-400'
-                                        }`} />
+                                    <h3 className="text-xl font-semibold text-gray-900">{leaveRequest.user.name}</h3>
+                                    <p className="text-sm text-gray-600">{leaveRequest.user.position || leaveRequest.user.department || leaveRequest.user.email}</p>
+                                    {leaveRequest.user.employee_id && (
+                                        <p className="text-xs text-gray-500 mt-1">ID: {leaveRequest.user.employee_id}</p>
                                     )}
                                 </div>
-                                <div className="flex-1">
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Leave Details */}
+                    <Card className="animate-fade-in animation-delay-100">
+                        <CardHeader>
+                            <CardTitle>Leave Request Details</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <p className="text-sm text-gray-600 mb-1">Start Date</p>
                                     <p className="font-medium text-gray-900">
-                                        {wasAutoApproved ? 'Manager Approval (Auto)' : 'Manager Approval'}
+                                        {new Date(leaveRequest.start_date).toLocaleDateString('en-US', { 
+                                            weekday: 'short',
+                                            month: 'short', 
+                                            day: 'numeric', 
+                                            year: 'numeric' 
+                                        })}
                                     </p>
-                                    {leaveRequest.manager ? (
-                                        <p className="text-sm text-gray-600 mt-1">{leaveRequest.manager.name}</p>
-                                    ) : (
-                                        <p className="text-sm text-gray-500 italic mt-1">No manager assigned</p>
-                                    )}
-                                    
-                                    {leaveRequest.manager_approved_at && (
-                                        <>
-                                            <p className="text-sm text-gray-600 mt-1">
-                                                {wasAutoApproved ? 'Auto-approved on' : 'Approved on'}{' '}
-                                                {new Date(leaveRequest.manager_approved_at).toLocaleString()}
-                                            </p>
-                                            {leaveRequest.manager_comments && (
-                                                <div className={`mt-2 p-3 rounded-lg ${wasAutoApproved ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'}`}>
-                                                    <p className="text-xs text-gray-500 mb-1">
-                                                        {wasAutoApproved ? 'System Note:' : 'Manager\'s Comment:'}
-                                                    </p>
-                                                    <p className={`text-sm ${wasAutoApproved ? 'text-blue-700' : 'text-gray-700'}`}>
-                                                        {leaveRequest.manager_comments}
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
-                                    
-                                    {leaveRequest.status === 'pending_manager' && (
-                                        <Badge className="mt-2 bg-yellow-100 text-yellow-700 border border-yellow-200">
-                                            <Clock className="h-3 w-3 mr-1" />
-                                            Awaiting Manager Approval
-                                        </Badge>
-                                    )}
-                                    
-                                    {leaveRequest.status === 'rejected_by_manager' && leaveRequest.manager_comments && (
-                                        <div className="mt-2 p-3 bg-red-50 rounded-lg border border-red-200">
-                                            <p className="text-xs text-red-500 mb-1">Rejection Reason:</p>
-                                            <p className="text-sm text-red-700">{leaveRequest.manager_comments}</p>
-                                        </div>
-                                    )}
                                 </div>
-                                {leaveRequest.manager_approved_at && (
-                                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                )}
-                                {leaveRequest.status === 'rejected_by_manager' && (
-                                    <XCircle className="h-5 w-5 text-red-600" />
-                                )}
-                                {leaveRequest.status === 'pending_manager' && (
-                                    <Clock className="h-5 w-5 text-yellow-600" />
-                                )}
+
+                                <div>
+                                    <p className="text-sm text-gray-600 mb-1">End Date</p>
+                                    <p className="font-medium text-gray-900">
+                                        {new Date(leaveRequest.end_date).toLocaleDateString('en-US', { 
+                                            weekday: 'short',
+                                            month: 'short', 
+                                            day: 'numeric', 
+                                            year: 'numeric' 
+                                        })}
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <p className="text-sm text-gray-600 mb-1">Total Duration</p>
+                                    <div className="flex items-center gap-2">
+                                        <Clock className="h-5 w-5 text-blue-600" />
+                                        <p className="font-bold text-2xl text-gray-900">
+                                            {leaveRequest.total_days}
+                                        </p>
+                                        <span className="text-gray-500">
+                                            {leaveRequest.total_days === 1 ? 'day' : 'days'}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
 
-                            {/* HR Approval */}
-                            {['pending_hr', 'approved', 'rejected_by_hr', 'appealed'].includes(leaveRequest.status) && (
+                            <div className="pt-4 border-t">
+                                <p className="text-sm text-gray-600 mb-2">Reason</p>
+                                <div className="p-4 bg-gray-50 rounded-lg">
+                                    <p className="text-gray-900 whitespace-pre-wrap">{leaveRequest.reason}</p>
+                                </div>
+                            </div>
+
+                            {leaveRequest.attachment && (
+                                <div className="pt-4 border-t">
+                                    <p className="text-sm text-gray-600 mb-2">Supporting Document</p>
+                                    <Button variant="outline" size="sm" asChild>
+                                        <a href={`/storage/${leaveRequest.attachment}`} download target="_blank">
+                                            <Download className="h-4 w-4 mr-2" />
+                                            Download Attachment
+                                        </a>
+                                    </Button>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Approval Timeline */}
+                    <Card className="animate-fade-in animation-delay-200">
+                        <CardHeader>
+                            <CardTitle>Approval Timeline</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                {/* Submitted */}
                                 <div className="flex items-start gap-4">
-                                    <div className={`flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 ${
-                                        leaveRequest.hr_approved_at ? 'bg-green-100' : 
-                                        leaveRequest.status === 'pending_hr' ? 'bg-blue-100' : 
-                                        leaveRequest.status === 'rejected_by_hr' ? 'bg-red-100' : 'bg-gray-100'
-                                    }`}>
-                                        <User className={`h-5 w-5 ${
-                                            leaveRequest.hr_approved_at ? 'text-green-600' : 
-                                            leaveRequest.status === 'pending_hr' ? 'text-blue-600' : 
-                                            leaveRequest.status === 'rejected_by_hr' ? 'text-red-600' : 'text-gray-400'
-                                        }`} />
+                                    <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full flex-shrink-0">
+                                        <Send className="h-5 w-5 text-blue-600" />
                                     </div>
                                     <div className="flex-1">
-                                        <p className="font-medium text-gray-900">HR Final Approval</p>
-                                        {leaveRequest.hr_approver && (
-                                            <p className="text-sm text-gray-600 mt-1">{leaveRequest.hr_approver.name}</p>
+                                        <p className="font-medium text-gray-900">Request Submitted</p>
+                                        <p className="text-sm text-gray-600">
+                                            {new Date(leaveRequest.created_at).toLocaleString()}
+                                        </p>
+                                    </div>
+                                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                </div>
+
+                                {/* Manager Approval */}
+                                <div className="flex items-start gap-4">
+                                    <div className={`flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 ${
+                                        leaveRequest.manager_approved_at ? 'bg-green-100' : 
+                                        isPendingManager ? 'bg-yellow-100' : 'bg-gray-100'
+                                    }`}>
+                                        {wasAutoApproved ? (
+                                            <Shield className="h-5 w-5 text-green-600" />
+                                        ) : (
+                                            <User className={`h-5 w-5 ${
+                                                leaveRequest.manager_approved_at ? 'text-green-600' : 
+                                                isPendingManager ? 'text-yellow-600' : 'text-gray-400'
+                                            }`} />
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-medium text-gray-900">
+                                            {wasAutoApproved ? 'Manager Approval (Auto)' : 'Manager Approval'}
+                                        </p>
+                                        {leaveRequest.manager ? (
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <div className="flex items-center justify-center w-6 h-6 bg-gray-600 rounded-full">
+                                                    <span className="text-xs font-medium text-white">
+                                                        {leaveRequest.manager.name.charAt(0).toUpperCase()}
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-gray-600">{leaveRequest.manager.name}</p>
+                                                {isAssignedManager && (
+                                                    <Badge className="bg-blue-100 text-blue-700 text-xs">You</Badge>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-gray-500 italic">No manager assigned</p>
                                         )}
                                         
-                                        {leaveRequest.hr_approved_at && (
+                                        {leaveRequest.manager_approved_at && (
                                             <>
                                                 <p className="text-sm text-gray-600 mt-1">
-                                                    Approved on {new Date(leaveRequest.hr_approved_at).toLocaleString()}
+                                                    {wasAutoApproved ? 'Auto-approved on' : 'Approved by ' + (leaveRequest.manager_approver?.name || 'Manager') + ' on'}{' '}
+                                                    {new Date(leaveRequest.manager_approved_at).toLocaleString()}
                                                 </p>
-                                                {leaveRequest.hr_comments && (
-                                                    <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                                                        <p className="text-xs text-gray-500 mb-1">HR Comment:</p>
-                                                        <p className="text-sm text-gray-700">{leaveRequest.hr_comments}</p>
+                                                {leaveRequest.manager_comments && (
+                                                    <div className={`mt-2 p-3 rounded-lg ${wasAutoApproved ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'}`}>
+                                                        <p className="text-xs text-gray-500 mb-1">
+                                                            {wasAutoApproved ? 'System Note:' : 'Manager\'s Comment:'}
+                                                        </p>
+                                                        <p className={`text-sm ${wasAutoApproved ? 'text-blue-700' : 'text-gray-700'}`}>
+                                                            {leaveRequest.manager_comments}
+                                                        </p>
                                                     </div>
                                                 )}
                                             </>
                                         )}
                                         
-                                        {leaveRequest.status === 'pending_hr' && (
-                                            <Badge className="mt-2 bg-blue-100 text-blue-700 border border-blue-200">
+                                        {isPendingManager && (
+                                            <Badge className="mt-2 bg-yellow-100 text-yellow-700 border border-yellow-200">
                                                 <Clock className="h-3 w-3 mr-1" />
-                                                Awaiting HR Approval
+                                                {canApproveAsManager ? 'Awaiting Your Approval' : 'Pending'}
                                             </Badge>
                                         )}
                                         
-                                        {leaveRequest.status === 'rejected_by_hr' && leaveRequest.hr_comments && (
+                                        {leaveRequest.status === 'rejected_by_manager' && leaveRequest.manager_comments && (
                                             <div className="mt-2 p-3 bg-red-50 rounded-lg border border-red-200">
                                                 <p className="text-xs text-red-500 mb-1">Rejection Reason:</p>
-                                                <p className="text-sm text-red-700">{leaveRequest.hr_comments}</p>
+                                                <p className="text-sm text-red-700">{leaveRequest.manager_comments}</p>
                                             </div>
                                         )}
                                     </div>
-                                    {leaveRequest.status === 'approved' && (
+                                    {leaveRequest.manager_approved_at && (
                                         <CheckCircle2 className="h-5 w-5 text-green-600" />
                                     )}
-                                    {leaveRequest.status === 'rejected_by_hr' && (
+                                    {leaveRequest.status === 'rejected_by_manager' && (
                                         <XCircle className="h-5 w-5 text-red-600" />
                                     )}
-                                    {leaveRequest.status === 'pending_hr' && (
-                                        <Clock className="h-5 w-5 text-blue-600" />
+                                    {isPendingManager && (
+                                        <Clock className="h-5 w-5 text-yellow-600" />
                                     )}
                                 </div>
-                            )}
 
-                            {/* Appeal Status */}
-                            {leaveRequest.status === 'appealed' && (
-                                <div className="flex items-start gap-4 pt-4 border-t-2 border-orange-200">
-                                    <div className="flex items-center justify-center w-10 h-10 bg-orange-100 rounded-full flex-shrink-0">
-                                        <AlertCircle className="h-5 w-5 text-orange-600" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="font-medium text-gray-900">Appeal Submitted</p>
-                                        <p className="text-sm text-gray-600">
-                                            Your appeal is being reviewed by HR
-                                        </p>
-                                        {leaveRequest.appealed_at && (
-                                            <p className="text-sm text-gray-600 mt-1">
-                                                Submitted on {new Date(leaveRequest.appealed_at).toLocaleString()}
-                                            </p>
+                                {/* HR Approval */}
+                                {['pending_hr', 'approved', 'rejected_by_hr', 'appealed'].includes(leaveRequest.status) && (
+                                    <div className="flex items-start gap-4">
+                                        <div className={`flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 ${
+                                            leaveRequest.hr_approved_at ? 'bg-green-100' : 
+                                            isPendingHR ? 'bg-blue-100' : 'bg-gray-100'
+                                        }`}>
+                                            <User className={`h-5 w-5 ${
+                                                leaveRequest.hr_approved_at ? 'text-green-600' : 
+                                                isPendingHR ? 'text-blue-600' : 'text-gray-400'
+                                            }`} />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-medium text-gray-900">HR Final Approval</p>
+                                            {leaveRequest.hr_approver && (
+                                                <p className="text-sm text-gray-600">{leaveRequest.hr_approver.name}</p>
+                                            )}
+                                            
+                                            {leaveRequest.hr_approved_at && (
+                                                <>
+                                                    <p className="text-sm text-gray-600 mt-1">
+                                                        {new Date(leaveRequest.hr_approved_at).toLocaleString()}
+                                                    </p>
+                                                    {leaveRequest.hr_comments && (
+                                                        <div className="mt-2 p-3 bg-gray-50 rounded-lg">
+                                                            <p className="text-xs text-gray-500 mb-1">HR Comment:</p>
+                                                            <p className="text-sm text-gray-700">{leaveRequest.hr_comments}</p>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                            
+                                            {isPendingHR && (
+                                                <Badge className="mt-2 bg-blue-100 text-blue-700 border border-blue-200">
+                                                    <Clock className="h-3 w-3 mr-1" />
+                                                    {canApproveAsHRFinal ? 'Awaiting Your Approval' : 'Awaiting HR Approval'}
+                                                </Badge>
+                                            )}
+                                            
+                                            {leaveRequest.status === 'rejected_by_hr' && leaveRequest.hr_comments && (
+                                                <div className="mt-2 p-3 bg-red-50 rounded-lg border border-red-200">
+                                                    <p className="text-xs text-red-500 mb-1">Rejection Reason:</p>
+                                                    <p className="text-sm text-red-700">{leaveRequest.hr_comments}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {leaveRequest.status === 'approved' && (
+                                            <CheckCircle2 className="h-5 w-5 text-green-600" />
                                         )}
-                                        {leaveRequest.appeal_reason && (
-                                            <div className="mt-2 p-3 bg-orange-50 rounded-lg border border-orange-200">
-                                                <p className="text-xs text-orange-600 mb-1">Your Appeal:</p>
-                                                <p className="text-sm text-gray-900">{leaveRequest.appeal_reason}</p>
-                                            </div>
+                                        {leaveRequest.status === 'rejected_by_hr' && (
+                                            <XCircle className="h-5 w-5 text-red-600" />
                                         )}
-                                        <Badge className="mt-2 bg-orange-100 text-orange-700 border border-orange-200">
-                                            <Clock className="h-3 w-3 mr-1" />
-                                            Under Review
-                                        </Badge>
+                                        {isPendingHR && (
+                                            <Clock className="h-5 w-5 text-blue-600" />
+                                        )}
                                     </div>
-                                    <Clock className="h-5 w-5 text-orange-600" />
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Leave Information Card - Same as before */}
+                    <Card className="animate-fade-in animation-delay-300">
+                        <CardHeader>
+                            <CardTitle>Leave Information</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="pt-4 border-t">
+                                <p className="text-sm text-gray-600 mb-2">Reason</p>
+                                <div className="p-4 bg-gray-50 rounded-lg">
+                                    <p className="text-gray-900 whitespace-pre-wrap">{leaveRequest.reason}</p>
                                 </div>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Sidebar */}
+                <div className="space-y-6">
+                    {/* Action Card for Manager Approval */}
+                    {canApproveAsManager && (
+                        <Card className="animate-fade-in border-yellow-300 border-2">
+                            <CardHeader>
+                                <CardTitle className="text-yellow-700 flex items-center gap-2">
+                                    <Clock className="h-5 w-5" />
+                                    Manager Approval Required
+                                </CardTitle>
+                                <CardDescription>
+                                    {isAssignedManager ? 'You are the assigned manager' : 'You can approve as HR'}
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                <Button 
+                                    className="w-full bg-green-600 hover:bg-green-700 justify-start"
+                                    onClick={() => setShowApproveModal(true)}
+                                >
+                                    <UserCheck className="h-5 w-5 mr-2" />
+                                    Approve as Manager
+                                </Button>
+                                <Button 
+                                    variant="destructive" 
+                                    className="w-full justify-start"
+                                    onClick={() => setShowRejectModal(true)}
+                                >
+                                    <UserX className="h-5 w-5 mr-2" />
+                                    Reject as Manager
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* Action Card for HR Approval */}
+                    {canApproveAsHRFinal && (
+                        <Card className="animate-fade-in border-blue-300 border-2">
+                            <CardHeader>
+                                <CardTitle className="text-blue-700 flex items-center gap-2">
+                                    <Shield className="h-5 w-5" />
+                                    HR Final Approval Required
+                                </CardTitle>
+                                <CardDescription>
+                                    Manager has approved, awaiting HR confirmation
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                <Button 
+                                    className="w-full bg-green-600 hover:bg-green-700 justify-start"
+                                    onClick={() => setShowApproveModal(true)}
+                                >
+                                    <UserCheck className="h-5 w-5 mr-2" />
+                                    Approve as HR
+                                </Button>
+                                <Button 
+                                    variant="destructive" 
+                                    className="w-full justify-start"
+                                    onClick={() => setShowRejectModal(true)}
+                                >
+                                    <UserX className="h-5 w-5 mr-2" />
+                                    Reject as HR
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* Emergency Contact & Leave Type cards remain the same */}
+                </div>
             </div>
 
-            {/* Appeal Modal */}
-            {showAppealModal && (
+            {/* ✅ MANAGER APPROVE MODAL */}
+            {showApproveModal && approvalType === 'manager' && (
                 <>
                     <div 
                         className="fixed inset-0 bg-black/50 z-50 animate-fade-in"
-                        onClick={() => setShowAppealModal(false)}
+                        onClick={() => setShowApproveModal(false)}
                     />
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md animate-scale-in">
                             <div className="flex items-start justify-between mb-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-orange-100 rounded-full">
-                                        <FileText className="h-6 w-6 text-orange-600" />
+                                    <div className="p-2 bg-green-100 rounded-full">
+                                        <UserCheck className="h-6 w-6 text-green-600" />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-semibold text-gray-900">Submit Appeal</h3>
+                                        <h3 className="text-lg font-semibold text-gray-900">Approve as Manager</h3>
                                         <p className="text-sm text-gray-600 mt-0.5">
-                                            Explain why you believe this decision should be reconsidered
+                                            {leaveRequest.user.name} - {leaveRequest.total_days} {leaveRequest.total_days === 1 ? 'day' : 'days'}
                                         </p>
                                     </div>
                                 </div>
                                 <button
-                                    onClick={() => setShowAppealModal(false)}
+                                    onClick={() => setShowApproveModal(false)}
                                     className="p-1 hover:bg-gray-100 rounded-md transition-colors"
                                 >
                                     <XIcon className="h-5 w-5 text-gray-500" />
                                 </button>
                             </div>
 
-                            <form onSubmit={handleAppeal} className="space-y-4">
+                            <form onSubmit={handleManagerApprove} className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="appeal_reason">Appeal Reason *</Label>
+                                    <Label htmlFor="manager_comments">Comments (Optional)</Label>
                                     <Textarea
-                                        id="appeal_reason"
-                                        value={appealData.appeal_reason}
-                                        onChange={(e) => setAppealData('appeal_reason', e.target.value)}
-                                        placeholder="Provide a detailed explanation for your appeal..."
-                                        rows={5}
-                                        required
+                                        id="manager_comments"
+                                        value={managerApproveData.manager_comments}
+                                        onChange={(e) => setManagerApproveData('manager_comments', e.target.value)}
+                                        placeholder="Add any comments..."
+                                        rows={3}
                                     />
-                                    <p className="text-xs text-gray-500">
-                                        This will be reviewed by HR. Be clear and professional in your explanation.
-                                    </p>
                                 </div>
 
-                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                                    <p className="text-sm text-orange-800">
-                                        <strong>Note:</strong> Your appeal will be reviewed by HR. You'll be notified once a decision is made.
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                                    <p className="text-sm text-green-800">
+                                        <strong>This will:</strong>
+                                        <br />• Approve as manager
+                                        <br />• Forward to HR for final approval
+                                        <br />• Send notification to employee
                                     </p>
                                 </div>
 
@@ -482,20 +608,253 @@ export default function Show({ auth, leaveRequest }) {
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        onClick={() => setShowAppealModal(false)}
+                                        onClick={() => setShowApproveModal(false)}
                                         className="flex-1"
                                     >
                                         Cancel
                                     </Button>
                                     <Button
                                         type="submit"
-                                        disabled={appealProcessing}
-                                        className="flex-1 bg-orange-600 hover:bg-orange-700"
+                                        disabled={managerApproveProcessing}
+                                        className="flex-1 bg-green-600 hover:bg-green-700"
                                     >
-                                        {appealProcessing ? (
-                                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting...</>
+                                        {managerApproveProcessing ? (
+                                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Approving...</>
                                         ) : (
-                                            <><FileText className="h-4 w-4 mr-2" />Submit Appeal</>
+                                            <><UserCheck className="h-4 w-4 mr-2" />Approve</>
+                                        )}
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* ✅ HR APPROVE MODAL */}
+            {showApproveModal && approvalType === 'hr' && (
+                <>
+                    <div 
+                        className="fixed inset-0 bg-black/50 z-50 animate-fade-in"
+                        onClick={() => setShowApproveModal(false)}
+                    />
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md animate-scale-in">
+                            <div className="flex items-start justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-green-100 rounded-full">
+                                        <UserCheck className="h-6 w-6 text-green-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-gray-900">Final HR Approval</h3>
+                                        <p className="text-sm text-gray-600 mt-0.5">
+                                            {leaveRequest.user.name} - {leaveRequest.total_days} {leaveRequest.total_days === 1 ? 'day' : 'days'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowApproveModal(false)}
+                                    className="p-1 hover:bg-gray-100 rounded-md transition-colors"
+                                >
+                                    <XIcon className="h-5 w-5 text-gray-500" />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleHrApprove} className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="hr_comments">Comments (Optional)</Label>
+                                    <Textarea
+                                        id="hr_comments"
+                                        value={hrApproveData.hr_comments}
+                                        onChange={(e) => setHrApproveData('hr_comments', e.target.value)}
+                                        placeholder="Add any comments for the employee..."
+                                        rows={3}
+                                    />
+                                </div>
+
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                                    <p className="text-sm text-green-800">
+                                        <strong>This will:</strong>
+                                        <br />• Approve the leave request (FINAL)
+                                        <br />• Deduct {leaveRequest.total_days} {leaveRequest.total_days === 1 ? 'day' : 'days'} from balance
+                                        <br />• Send email notification to employee
+                                    </p>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setShowApproveModal(false)}
+                                        className="flex-1"
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        disabled={hrApproveProcessing}
+                                        className="flex-1 bg-green-600 hover:bg-green-700"
+                                    >
+                                        {hrApproveProcessing ? (
+                                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Approving...</>
+                                        ) : (
+                                            <><UserCheck className="h-4 w-4 mr-2" />Approve</>
+                                        )}
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* ✅ MANAGER REJECT MODAL */}
+            {showRejectModal && approvalType === 'manager' && (
+                <>
+                    <div 
+                        className="fixed inset-0 bg-black/50 z-50 animate-fade-in"
+                        onClick={() => setShowRejectModal(false)}
+                    />
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md animate-scale-in">
+                            <div className="flex items-start justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-red-100 rounded-full">
+                                        <UserX className="h-6 w-6 text-red-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-gray-900">Reject as Manager</h3>
+                                        <p className="text-sm text-gray-600 mt-0.5">
+                                            {leaveRequest.user.name} - {leaveRequest.total_days} {leaveRequest.total_days === 1 ? 'day' : 'days'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowRejectModal(false)}
+                                    className="p-1 hover:bg-gray-100 rounded-md transition-colors"
+                                >
+                                    <XIcon className="h-5 w-5 text-gray-500" />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleManagerReject} className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="manager_reject_comments">Rejection Reason *</Label>
+                                    <Textarea
+                                        id="manager_reject_comments"
+                                        value={managerRejectData.manager_comments}
+                                        onChange={(e) => setManagerRejectData('manager_comments', e.target.value)}
+                                        placeholder="Please provide a reason for rejection..."
+                                        rows={3}
+                                        required
+                                    />
+                                </div>
+
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                    <p className="text-sm text-red-800">
+                                        <strong>This will:</strong>
+                                        <br />• Reject the leave request
+                                        <br />• Employee can appeal this decision
+                                        <br />• Send email notification
+                                    </p>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setShowRejectModal(false)}
+                                        className="flex-1"
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        disabled={managerRejectProcessing}
+                                        className="flex-1 bg-red-600 hover:bg-red-700"
+                                    >
+                                        {managerRejectProcessing ? (
+                                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Rejecting...</>
+                                        ) : (
+                                            <><UserX className="h-4 w-4 mr-2" />Reject</>
+                                        )}
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* ✅ HR REJECT MODAL - Same structure as manager but calls HR route */}
+            {showRejectModal && approvalType === 'hr' && (
+                <>
+                    <div 
+                        className="fixed inset-0 bg-black/50 z-50 animate-fade-in"
+                        onClick={() => setShowRejectModal(false)}
+                    />
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md animate-scale-in">
+                            <div className="flex items-start justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-red-100 rounded-full">
+                                        <UserX className="h-6 w-6 text-red-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-gray-900">Final HR Rejection</h3>
+                                        <p className="text-sm text-gray-600 mt-0.5">
+                                            {leaveRequest.user.name} - {leaveRequest.total_days} {leaveRequest.total_days === 1 ? 'day' : 'days'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowRejectModal(false)}
+                                    className="p-1 hover:bg-gray-100 rounded-md transition-colors"
+                                >
+                                    <XIcon className="h-5 w-5 text-gray-500" />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleHrReject} className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="hr_reject_comments">Rejection Reason *</Label>
+                                    <Textarea
+                                        id="hr_reject_comments"
+                                        value={hrRejectData.hr_comments}
+                                        onChange={(e) => setHrRejectData('hr_comments', e.target.value)}
+                                        placeholder="Please provide a reason for rejection..."
+                                        rows={3}
+                                        required
+                                    />
+                                </div>
+
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                    <p className="text-sm text-red-800">
+                                        <strong>This will:</strong>
+                                        <br />• Reject the leave request (FINAL)
+                                        <br />• Balance will NOT be deducted
+                                        <br />• Send email notification to employee
+                                    </p>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setShowRejectModal(false)}
+                                        className="flex-1"
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        disabled={hrRejectProcessing}
+                                        className="flex-1 bg-red-600 hover:bg-red-700"
+                                    >
+                                        {hrRejectProcessing ? (
+                                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Rejecting...</>
+                                        ) : (
+                                            <><UserX className="h-4 w-4 mr-2" />Reject</>
                                         )}
                                     </Button>
                                 </div>
