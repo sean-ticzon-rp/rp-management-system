@@ -75,37 +75,6 @@ export default function Show({ auth, leaveRequest }) {
         manager_comments: '',
     });
 
-    // ✅ Check if user is the assigned manager
-    const isAssignedManager = auth.user?.id === leaveRequest.manager_id;
-
-    // ✅ Check if user has HR approval permissions
-    const canApproveAsHR = auth.user?.roles?.some(role => 
-        ['super-admin', 'admin', 'hr-manager'].includes(role.slug)
-    );
-
-    // ✅ Determine which approval step user can perform
-    const isPendingManager = leaveRequest.status === 'pending_manager';
-    const isPendingHR = leaveRequest.status === 'pending_hr';
-
-    // ✅ User can approve as manager if they're the assigned manager OR have HR roles (HR can override)
-    const canApproveAsManager = isPendingManager && (isAssignedManager || canApproveAsHR);
-
-    // ✅ User can approve as HR if status is pending_hr AND they have HR role
-    const canApproveAsHRFinal = isPendingHR && canApproveAsHR;
-
-    // ✅ Combined permission check
-    const canTakeAction = canApproveAsManager || canApproveAsHRFinal;
-    const approvalType = isPendingManager ? 'manager' : 'hr';
-
-    // Forms for manager approval
-    const { data: managerApproveData, setData: setManagerApproveData, post: postManagerApprove, processing: managerApproveProcessing } = useForm({
-        manager_comments: '',
-    });
-
-    const { data: managerRejectData, setData: setManagerRejectData, post: postManagerReject, processing: managerRejectProcessing } = useForm({
-        manager_comments: '',
-    });
-
     // Forms for HR approval
     const { data: hrApproveData, setData: setHrApproveData, post: postHrApprove, processing: hrApproveProcessing } = useForm({
         hr_comments: '',
@@ -136,28 +105,7 @@ export default function Show({ auth, leaveRequest }) {
         });
     };
 
-    // ✅ Handle HR approval
-    const handleHrApprove = (e) => {
-        e.preventDefault();
-        postHrApprove(route('leaves.hr-approve', leaveRequest.id), {
-            preserveScroll: true,
-            onSuccess: () => {
-                setShowApproveModal(false);
-            }
-        });
-    };
-
-    const handleHrReject = (e) => {
-        e.preventDefault();
-        postHrReject(route('leaves.hr-reject', leaveRequest.id), {
-            preserveScroll: true,
-            onSuccess: () => {
-                setShowRejectModal(false);
-            }
-        });
-    };
-
-    // ✅ Handle HR approval - NOW WITH APPEAL ROUTE SUPPORT!
+    // ✅ Handle HR approval - WITH APPEAL ROUTE SUPPORT!
     const handleHrApprove = (e) => {
         e.preventDefault();
         
@@ -166,15 +114,10 @@ export default function Show({ auth, leaveRequest }) {
             ? 'leaves.approve-appeal' 
             : 'leaves.hr-approve';
         
-        console.log('HR Approve clicked - Status:', leaveRequest.status, 'Route:', routeName);
-        
         postHrApprove(route(routeName, leaveRequest.id), {
             preserveScroll: true,
             onSuccess: () => {
                 setShowApproveModal(false);
-            },
-            onError: (errors) => {
-                console.error('Approval error:', errors);
             }
         });
     };
@@ -187,15 +130,10 @@ export default function Show({ auth, leaveRequest }) {
             ? 'leaves.reject-appeal' 
             : 'leaves.hr-reject';
         
-        console.log('HR Reject clicked - Status:', leaveRequest.status, 'Route:', routeName);
-        
         postHrReject(route(routeName, leaveRequest.id), {
             preserveScroll: true,
             onSuccess: () => {
                 setShowRejectModal(false);
-            },
-            onError: (errors) => {
-                console.error('Rejection error:', errors);
             }
         });
     };
@@ -271,14 +209,14 @@ export default function Show({ auth, leaveRequest }) {
                                 onClick={() => setShowApproveModal(true)}
                             >
                                 <UserCheck className="h-4 w-4 mr-2" />
-                                Approve {isPendingManager ? '(Manager)' : '(HR)'}
+                                Approve {isPendingManager ? '(Manager)' : isAppealed ? '(Appeal)' : '(HR)'}
                             </Button>
                             <Button 
                                 variant="destructive"
                                 onClick={() => setShowRejectModal(true)}
                             >
                                 <UserX className="h-4 w-4 mr-2" />
-                                Reject {isPendingManager ? '(Manager)' : '(HR)'}
+                                Reject {isPendingManager ? '(Manager)' : isAppealed ? '(Appeal)' : '(HR)'}
                             </Button>
                         </div>
                     )}
