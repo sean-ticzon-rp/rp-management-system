@@ -75,6 +75,43 @@ export default function Show({ auth, leaveRequest }) {
         manager_comments: '',
     });
 
+    // ✅ Check if user is the assigned manager
+    const isAssignedManager = auth.user?.id === leaveRequest.manager_id;
+
+    // ✅ Check if user has HR approval permissions
+    const canApproveAsHR = auth.user?.roles?.some(role => 
+        ['super-admin', 'admin', 'hr-manager'].includes(role.slug)
+    );
+
+    // ✅ Determine which approval step user can perform
+    const isPendingManager = leaveRequest.status === 'pending_manager';
+    const isPendingHR = leaveRequest.status === 'pending_hr';
+    const isAppealed = leaveRequest.status === 'appealed';
+
+    // ✅ User can approve as manager if they're the assigned manager OR have HR roles (HR can override)
+    const canApproveAsManager = isPendingManager && (isAssignedManager || canApproveAsHR);
+
+    // ✅ User can approve as HR if status is pending_hr AND they have HR role
+    const canApproveAsHRFinal = isPendingHR && canApproveAsHR;
+
+    // ✅ User can handle appeals if they have HR role and status is appealed
+    const canHandleAppeal = isAppealed && canApproveAsHR;
+
+    // ✅ Combined permission check
+    const canTakeAction = canApproveAsManager || canApproveAsHRFinal || canHandleAppeal;
+    
+    // ✅ Determine approval type based on status
+    const approvalType = isPendingManager ? 'manager' : (isPendingHR || isAppealed) ? 'hr' : 'manager';
+
+    // Forms for manager approval
+    const { data: managerApproveData, setData: setManagerApproveData, post: postManagerApprove, processing: managerApproveProcessing } = useForm({
+        manager_comments: '',
+    });
+
+    const { data: managerRejectData, setData: setManagerRejectData, post: postManagerReject, processing: managerRejectProcessing } = useForm({
+        manager_comments: '',
+    });
+
     // Forms for HR approval
     const { data: hrApproveData, setData: setHrApproveData, post: postHrApprove, processing: hrApproveProcessing } = useForm({
         hr_comments: '',
@@ -134,6 +171,49 @@ export default function Show({ auth, leaveRequest }) {
             preserveScroll: true,
             onSuccess: () => {
                 setShowRejectModal(false);
+            }
+        });
+    };
+
+    // ✅ Handle HR approval - NOW WITH APPEAL ROUTE SUPPORT!
+    const handleHrApprove = (e) => {
+        e.preventDefault();
+        
+        // ✅ Use different route for appeals vs normal HR approval
+        const routeName = leaveRequest.status === 'appealed' 
+            ? 'leaves.approve-appeal' 
+            : 'leaves.hr-approve';
+        
+        console.log('HR Approve clicked - Status:', leaveRequest.status, 'Route:', routeName);
+        
+        postHrApprove(route(routeName, leaveRequest.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowApproveModal(false);
+            },
+            onError: (errors) => {
+                console.error('Approval error:', errors);
+            }
+        });
+    };
+
+    const handleHrReject = (e) => {
+        e.preventDefault();
+        
+        // ✅ Use different route for appeals vs normal HR rejection
+        const routeName = leaveRequest.status === 'appealed' 
+            ? 'leaves.reject-appeal' 
+            : 'leaves.hr-reject';
+        
+        console.log('HR Reject clicked - Status:', leaveRequest.status, 'Route:', routeName);
+        
+        postHrReject(route(routeName, leaveRequest.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowRejectModal(false);
+            },
+            onError: (errors) => {
+                console.error('Rejection error:', errors);
             }
         });
     };
