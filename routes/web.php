@@ -111,7 +111,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [LeaveRequestController::class, 'index'])->name('index');
         Route::get('/apply', [LeaveRequestController::class, 'create'])->name('apply');
         Route::post('/', [LeaveRequestController::class, 'store'])->name('store');
-        Route::get('/{leave}/edit', [LeaveRequestController::class, 'edit'])->name('edit');
+        Route::get('/{leave}/edit', [LeaveRequestController::class, 'edit'])->name('edit'); // ✅ EDIT must come BEFORE show
         Route::put('/{leave}', [LeaveRequestController::class, 'update'])->name('update');
         Route::get('/{leave}', [LeaveRequestController::class, 'show'])->name('show');
         Route::post('/{leave}/cancel', [LeaveRequestController::class, 'cancel'])->name('cancel');
@@ -172,7 +172,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // 📋 LEAVE MANAGEMENT ROUTES
     // ============================================
     Route::prefix('leaves')->name('leaves.')->group(function () {
-        // Pending Approvals (Hierarchical - MUST come BEFORE {leave} routes)
+        // ✅ Pending Approvals (Hierarchical - MUST come BEFORE {leave} routes)
         Route::get('/pending-approvals', [LeaveApprovalController::class, 'pendingApprovals'])->name('pending-approvals');
         
         // Basic CRUD
@@ -188,19 +188,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // HR Approval Routes
         Route::post('/{leave}/hr-approve', [LeaveApprovalController::class, 'hrApprove'])->name('hr-approve');
         Route::post('/{leave}/hr-reject', [LeaveApprovalController::class, 'hrReject'])->name('hr-reject');
-    });
-
-    // ============================================
-    // 📋 LEAVE TYPES MANAGEMENT (HR/Admin only)
-    // ============================================
-    Route::prefix('leave-types')->name('leave-types.')->group(function () {
-        Route::get('/', [LeaveTypeController::class, 'index'])->name('index');
-        Route::get('/create', [LeaveTypeController::class, 'create'])->name('create');
-        Route::post('/', [LeaveTypeController::class, 'store'])->name('store');
-        Route::get('/{leaveType}/edit', [LeaveTypeController::class, 'edit'])->name('edit');
-        Route::put('/{leaveType}', [LeaveTypeController::class, 'update'])->name('update');
-        Route::patch('/{leaveType}/toggle', [LeaveTypeController::class, 'toggleActive'])->name('toggle');
-        Route::delete('/{leaveType}', [LeaveTypeController::class, 'destroy'])->name('destroy');
+        
     });
 });
 
