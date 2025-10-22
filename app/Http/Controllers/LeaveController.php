@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\User;
-use App\Models\LeaveBalance; // ✅ ADD THIS LINE
+use App\Models\LeaveBalance;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -103,7 +103,7 @@ class LeaveController extends Controller
     }
 
     /**
-     * Show the form for creating a new leave request
+     * Show the form for creating a new leave request (Admin version)
      */
     public function create()
     {
@@ -116,7 +116,7 @@ class LeaveController extends Controller
             ->filter(function($leaveType) use ($user) {
                 return $leaveType->isEligibleForUser($user);
             })
-            ->values(); // Reset array keys
+            ->values();
 
         // Get current year balances
         $leaveBalances = LeaveBalance::where('user_id', $user->id)
@@ -140,7 +140,7 @@ class LeaveController extends Controller
     }
 
     /**
-     * Store a newly created leave request
+     * Store a newly created leave request (Admin version)
      */
     public function store(Request $request)
     {
@@ -159,7 +159,7 @@ class LeaveController extends Controller
             'emergency_contact_phone' => 'nullable|required_if:use_default_emergency_contact,false|string|max:20',
             'use_default_emergency_contact' => 'boolean',
             'availability' => 'nullable|in:reachable,offline,emergency_only',
-            'manager_id' => 'required|exists:users,id', // Manager selection
+            'manager_id' => 'required|exists:users,id',
         ]);
 
         // Calculate total days
@@ -202,6 +202,7 @@ class LeaveController extends Controller
             'status' => 'pending_manager',
         ]);
 
+        // ✅ FIXED: Admin stays on admin leaves page
         return redirect()->route('leaves.index')->with('success', 
             'Leave request submitted successfully! Your manager will review it.'
         );

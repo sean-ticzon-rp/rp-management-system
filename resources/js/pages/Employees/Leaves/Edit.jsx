@@ -1,4 +1,4 @@
-// resources/js/Pages/Employees/Leaves/Apply.jsx
+// resources/js/Pages/Employees/Leaves/Edit.jsx
 import { useState, useEffect } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
@@ -14,7 +14,7 @@ import { Progress } from '@/Components/ui/progress';
 import {
     Calendar,
     ArrowLeft,
-    Send,
+    Save,
     Loader2,
     AlertCircle,
     Clock,
@@ -24,29 +24,30 @@ import {
     XCircle,
     Info,
     FileText,
+    Edit2,
     Users,
     Shield,
 } from 'lucide-react';
 
-export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user }) {
-    const { data, setData, post, processing, errors } = useForm({
-        leave_type_id: '',
-        start_date: '',
-        end_date: '',
-        duration: 'full_day',
-        custom_start_time: '',
-        custom_end_time: '',
-        reason: '',
+export default function Edit({ auth, leaveRequest = {}, leaveTypes = [], leaveBalances = {}, user }) {
+    const { data, setData, put, processing, errors } = useForm({
+        leave_type_id: leaveRequest?.leave_type_id?.toString() || '',
+        start_date: leaveRequest?.start_date ? leaveRequest.start_date.split('T')[0] : '',
+        end_date: leaveRequest?.end_date ? leaveRequest.end_date.split('T')[0] : '',
+        duration: leaveRequest?.duration || 'full_day',
+        custom_start_time: leaveRequest?.custom_start_time || '',
+        custom_end_time: leaveRequest?.custom_end_time || '',
+        reason: leaveRequest?.reason || '',
         attachment: null,
-        emergency_contact_name: user?.emergency_contact_name || '',
-        emergency_contact_phone: user?.emergency_contact_phone || '',
-        use_default_emergency_contact: true,
-        availability: 'reachable',
+        emergency_contact_name: leaveRequest?.emergency_contact_name || '',
+        emergency_contact_phone: leaveRequest?.emergency_contact_phone || '',
+        use_default_emergency_contact: false,
+        availability: leaveRequest?.availability || 'reachable',
     });
 
     const [selectedLeaveType, setSelectedLeaveType] = useState(null);
-    const [calculatedDays, setCalculatedDays] = useState(0);
-    const [filePreview, setFilePreview] = useState(null);
+    const [calculatedDays, setCalculatedDays] = useState(leaveRequest?.total_days || 0);
+    const [filePreview, setFilePreview] = useState(leaveRequest?.attachment ? 'Current attachment' : null);
 
     useEffect(() => {
         if (data.leave_type_id && Array.isArray(leaveTypes) && leaveTypes.length > 0) {
@@ -94,7 +95,7 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user 
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        post(route('my-leaves.store'));
+        put(route('my-leaves.update', leaveRequest.id));
     };
 
     const selectedBalance = data.leave_type_id 
@@ -115,31 +116,30 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user 
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <Button asChild variant="ghost" size="sm">
-                            <Link href={route('my-leaves.index')}>
+                            <Link href={route('my-leaves.show', leaveRequest.id)}>
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back
                             </Link>
                         </Button>
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 rounded-lg">
-                                <Calendar className="h-6 w-6 text-blue-600" />
+                            <div className="p-2 bg-orange-100 rounded-lg">
+                                <Edit2 className="h-6 w-6 text-orange-600" />
                             </div>
                             <div>
-                                <h2 className="text-3xl font-bold text-gray-900">Apply for Leave</h2>
-                                <p className="text-gray-600 mt-1">Submit a new leave request</p>
+                                <h2 className="text-3xl font-bold text-gray-900">Edit Leave Request</h2>
+                                <p className="text-gray-600 mt-1">Update your leave request details</p>
                             </div>
                         </div>
                     </div>
                 </div>
             }
         >
-            <Head title="Apply for Leave" />
+            <Head title="Edit Leave Request" />
 
-            {/* ✅ Open Queue Info */}
-            <Alert className="mb-6 bg-blue-50 border-blue-200 animate-fade-in">
-                <Users className="h-4 w-4 text-blue-600" />
-                <AlertDescription className="text-blue-800">
-                    <strong>Approval Process:</strong> Your request will be reviewed by any available Senior, Lead, or Project Manager, then forwarded to HR for final approval.
+            <Alert className="mb-6 bg-yellow-50 border-yellow-300 animate-fade-in">
+                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                <AlertDescription className="text-yellow-800">
+                    <strong>Note:</strong> You can only edit this request while it's pending review. Once approved or rejected, you cannot make changes.
                 </AlertDescription>
             </Alert>
 
@@ -150,7 +150,7 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user 
                         <Card className="animate-fade-in">
                             <CardHeader>
                                 <CardTitle>Leave Details</CardTitle>
-                                <CardDescription>Select leave type and dates</CardDescription>
+                                <CardDescription>Update leave type and dates</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="space-y-2">
@@ -289,7 +289,7 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user 
                         <Card className="animate-fade-in animation-delay-100">
                             <CardHeader>
                                 <CardTitle>Request Details</CardTitle>
-                                <CardDescription>Provide reason and supporting documents</CardDescription>
+                                <CardDescription>Update reason and supporting documents</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="space-y-2">
@@ -326,7 +326,7 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user 
                                             onClick={() => document.getElementById('attachment').click()}
                                         >
                                             <Upload className="h-4 w-4 mr-2" />
-                                            Choose File
+                                            {leaveRequest?.attachment ? 'Replace File' : 'Choose File'}
                                         </Button>
                                         {filePreview && (
                                             <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -427,17 +427,17 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user 
                                     </p>
                                     <div className="flex gap-3">
                                         <Button type="button" variant="outline" asChild>
-                                            <Link href={route('my-leaves.index')}>Cancel</Link>
+                                            <Link href={route('my-leaves.show', leaveRequest.id)}>Cancel</Link>
                                         </Button>
                                         <Button 
                                             type="submit" 
                                             disabled={processing || !hasSufficientBalance} 
-                                            className="bg-blue-600 hover:bg-blue-700"
+                                            className="bg-orange-600 hover:bg-orange-700"
                                         >
                                             {processing ? (
-                                                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting...</>
+                                                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Updating...</>
                                             ) : (
-                                                <><Send className="h-4 w-4 mr-2" />Submit Request</>
+                                                <><Save className="h-4 w-4 mr-2" />Save Changes</>
                                             )}
                                         </Button>
                                     </div>
@@ -500,7 +500,7 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user 
                         </Card>
                     )}
 
-                    {/* ✅ Approval Workflow - Open Queue */}
+                    {/* Approval Workflow */}
                     <Card className="animate-fade-in animation-delay-200">
                         <CardHeader>
                             <CardTitle className="text-lg">Approval Workflow</CardTitle>

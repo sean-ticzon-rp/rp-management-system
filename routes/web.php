@@ -67,18 +67,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ============================================
     // 🏠 SMART DASHBOARD ROUTER
     // ============================================
-    // Redirects to appropriate dashboard based on user role
     Route::get('/dashboard', function () {
         $user = auth()->user();
         
-        // Check if user has admin/HR roles
         $isAdmin = $user->roles->whereIn('slug', [
             'super-admin', 
             'admin', 
             'hr-manager'
         ])->count() > 0;
         
-        // Redirect based on role
         if ($isAdmin) {
             return app(DashboardController::class)->index();
         } else {
@@ -104,7 +101,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ============================================
     Route::prefix('employees')->name('employees.')->group(function () {
         Route::get('/assets', [EmployeeAssetController::class, 'index'])->name('assets');
-        // Add more employee routes here later (profile, payslips, etc.)
     });
 
     // ============================================
@@ -114,6 +110,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [LeaveRequestController::class, 'index'])->name('index');
         Route::get('/apply', [LeaveRequestController::class, 'create'])->name('apply');
         Route::post('/', [LeaveRequestController::class, 'store'])->name('store');
+        Route::get('/{leave}/edit', [LeaveRequestController::class, 'edit'])->name('edit'); // ✅ EDIT must come BEFORE show
+        Route::put('/{leave}', [LeaveRequestController::class, 'update'])->name('update');
         Route::get('/{leave}', [LeaveRequestController::class, 'show'])->name('show');
         Route::post('/{leave}/cancel', [LeaveRequestController::class, 'cancel'])->name('cancel');
         Route::post('/{leave}/appeal', [LeaveRequestController::class, 'appeal'])->name('appeal');
@@ -158,30 +156,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/{task}', [TaskController::class, 'destroy'])->name('destroy');
     });
 
-    // Individual Assets (Admin - tracks ALL specific physical items)
-    // ✅ IMPORTANT: Specific routes MUST come BEFORE dynamic {asset} routes
+    // Individual Assets
     Route::prefix('individual-assets')->name('individual-assets.')->group(function () {
         Route::get('/', [AssetController::class, 'index'])->name('index');
-        
-        // Specific routes FIRST
         Route::get('/assign/{asset?}', [AssetController::class, 'assignForm'])->name('assign');
         Route::post('/assign', [AssetController::class, 'assign'])->name('store-assignment');
         Route::post('/lookup', [AssetController::class, 'lookup'])->name('lookup');
-        
-        // Dynamic routes LAST
         Route::get('/{asset}/edit', [AssetController::class, 'edit'])->name('edit');
         Route::put('/{asset}', [AssetController::class, 'update'])->name('update');
         Route::post('/{assignment}/return', [AssetController::class, 'return'])->name('return');
         Route::get('/{asset}', [AssetController::class, 'show'])->name('show');
     });
 
-    // Admin Leave Management (Manage All Employees)
+    // ============================================
+    // 📋 LEAVE MANAGEMENT ROUTES
+    // ============================================
     Route::prefix('leaves')->name('leaves.')->group(function () {
+        // ✅ Pending Approvals (Hierarchical - MUST come BEFORE {leave} routes)
+        Route::get('/pending-approvals', [LeaveApprovalController::class, 'pendingApprovals'])->name('pending-approvals');
+        
         // Basic CRUD
-        Route::get('/', [LeaveController::class, 'index'])->name('index');
-        Route::get('/apply', [LeaveController::class, 'create'])->name('apply');
-        Route::post('/', [LeaveController::class, 'store'])->name('store');
-        Route::get('/{leave}', [LeaveController::class, 'show'])->name('show');
         Route::get('/', [LeaveController::class, 'index'])->name('index');
         Route::get('/apply', [LeaveController::class, 'create'])->name('apply');
         Route::post('/', [LeaveController::class, 'store'])->name('store');
@@ -194,14 +188,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // HR Approval Routes
         Route::post('/{leave}/hr-approve', [LeaveApprovalController::class, 'hrApprove'])->name('hr-approve');
         Route::post('/{leave}/hr-reject', [LeaveApprovalController::class, 'hrReject'])->name('hr-reject');
-        Route::post('/{leave}/hr-approve', [LeaveApprovalController::class, 'hrApprove'])->name('hr-approve');
-        Route::post('/{leave}/hr-reject', [LeaveApprovalController::class, 'hrReject'])->name('hr-reject');
         
-        // Manager Approval Routes
-        Route::post('/{leave}/manager-approve', [LeaveApprovalController::class, 'managerApprove'])->name('manager-approve');
-        Route::post('/{leave}/manager-reject', [LeaveApprovalController::class, 'managerReject'])->name('manager-reject');
-        Route::post('/{leave}/manager-approve', [LeaveApprovalController::class, 'managerApprove'])->name('manager-approve');
-        Route::post('/{leave}/manager-reject', [LeaveApprovalController::class, 'managerReject'])->name('manager-reject');
     });
 });
 
