@@ -25,7 +25,7 @@ class LeaveRequest extends Model
         'emergency_contact_phone',
         'use_default_emergency_contact',
         'availability',
-        'manager_id',
+        'manager_id', // ✅ Nullable - for future teams feature
         'manager_approved_by',
         'manager_approved_at',
         'manager_comments',
@@ -33,8 +33,6 @@ class LeaveRequest extends Model
         'hr_approved_at',
         'hr_comments',
         'status',
-        'appeal_reason',
-        'appealed_at',
     ];
 
     protected $casts = [
@@ -44,7 +42,6 @@ class LeaveRequest extends Model
         'use_default_emergency_contact' => 'boolean',
         'manager_approved_at' => 'datetime',
         'hr_approved_at' => 'datetime',
-        'appealed_at' => 'datetime',
     ];
 
     // ============================================
@@ -100,16 +97,6 @@ class LeaveRequest extends Model
         return $query->whereIn('status', ['rejected_by_manager', 'rejected_by_hr']);
     }
 
-    public function scopeAppealed($query)
-    {
-        return $query->where('status', 'appealed');
-    }
-
-    public function scopeForManager($query, $managerId)
-    {
-        return $query->where('manager_id', $managerId);
-    }
-
     public function scopeCurrentYear($query)
     {
         return $query->whereYear('start_date', now()->year);
@@ -146,11 +133,6 @@ class LeaveRequest extends Model
         return in_array($this->status, ['rejected_by_manager', 'rejected_by_hr']);
     }
 
-    public function canBeAppealed()
-    {
-        return $this->status === 'rejected_by_manager';
-    }
-
     public function canBeCancelled()
     {
         return in_array($this->status, ['pending_manager', 'pending_hr']);
@@ -160,11 +142,11 @@ class LeaveRequest extends Model
     // APPROVAL WORKFLOW METHODS
     // ============================================
 
-    public function approveByManager($managerId, $comments = null)
+    public function approveByManager($approverId, $comments = null)
     {
         $this->update([
             'status' => 'pending_hr',
-            'manager_approved_by' => $managerId,
+            'manager_approved_by' => $approverId,
             'manager_approved_at' => now(),
             'manager_comments' => $comments,
         ]);
@@ -173,16 +155,17 @@ class LeaveRequest extends Model
         // TODO: Send update email to employee
     }
 
-    public function rejectByManager($managerId, $reason)
+    public function rejectByManager($approverId, $reason)
     {
+        // ✅ Manager rejection is FINAL (no appeals)
         $this->update([
             'status' => 'rejected_by_manager',
-            'manager_approved_by' => $managerId,
+            'manager_approved_by' => $approverId,
             'manager_approved_at' => now(),
             'manager_comments' => $reason,
         ]);
 
-        // TODO: Send email to employee (with appeal option)
+        // TODO: Send FINAL rejection email to employee
         // TODO: Send FYI email to HR
     }
 
@@ -199,12 +182,13 @@ class LeaveRequest extends Model
         $this->deductFromBalance();
 
         // TODO: Send success email to employee
-        // TODO: Send FYI email to manager
+        // TODO: Send FYI email to approver
         // TODO: Add to team calendar
     }
 
     public function rejectByHr($hrUserId, $reason)
     {
+        // ✅ HR rejection is ALWAYS final
         $this->update([
             'status' => 'rejected_by_hr',
             'hr_approved_by' => $hrUserId,
@@ -212,27 +196,8 @@ class LeaveRequest extends Model
             'hr_comments' => $reason,
         ]);
 
-        // TODO: Send rejection email to employee
-        // TODO: Send FYI email to manager
-    }
-
-    /**
-     * ✅ NEW: Employee appeals a manager rejection
-     */
-    public function appeal($reason)
-    {
-        if (!$this->canBeAppealed()) {
-            throw new \Exception('This request cannot be appealed.');
-        }
-
-        $this->update([
-            'status' => 'appealed',
-            'appeal_reason' => $reason,
-            'appealed_at' => now(),
-        ]);
-
-        // TODO: Send escalation email to HR
-        // TODO: Send confirmation email to employee
+        // TODO: Send FINAL rejection email to employee
+        // TODO: Send FYI email to first approver if any
     }
 
     public function cancel()
@@ -245,7 +210,7 @@ class LeaveRequest extends Model
             'status' => 'cancelled',
         ]);
 
-        // TODO: Send cancellation email to manager and HR
+        // TODO: Send cancellation email to HR and approver
     }
 
     // ============================================
@@ -276,7 +241,6 @@ class LeaveRequest extends Model
             'pending_hr' => 'blue',
             'approved' => 'green',
             'rejected_by_manager', 'rejected_by_hr' => 'red',
-            'appealed' => 'orange',
             'cancelled' => 'gray',
             default => 'gray',
         };
@@ -285,12 +249,11 @@ class LeaveRequest extends Model
     public function getStatusLabelAttribute()
     {
         return match($this->status) {
-            'pending_manager' => 'Pending Manager Approval',
+            'pending_manager' => 'Pending Review',
             'pending_hr' => 'Pending HR Approval',
             'approved' => 'Approved',
-            'rejected_by_manager' => 'Rejected by Manager',
+            'rejected_by_manager' => 'Rejected',
             'rejected_by_hr' => 'Rejected by HR',
-            'appealed' => 'Under Appeal',
             'cancelled' => 'Cancelled',
             default => 'Unknown',
         };
