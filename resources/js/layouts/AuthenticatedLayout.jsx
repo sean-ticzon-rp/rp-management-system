@@ -97,57 +97,23 @@ export default function AuthenticatedLayout({ header, children }) {
         // LEAVE MANAGEMENT (Accordion - if can approve leaves)
         // ============================================
         if (auth.user?.can_approve_leaves) {
-            const leaveItems = [];
-            
-            // ✅ Check if user is Senior/Lead/PM (show Pending Approvals)
-            const isSeniorOrAbove = auth.user.roles?.some(r => 
-                ['senior-engineer', 'lead-engineer', 'project-manager'].includes(r.slug)
-            );
-            
-            // ✅ Check if user is HR/Admin (show All Requests)
-            const isHROrAdmin = auth.user.roles?.some(r => 
-                ['super-admin', 'admin', 'hr-manager'].includes(r.slug)
-            );
-            
-            if (isSeniorOrAbove) {
-                // Senior/Lead/PM see hierarchical Pending Approvals
-                leaveItems.push({ 
-                    name: 'Pending Approvals', 
-                    href: '/leaves/pending-approvals', 
-                    icon: CheckSquare, 
-                    badge: 'pending' 
-                });
-            }
-            
-            if (isHROrAdmin) {
-                // HR/Admin see All Requests + HR Pending (NO APPEALS)
-                leaveItems.push({ 
-                    name: 'All Requests', 
-                    href: '/leaves', 
-                    icon: ClipboardList 
-                });
-                leaveItems.push({ 
-                    name: 'Pending HR Approval', 
-                    href: '/leaves?status=pending_hr', 
-                    icon: CheckSquare, 
-                    badge: 'pending' 
-                });
-                // ❌ REMOVED: Appealed Requests
-                leaveItems.push({ 
-                    name: 'Leave Types', 
-                    href: '/leave-types', 
-                    icon: Layers 
-                });
+            const leaveItems = [
+                { name: 'All Requests', href: '/leaves', icon: ClipboardList },
+                { name: 'Pending Approvals', href: '/leaves?status=pending_manager', icon: CheckSquare, badge: 'pending' },
+                { name: 'Appealed Requests', href: '/leaves?status=appealed', icon: CheckSquare, badge: 'appeal' },
+            ];
+
+            // Only HR/Admin can manage leave types
+            if (auth.user.roles?.some(r => ['super-admin', 'admin', 'hr-manager'].includes(r.slug))) {
+                leaveItems.push({ name: 'Leave Types', href: '/leave-types', icon: Layers });
             }
 
-            if (leaveItems.length > 0) {
-                nav.push({
-                    type: 'accordion',
-                    name: 'Leave Management',
-                    icon: Calendar,
-                    items: leaveItems
-                });
-            }
+            nav.push({
+                type: 'accordion',
+                name: 'Leave Management',
+                icon: Calendar,
+                items: leaveItems
+            });
         }
 
         // ============================================
@@ -350,10 +316,12 @@ export default function AuthenticatedLayout({ header, children }) {
                                                         <Badge className={`text-xs ml-2 ${
                                                             item.badge === 'new' ? 'bg-green-100 text-green-700 border-green-200' :
                                                             item.badge === 'pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+                                                            item.badge === 'appeal' ? 'bg-orange-100 text-orange-700 border-orange-200' :
                                                             'bg-blue-100 text-blue-700'
                                                         } border`}>
                                                             {item.badge === 'new' ? '!' :
-                                                             item.badge === 'pending' ? '•' : item.badge}
+                                                             item.badge === 'pending' ? '•' :
+                                                             item.badge === 'appeal' ? '⚠' : item.badge}
                                                         </Badge>
                                                     )}
                                                     {active && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-700 rounded-r"></div>}
@@ -404,10 +372,12 @@ export default function AuthenticatedLayout({ header, children }) {
                                                                 <Badge className={`text-xs ml-2 ${
                                                                     item.badge === 'new' ? 'bg-green-100 text-green-700 border-green-200' :
                                                                     item.badge === 'pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+                                                                    item.badge === 'appeal' ? 'bg-orange-100 text-orange-700 border-orange-200' :
                                                                     'bg-blue-100 text-blue-700'
                                                                 } border`}>
                                                                     {item.badge === 'new' ? '!' :
-                                                                     item.badge === 'pending' ? '•' : item.badge}
+                                                                     item.badge === 'pending' ? '•' :
+                                                                     item.badge === 'appeal' ? '⚠' : item.badge}
                                                                 </Badge>
                                                             )}
                                                         </Link>

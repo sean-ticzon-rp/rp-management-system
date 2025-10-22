@@ -128,13 +128,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ============================================
     // 👥 USER MANAGEMENT ROUTES
     // ============================================
+    // Users - Import routes MUST come BEFORE resource routes
     Route::get('/users/import', [UserImportController::class, 'show'])->name('users.import');
     Route::post('/users/import', [UserImportController::class, 'import'])->name('users.import.store');
     
-    // ✅ Pending Approvals (for Senior/Lead/PM)
+    // ✅ NEW: Pending Approvals (for Senior/Lead/PM)
     Route::get('/users/pending-approvals', [UserController::class, 'pendingApprovals'])->name('users.pending-approvals');
     
-    // User Approval Routes
+    // User Approval Routes (BEFORE resource routes)
+    // User Approval Routes (BEFORE resource routes)
     Route::post('/users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
     Route::post('/users/{user}/reject', [UserController::class, 'reject'])->name('users.reject');
     
