@@ -41,7 +41,7 @@ class UserController extends Controller
                 $q->where('roles.id', $request->role);
             });
         }
-        
+
         // Filter by account status
         if ($request->has('account_status') && $request->account_status !== 'all') {
             $query->where('account_status', $request->account_status);
@@ -52,7 +52,7 @@ class UserController extends Controller
                     ->latest()
                     ->paginate(15)
                     ->withQueryString();
-        
+
         $roles = Role::all();
 
         return Inertia::render('Admin/Users/Index', [
@@ -103,7 +103,7 @@ class UserController extends Controller
         }
 
         $roles = Role::with('permissions')->get();
-        
+
         return Inertia::render('Admin/Users/Create', [
             'roles' => $roles,
         ]);
@@ -242,7 +242,7 @@ class UserController extends Controller
         $user->load('roles.permissions', 'permissions');
         $roles = Role::with('permissions')->get();
         $allPermissions = Permission::all();
-        
+
         return Inertia::render('Admin/Users/Edit', [
             'user' => $user,
             'roles' => $roles,
@@ -411,9 +411,40 @@ class UserController extends Controller
         ]);
 
         // TODO: Send welcome email to user
-        
+
         return back()->with('success', "User {$user->name} has been approved and can now access the system!");
     }
+
+    public function bulkApprove(Request $request)
+    {
+        $userIds = $request->input('userIds');
+        if (!$userIds ) {
+            return back()->with('error', "No users selected {$userIds}",);
+        }
+        foreach ($userIds as $userId) {
+            $user = User::find($userId);
+            if ($user) {
+                $this->approve($user);
+            }
+        }
+        return back()->with('success', "Users has been approved and can now access the system!");
+    }
+
+    public function bulkReject(Request $request)
+    {
+        $userIds = $request->input('userIds');
+        if (!$userIds ) {
+            return back()->with('error', "No users selected {$userIds}",);
+        }
+        foreach ($userIds as $userId) {
+            $user = User::find($userId);
+            if ($user) {
+                $this->reject($user);
+            }
+        }
+        return back()->with('success', "Users has been rejected");
+    }
+
 
     /**
      * ✅ Reject a pending user account
@@ -434,7 +465,7 @@ class UserController extends Controller
         ]);
 
         // TODO: Send rejection email to user
-        
+
         return back()->with('success', "User {$user->name} has been rejected.");
     }
 }
