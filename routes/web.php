@@ -12,6 +12,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\LeaveApprovalController;
+use App\Http\Controllers\LeaveTypeController;
 use App\Http\Controllers\EmployeeDashboardController;
 use App\Http\Controllers\EmployeeAssetController;
 use Illuminate\Foundation\Application;
@@ -132,10 +133,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/users/import', [UserImportController::class, 'show'])->name('users.import');
     Route::post('/users/import', [UserImportController::class, 'import'])->name('users.import.store');
     
-    // ✅ NEW: Pending Approvals (for Senior/Lead/PM)
+    // Pending Approvals (for Senior/Lead/PM)
     Route::get('/users/pending-approvals', [UserController::class, 'pendingApprovals'])->name('users.pending-approvals');
     
-    // User Approval Routes (BEFORE resource routes)
     // User Approval Routes (BEFORE resource routes)
     Route::post('/users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
     Route::post('/users/{user}/reject', [UserController::class, 'reject'])->name('users.reject');

@@ -61,7 +61,7 @@ export default function AuthenticatedLayout({ header, children }) {
         // EVERYONE - Personal (Always Expanded, No Accordion)
         // ============================================
         nav.push({ 
-            type: 'items', // Simple items, no accordion
+            type: 'items',
             items: [
                 { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
                 { name: 'My Leaves', href: '/my-leaves', icon: Calendar },
@@ -73,7 +73,6 @@ export default function AuthenticatedLayout({ header, children }) {
         // USER MANAGEMENT
         // ============================================
         if (auth.user?.can_manage_users) {
-            // Full User Management for HR/Admin
             nav.push({
                 type: 'accordion',
                 name: 'User Management',
@@ -84,7 +83,6 @@ export default function AuthenticatedLayout({ header, children }) {
                 ]
             });
         } else if (auth.user?.can_approve_users) {
-            // Limited view for PM/Lead/Senior - Only Pending Approvals
             nav.push({
                 type: 'items',
                 items: [
@@ -94,30 +92,60 @@ export default function AuthenticatedLayout({ header, children }) {
         }
 
         // ============================================
-        // LEAVE MANAGEMENT (Accordion - if can approve leaves)
+        // LEAVE MANAGEMENT
         // ============================================
         if (auth.user?.can_approve_leaves) {
-            const leaveItems = [
-                { name: 'All Requests', href: '/leaves', icon: ClipboardList },
-                { name: 'Pending Approvals', href: '/leaves?status=pending_manager', icon: CheckSquare, badge: 'pending' },
-                { name: 'Appealed Requests', href: '/leaves?status=appealed', icon: CheckSquare, badge: 'appeal' },
-            ];
-
-            // Only HR/Admin can manage leave types
-            if (auth.user.roles?.some(r => ['super-admin', 'admin', 'hr-manager'].includes(r.slug))) {
-                leaveItems.push({ name: 'Leave Types', href: '/leave-types', icon: Layers });
+            const leaveItems = [];
+            
+            const isSeniorOrAbove = auth.user.roles?.some(r => 
+                ['senior-engineer', 'lead-engineer', 'project-manager'].includes(r.slug)
+            );
+            
+            const isHROrAdmin = auth.user.roles?.some(r => 
+                ['super-admin', 'admin', 'hr-manager'].includes(r.slug)
+            );
+            
+            if (isSeniorOrAbove) {
+                leaveItems.push({ 
+                    name: 'Pending Approvals', 
+                    href: '/leaves/pending-approvals', 
+                    icon: CheckSquare, 
+                    badge: 'pending' 
+                });
+            }
+            
+            if (isHROrAdmin) {
+                leaveItems.push({ 
+                    name: 'All Requests', 
+                    href: '/leaves', 
+                    icon: ClipboardList 
+                });
+                leaveItems.push({ 
+                    name: 'Pending HR Approval', 
+                    href: '/leaves?status=pending_hr', 
+                    icon: CheckSquare, 
+                    badge: 'pending' 
+                });
+                // ❌ REMOVED: Appealed Requests
+                leaveItems.push({ 
+                    name: 'Leave Types', 
+                    href: '/leave-types', 
+                    icon: Layers 
+                });
             }
 
-            nav.push({
-                type: 'accordion',
-                name: 'Leave Management',
-                icon: Calendar,
-                items: leaveItems
-            });
+            if (leaveItems.length > 0) {
+                nav.push({
+                    type: 'accordion',
+                    name: 'Leave Management',
+                    icon: Calendar,
+                    items: leaveItems
+                });
+            }
         }
 
         // ============================================
-        // INVENTORY MANAGEMENT (Accordion - if can manage inventory)
+        // INVENTORY MANAGEMENT
         // ============================================
         if (auth.user?.can_manage_inventory) {
             nav.push({
@@ -132,7 +160,7 @@ export default function AuthenticatedLayout({ header, children }) {
         }
 
         // ============================================
-        // PROJECT MANAGEMENT (Accordion - if can manage projects)
+        // PROJECT MANAGEMENT
         // ============================================
         if (auth.user?.can_manage_projects) {
             nav.push({
@@ -148,7 +176,7 @@ export default function AuthenticatedLayout({ header, children }) {
         }
 
         // ============================================
-        // SETTINGS (Always visible, simple item)
+        // SETTINGS
         // ============================================
         nav.push({
             type: 'items',
@@ -162,15 +190,12 @@ export default function AuthenticatedLayout({ header, children }) {
 
     const navigation = buildNavigation();
 
-    // ✅ Better active check - exact match first, then prefix
     const isActive = (href) => {
         const cleanHref = href.split('?')[0];
         const cleanUrl = currentUrl.split('?')[0];
         
-        // Exact match
         if (cleanUrl === cleanHref) return true;
         
-        // For /users, only match /users/* not /users itself from other routes
         if (cleanHref === '/users' && cleanUrl.startsWith('/users/')) return true;
         if (cleanHref === '/leaves' && cleanUrl.startsWith('/leaves/')) return true;
         if (cleanHref === '/inventory' && cleanUrl.startsWith('/inventory/')) return true;
@@ -181,7 +206,6 @@ export default function AuthenticatedLayout({ header, children }) {
         return false;
     };
 
-    // Auto-expand sections with active items
     useState(() => {
         const initialExpanded = {};
         navigation.forEach((section, idx) => {
@@ -194,7 +218,6 @@ export default function AuthenticatedLayout({ header, children }) {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            {/* Top Navigation */}
             <nav className="bg-white border-b border-gray-200 fixed w-full z-30 top-0">
                 <div className="px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16">
@@ -264,7 +287,6 @@ export default function AuthenticatedLayout({ header, children }) {
                 </div>
             </nav>
 
-            {/* Mobile Overlay */}
             {sidebarOpen && (
                 <div
                     className="fixed inset-0 bg-gray-900 bg-opacity-50 z-20 lg:hidden"
@@ -272,7 +294,6 @@ export default function AuthenticatedLayout({ header, children }) {
                 />
             )}
 
-            {/* Sidebar with Accordions */}
             <aside
                 className={`fixed left-0 z-20 bg-white border-r border-gray-200 transform transition-all duration-300
                     ${sidebarMinimized ? 'w-20' : 'w-64'}
@@ -280,7 +301,6 @@ export default function AuthenticatedLayout({ header, children }) {
                 style={{ top: '64px', height: 'calc(100vh - 64px)' }}
             >
                 <div className="h-full flex flex-col">
-                    {/* Minimize Toggle */}
                     <div className="hidden lg:flex items-center justify-end px-4 py-2 border-b">
                         <button
                             onClick={() => setSidebarMinimized(!sidebarMinimized)}
@@ -290,12 +310,10 @@ export default function AuthenticatedLayout({ header, children }) {
                         </button>
                     </div>
 
-                    {/* Navigation */}
                     <nav className="flex-1 overflow-y-auto px-3 py-4">
                         {navigation.map((section, idx) => (
                             <div key={idx} className="mb-2">
                                 {section.type === 'items' ? (
-                                    // Simple items (no accordion)
                                     <div className="space-y-1">
                                         {section.items.map((item) => {
                                             const Icon = item.icon;
@@ -316,12 +334,10 @@ export default function AuthenticatedLayout({ header, children }) {
                                                         <Badge className={`text-xs ml-2 ${
                                                             item.badge === 'new' ? 'bg-green-100 text-green-700 border-green-200' :
                                                             item.badge === 'pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
-                                                            item.badge === 'appeal' ? 'bg-orange-100 text-orange-700 border-orange-200' :
                                                             'bg-blue-100 text-blue-700'
                                                         } border`}>
                                                             {item.badge === 'new' ? '!' :
-                                                             item.badge === 'pending' ? '•' :
-                                                             item.badge === 'appeal' ? '⚠' : item.badge}
+                                                             item.badge === 'pending' ? '•' : item.badge}
                                                         </Badge>
                                                     )}
                                                     {active && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-700 rounded-r"></div>}
@@ -335,9 +351,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                         })}
                                     </div>
                                 ) : (
-                                    // Accordion sections
                                     <div>
-                                        {/* Accordion Header */}
                                         <button
                                             onClick={() => toggleSection(section.name)}
                                             className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors
@@ -353,7 +367,6 @@ export default function AuthenticatedLayout({ header, children }) {
                                             )}
                                         </button>
 
-                                        {/* Accordion Content */}
                                         {!sidebarMinimized && expandedSections[section.name] && (
                                             <div className="ml-4 mt-1 space-y-1 border-l-2 border-gray-200 pl-2">
                                                 {section.items.map((item) => {
@@ -372,12 +385,10 @@ export default function AuthenticatedLayout({ header, children }) {
                                                                 <Badge className={`text-xs ml-2 ${
                                                                     item.badge === 'new' ? 'bg-green-100 text-green-700 border-green-200' :
                                                                     item.badge === 'pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
-                                                                    item.badge === 'appeal' ? 'bg-orange-100 text-orange-700 border-orange-200' :
                                                                     'bg-blue-100 text-blue-700'
                                                                 } border`}>
                                                                     {item.badge === 'new' ? '!' :
-                                                                     item.badge === 'pending' ? '•' :
-                                                                     item.badge === 'appeal' ? '⚠' : item.badge}
+                                                                     item.badge === 'pending' ? '•' : item.badge}
                                                                 </Badge>
                                                             )}
                                                         </Link>
@@ -391,7 +402,6 @@ export default function AuthenticatedLayout({ header, children }) {
                         ))}
                     </nav>
 
-                    {/* User Info Footer */}
                     {!sidebarMinimized && (
                         <div className="border-t border-gray-200 p-4 bg-gray-50">
                             <div className="flex items-center gap-3 mb-3">
@@ -405,7 +415,6 @@ export default function AuthenticatedLayout({ header, children }) {
                                     <p className="text-xs text-gray-500 truncate">{auth.user.position || auth.user.email}</p>
                                 </div>
                             </div>
-                            {/* Permission Badges */}
                             {(auth.user.can_approve_users || auth.user.can_approve_leaves) && (
                                 <div className="flex flex-wrap gap-1">
                                     {auth.user.can_approve_users && (
@@ -427,7 +436,6 @@ export default function AuthenticatedLayout({ header, children }) {
                 </div>
             </aside>
 
-            {/* Main Content */}
             <main className={`flex-1 transition-all duration-300 ${sidebarMinimized ? 'lg:ml-20' : 'lg:ml-64'} pt-16`}>
                 {header && (
                     <header className="bg-white border-b border-gray-200">
