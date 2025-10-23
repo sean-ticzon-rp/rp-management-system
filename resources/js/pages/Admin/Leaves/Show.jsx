@@ -1,7 +1,7 @@
 // resources/js/Pages/Admin/Leaves/Show.jsx
 import { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Textarea } from '@/Components/ui/textarea';
 import { Label } from '@/Components/ui/label';
@@ -23,11 +23,16 @@ import {
     Loader2,
     X as XIcon,
     Shield,
+    AlertTriangle,
+    RotateCcw,
 } from 'lucide-react';
 
 export default function Show({ auth, leaveRequest }) {
     const [showApproveModal, setShowApproveModal] = useState(false);
     const [showRejectModal, setShowRejectModal] = useState(false);
+    const [showApproveCancelModal, setShowApproveCancelModal] = useState(false);
+    const [showRejectCancelModal, setShowRejectCancelModal] = useState(false);
+    const { flash } = usePage().props;
 
     // ✅ FIXED: Check if user is HR/Admin (by ROLE, not permission)
     const isHROrAdmin = auth.user?.roles?.some(role => 
@@ -42,7 +47,7 @@ export default function Show({ auth, leaveRequest }) {
     // ✅ Determine which approval step user can perform
     const isPendingManager = leaveRequest.status === 'pending_manager';
     const isPendingHR = leaveRequest.status === 'pending_hr';
-    const isAppealed = leaveRequest.status === 'appealed';
+    const isPendingCancellation = leaveRequest.status === 'pending_cancellation';
 
     // ✅ User can approve as manager if they're Senior/Lead/PM OR HR (HR can override)
     const canApproveAsManager = isPendingManager && (isSeniorOrAbove || isHROrAdmin);
@@ -50,14 +55,14 @@ export default function Show({ auth, leaveRequest }) {
     // ✅ User can approve as HR if status is pending_hr AND they have HR role
     const canApproveAsHRFinal = isPendingHR && isHROrAdmin;
 
-    // ✅ User can handle appeals if they have HR role and status is appealed
-    const canHandleAppeal = isAppealed && canApproveAsHR;
+    // ✅ User can handle cancellation requests (HR only)
+    const canHandleCancellation = isPendingCancellation && isHROrAdmin;
 
     // ✅ Combined permission check
-    const canTakeAction = canApproveAsManager || canApproveAsHRFinal || canHandleAppeal;
+    const canTakeAction = canApproveAsManager || canApproveAsHRFinal || canHandleCancellation;
     
     // ✅ Determine approval type based on status
-    const approvalType = isPendingManager ? 'manager' : (isPendingHR || isAppealed) ? 'hr' : 'manager';
+    const approvalType = isPendingManager ? 'manager' : isPendingHR ? 'hr' : 'none';
 
     // ✅ FIXED: Smart Back Button Logic
     const getBackUrl = () => {
@@ -91,6 +96,15 @@ export default function Show({ auth, leaveRequest }) {
         hr_comments: '',
     });
 
+    // ✅ NEW: Forms for cancellation approval
+    const { data: cancelApproveData, setData: setCancelApproveData, post: postCancelApprove, processing: cancelApproveProcessing } = useForm({
+        cancellation_hr_comments: '',
+    });
+
+    const { data: cancelRejectData, setData: setCancelRejectData, post: postCancelReject, processing: cancelRejectProcessing } = useForm({
+        cancellation_hr_comments: '',
+    });
+
     // ✅ Handle manager approval
     const handleManagerApprove = (e) => {
         e.preventDefault();
@@ -112,16 +126,10 @@ export default function Show({ auth, leaveRequest }) {
         });
     };
 
-    // ✅ Handle HR approval - WITH APPEAL ROUTE SUPPORT!
+    // ✅ Handle HR approval
     const handleHrApprove = (e) => {
         e.preventDefault();
-        
-        // ✅ Use different route for appeals vs normal HR approval
-        const routeName = leaveRequest.status === 'appealed' 
-            ? 'leaves.approve-appeal' 
-            : 'leaves.hr-approve';
-        
-        postHrApprove(route(routeName, leaveRequest.id), {
+        postHrApprove(route('leaves.hr-approve', leaveRequest.id), {
             preserveScroll: true,
             onSuccess: () => {
                 setShowApproveModal(false);
@@ -131,16 +139,31 @@ export default function Show({ auth, leaveRequest }) {
 
     const handleHrReject = (e) => {
         e.preventDefault();
-        
-        // ✅ Use different route for appeals vs normal HR rejection
-        const routeName = leaveRequest.status === 'appealed' 
-            ? 'leaves.reject-appeal' 
-            : 'leaves.hr-reject';
-        
-        postHrReject(route(routeName, leaveRequest.id), {
+        postHrReject(route('leaves.hr-reject', leaveRequest.id), {
             preserveScroll: true,
             onSuccess: () => {
                 setShowRejectModal(false);
+            }
+        });
+    };
+
+    // ✅ NEW: Handle cancellation approval
+    const handleApproveCancellation = (e) => {
+        e.preventDefault();
+        postCancelApprove(route('leaves.approve-cancellation', leaveRequest.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowApproveCancelModal(false);
+            }
+        });
+    };
+
+    const handleRejectCancellation = (e) => {
+        e.preventDefault();
+        postCancelReject(route('leaves.reject-cancellation', leaveRequest.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowRejectCancelModal(false);
             }
         });
     };
@@ -153,6 +176,7 @@ export default function Show({ auth, leaveRequest }) {
             'rejected_by_manager': { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200', icon: XCircle },
             'rejected_by_hr': { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200', icon: XCircle },
             'cancelled': { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-200', icon: XCircle },
+            'pending_cancellation': { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200', icon: AlertTriangle },
         };
         return styles[status] || styles.pending_manager;
     };
@@ -167,11 +191,11 @@ export default function Show({ auth, leaveRequest }) {
                     <div className="flex items-center gap-3">
                         <Button asChild variant="ghost" size="sm">
                             <Link href={getBackUrl()}>
-                                {/* ✅ FIXED: Smart back button based on user role */}
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back
                             </Link>
                         </Button>
+                        <div className="h-8 w-px bg-gray-300" />
                         <div className="flex items-center gap-3">
                             <div 
                                 className="p-2 rounded-lg"
@@ -194,22 +218,60 @@ export default function Show({ auth, leaveRequest }) {
                         </div>
                     </div>
                     
-                    {/* ✅ Show appropriate buttons based on approval stage */}
-                    {canTakeAction && (
+                    {/* ✅ Show appropriate buttons */}
+                    {canApproveAsManager && (
                         <div className="flex gap-3">
                             <Button 
                                 className="bg-green-600 hover:bg-green-700"
                                 onClick={() => setShowApproveModal(true)}
                             >
                                 <UserCheck className="h-4 w-4 mr-2" />
-                                Approve {isPendingManager ? '(Manager)' : isAppealed ? '(Appeal)' : '(HR)'}
+                                Approve (Manager)
                             </Button>
                             <Button 
                                 variant="destructive"
                                 onClick={() => setShowRejectModal(true)}
                             >
                                 <UserX className="h-4 w-4 mr-2" />
-                                Reject {isPendingManager ? '(Manager)' : isAppealed ? '(Appeal)' : '(HR)'}
+                                Reject (Manager)
+                            </Button>
+                        </div>
+                    )}
+
+                    {canApproveAsHRFinal && (
+                        <div className="flex gap-3">
+                            <Button 
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => setShowApproveModal(true)}
+                            >
+                                <UserCheck className="h-4 w-4 mr-2" />
+                                Approve (HR Final)
+                            </Button>
+                            <Button 
+                                variant="destructive"
+                                onClick={() => setShowRejectModal(true)}
+                            >
+                                <UserX className="h-4 w-4 mr-2" />
+                                Reject (HR Final)
+                            </Button>
+                        </div>
+                    )}
+
+                    {canHandleCancellation && (
+                        <div className="flex gap-3">
+                            <Button 
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => setShowApproveCancelModal(true)}
+                            >
+                                <CheckCircle2 className="h-4 w-4 mr-2" />
+                                Approve Cancellation
+                            </Button>
+                            <Button 
+                                variant="destructive"
+                                onClick={() => setShowRejectCancelModal(true)}
+                            >
+                                <XCircle className="h-4 w-4 mr-2" />
+                                Reject Cancellation
                             </Button>
                         </div>
                     )}
@@ -221,6 +283,74 @@ export default function Show({ auth, leaveRequest }) {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Content */}
                 <div className="lg:col-span-2 space-y-6">
+                    {/* Flash Messages */}
+                    {flash?.success && (
+                        <Alert className="bg-green-50 border-green-200 animate-fade-in">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            <AlertDescription className="text-green-800 font-medium">
+                                {flash.success}
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                    {flash?.error && (
+                        <Alert className="bg-red-50 border-red-200 animate-fade-in">
+                            <AlertCircle className="h-4 w-4 text-red-600" />
+                            <AlertDescription className="text-red-800 font-medium">
+                                {flash.error}
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                    {/* ✅ NEW: Cancellation Request Alert (for HR) */}
+                    {isPendingCancellation && (
+                        <Alert className="bg-orange-50 border-orange-300 animate-fade-in">
+                            <AlertTriangle className="h-5 w-5 text-orange-600" />
+                            <AlertDescription className="text-orange-800">
+                                <strong>Cancellation Request Pending:</strong> Employee requested to cancel this approved leave. Review the reason below and approve/reject.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                    {/* ✅ NEW: Cancellation Details Card (if pending cancellation) */}
+                    {isPendingCancellation && (
+                        <Card className="border-orange-300 border-2 bg-orange-50 animate-fade-in">
+                            <CardHeader>
+                                <CardTitle className="text-orange-800 flex items-center gap-2">
+                                    <AlertTriangle className="h-5 w-5" />
+                                    Cancellation Request Details
+                                </CardTitle>
+                                <CardDescription className="text-orange-700">
+                                    Employee wants to cancel this approved leave
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div>
+                                    <Label className="text-orange-800 font-semibold">Cancellation Reason:</Label>
+                                    <div className="mt-2 p-4 bg-white rounded-lg border border-orange-200">
+                                        <p className="text-gray-900 whitespace-pre-wrap">{leaveRequest.cancellation_reason}</p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-orange-200">
+                                    <div>
+                                        <p className="text-sm text-orange-700 font-medium">Requested By</p>
+                                        <p className="text-gray-900">{leaveRequest.user.name}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-orange-700 font-medium">Requested On</p>
+                                        <p className="text-gray-900">{new Date(leaveRequest.cancellation_requested_at).toLocaleString()}</p>
+                                    </div>
+                                </div>
+                                <div className="bg-white rounded-lg border border-orange-200 p-3">
+                                    <p className="text-sm text-orange-800">
+                                        <strong>If you approve:</strong> {leaveRequest.total_days} days will be restored to employee's balance
+                                        <br />
+                                        <strong>If you reject:</strong> Leave remains approved, employee must take the leave
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
                     {/* ✅ Permission Info Alert */}
                     {isPendingManager && !canApproveAsManager && (
                         <Alert className="bg-yellow-50 border-yellow-300 animate-fade-in">
@@ -375,14 +505,7 @@ export default function Show({ auth, leaveRequest }) {
                                         <p className="font-medium text-gray-900">Manager Review</p>
                                         
                                         {leaveRequest.manager_approver ? (
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <div className="flex items-center justify-center w-6 h-6 bg-gray-600 rounded-full">
-                                                    <span className="text-xs font-medium text-white">
-                                                        {leaveRequest.manager_approver.name.charAt(0).toUpperCase()}
-                                                    </span>
-                                                </div>
-                                                <p className="text-sm text-gray-600">Reviewed by {leaveRequest.manager_approver.name}</p>
-                                            </div>
+                                            <p className="text-sm text-gray-600">Reviewed by {leaveRequest.manager_approver.name}</p>
                                         ) : (
                                             <p className="text-sm text-gray-500 italic">Waiting for review</p>
                                         )}
@@ -398,9 +521,7 @@ export default function Show({ auth, leaveRequest }) {
                                                             ? 'bg-red-50 border border-red-200' 
                                                             : 'bg-gray-50'
                                                     }`}>
-                                                        <p className="text-xs text-gray-500 mb-1">
-                                                            {leaveRequest.status === 'rejected_by_manager' ? 'Rejection Reason:' : 'Comment:'}
-                                                        </p>
+                                                        <p className="text-xs text-gray-500 mb-1">Comment:</p>
                                                         <p className={`text-sm ${
                                                             leaveRequest.status === 'rejected_by_manager' 
                                                                 ? 'text-red-700' 
@@ -432,7 +553,7 @@ export default function Show({ auth, leaveRequest }) {
                                 </div>
 
                                 {/* HR Approval */}
-                                {['pending_hr', 'approved', 'rejected_by_hr'].includes(leaveRequest.status) && (
+                                {['pending_hr', 'approved', 'rejected_by_hr', 'pending_cancellation'].includes(leaveRequest.status) && (
                                     <div className="flex items-start gap-4">
                                         <div className={`flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 ${
                                             leaveRequest.hr_approved_at ? 'bg-green-100' : 
@@ -493,6 +614,9 @@ export default function Show({ auth, leaveRequest }) {
                                         {isPendingHR && (
                                             <Clock className="h-5 w-5 text-blue-600" />
                                         )}
+                                        {isPendingCancellation && (
+                                            <AlertTriangle className="h-5 w-5 text-orange-600" />
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -502,6 +626,43 @@ export default function Show({ auth, leaveRequest }) {
 
                 {/* Sidebar */}
                 <div className="space-y-6">
+                    {/* ✅ NEW: Cancellation Action Card (HR only) */}
+                    {canHandleCancellation && (
+                        <Card className="animate-fade-in border-orange-300 border-2">
+                            <CardHeader>
+                                <CardTitle className="text-orange-700 flex items-center gap-2">
+                                    <AlertTriangle className="h-5 w-5" />
+                                    Cancellation Review
+                                </CardTitle>
+                                <CardDescription>
+                                    Approve or reject the cancellation request
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                <Button 
+                                    className="w-full bg-green-600 hover:bg-green-700 justify-start"
+                                    onClick={() => setShowApproveCancelModal(true)}
+                                >
+                                    <CheckCircle2 className="h-5 w-5 mr-2" />
+                                    Approve Cancellation
+                                </Button>
+                                <Button 
+                                    variant="destructive" 
+                                    className="w-full justify-start"
+                                    onClick={() => setShowRejectCancelModal(true)}
+                                >
+                                    <XCircle className="h-5 w-5 mr-2" />
+                                    Reject (Keep Approved)
+                                </Button>
+                                <div className="pt-2 border-t mt-3">
+                                    <p className="text-xs text-gray-600">
+                                        Approving will restore {leaveRequest.total_days} days to employee's balance
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
                     {/* Action Card for Manager Approval */}
                     {canApproveAsManager && (
                         <Card className="animate-fade-in border-yellow-300 border-2">
@@ -568,75 +729,40 @@ export default function Show({ auth, leaveRequest }) {
                 </div>
             </div>
 
-            {/* ✅ MANAGER APPROVE MODAL */}
+            {/* Manager/HR Approval Modals (existing modals - keeping your original code) */}
             {showApproveModal && approvalType === 'manager' && (
                 <>
-                    <div 
-                        className="fixed inset-0 bg-black/50 z-50 animate-fade-in"
-                        onClick={() => setShowApproveModal(false)}
-                    />
+                    <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setShowApproveModal(false)} />
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md animate-scale-in">
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
                             <div className="flex items-start justify-between mb-4">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-green-100 rounded-full">
                                         <UserCheck className="h-6 w-6 text-green-600" />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-semibold text-gray-900">Approve Leave Request</h3>
-                                        <p className="text-sm text-gray-600 mt-0.5">
-                                            {leaveRequest.user.name} - {leaveRequest.total_days} {leaveRequest.total_days === 1 ? 'day' : 'days'}
-                                        </p>
+                                        <h3 className="text-lg font-semibold">Approve (Manager)</h3>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => setShowApproveModal(false)}
-                                    className="p-1 hover:bg-gray-100 rounded-md transition-colors"
-                                >
-                                    <XIcon className="h-5 w-5 text-gray-500" />
+                                <button onClick={() => setShowApproveModal(false)}>
+                                    <XIcon className="h-5 w-5" />
                                 </button>
                             </div>
-
                             <form onSubmit={handleManagerApprove} className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="manager_comments">Comments (Optional)</Label>
+                                <div>
+                                    <Label>Comments (Optional)</Label>
                                     <Textarea
-                                        id="manager_comments"
                                         value={managerApproveData.manager_comments}
                                         onChange={(e) => setManagerApproveData('manager_comments', e.target.value)}
-                                        placeholder="Add any comments..."
                                         rows={3}
                                     />
                                 </div>
-
-                                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                                    <p className="text-sm text-green-800">
-                                        <strong>This will:</strong>
-                                        <br />• Approve the request
-                                        <br />• Forward to HR for final approval
-                                        <br />• Send notification to employee
-                                    </p>
-                                </div>
-
                                 <div className="flex gap-3">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => setShowApproveModal(false)}
-                                        className="flex-1"
-                                    >
+                                    <Button type="button" variant="outline" onClick={() => setShowApproveModal(false)} className="flex-1">
                                         Cancel
                                     </Button>
-                                    <Button
-                                        type="submit"
-                                        disabled={managerApproveProcessing}
-                                        className="flex-1 bg-green-600 hover:bg-green-700"
-                                    >
-                                        {managerApproveProcessing ? (
-                                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Approving...</>
-                                        ) : (
-                                            <><UserCheck className="h-4 w-4 mr-2" />Approve</>
-                                        )}
+                                    <Button type="submit" disabled={managerApproveProcessing} className="flex-1 bg-green-600">
+                                        {managerApproveProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Approve'}
                                     </Button>
                                 </div>
                             </form>
@@ -645,75 +771,177 @@ export default function Show({ auth, leaveRequest }) {
                 </>
             )}
 
-            {/* ✅ HR APPROVE MODAL */}
+            {showRejectModal && approvalType === 'manager' && (
+                <>
+                    <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setShowRejectModal(false)} />
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+                            <div className="flex items-start justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-red-100 rounded-full">
+                                        <UserX className="h-6 w-6 text-red-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold">Reject (Manager)</h3>
+                                    </div>
+                                </div>
+                                <button onClick={() => setShowRejectModal(false)}>
+                                    <XIcon className="h-5 w-5" />
+                                </button>
+                            </div>
+                            <form onSubmit={handleManagerReject} className="space-y-4">
+                                <div>
+                                    <Label>Rejection Reason *</Label>
+                                    <Textarea
+                                        value={managerRejectData.manager_comments}
+                                        onChange={(e) => setManagerRejectData('manager_comments', e.target.value)}
+                                        required
+                                        rows={3}
+                                    />
+                                </div>
+                                <div className="flex gap-3">
+                                    <Button type="button" variant="outline" onClick={() => setShowRejectModal(false)} className="flex-1">
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" disabled={managerRejectProcessing} variant="destructive" className="flex-1">
+                                        {managerRejectProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Reject'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </>
+            )}
+
             {showApproveModal && approvalType === 'hr' && (
                 <>
-                    <div 
-                        className="fixed inset-0 bg-black/50 z-50 animate-fade-in"
-                        onClick={() => setShowApproveModal(false)}
-                    />
+                    <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setShowApproveModal(false)} />
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md animate-scale-in">
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
                             <div className="flex items-start justify-between mb-4">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-green-100 rounded-full">
-                                        <UserCheck className="h-6 w-6 text-green-600" />
+                                        <Shield className="h-6 w-6 text-green-600" />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-semibold text-gray-900">Final HR Approval</h3>
+                                        <h3 className="text-lg font-semibold">Final HR Approval</h3>
+                                    </div>
+                                </div>
+                                <button onClick={() => setShowApproveModal(false)}>
+                                    <XIcon className="h-5 w-5" />
+                                </button>
+                            </div>
+                            <form onSubmit={handleHrApprove} className="space-y-4">
+                                <div>
+                                    <Label>Comments (Optional)</Label>
+                                    <Textarea
+                                        value={hrApproveData.hr_comments}
+                                        onChange={(e) => setHrApproveData('hr_comments', e.target.value)}
+                                        rows={3}
+                                    />
+                                </div>
+                                <div className="flex gap-3">
+                                    <Button type="button" variant="outline" onClick={() => setShowApproveModal(false)} className="flex-1">
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" disabled={hrApproveProcessing} className="flex-1 bg-green-600">
+                                        {hrApproveProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Approve'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {showRejectModal && approvalType === 'hr' && (
+                <>
+                    <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setShowRejectModal(false)} />
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+                            <div className="flex items-start justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-red-100 rounded-full">
+                                        <UserX className="h-6 w-6 text-red-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold">Final HR Rejection</h3>
+                                    </div>
+                                </div>
+                                <button onClick={() => setShowRejectModal(false)}>
+                                    <XIcon className="h-5 w-5" />
+                                </button>
+                            </div>
+                            <form onSubmit={handleHrReject} className="space-y-4">
+                                <div>
+                                    <Label>Rejection Reason *</Label>
+                                    <Textarea
+                                        value={hrRejectData.hr_comments}
+                                        onChange={(e) => setHrRejectData('hr_comments', e.target.value)}
+                                        required
+                                        rows={3}
+                                    />
+                                </div>
+                                <div className="flex gap-3">
+                                    <Button type="button" variant="outline" onClick={() => setShowRejectModal(false)} className="flex-1">
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" disabled={hrRejectProcessing} variant="destructive" className="flex-1">
+                                        {hrRejectProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Reject'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* ✅ NEW: Approve Cancellation Modal */}
+            {showApproveCancelModal && (
+                <>
+                    <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setShowApproveCancelModal(false)} />
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+                            <div className="flex items-start justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-green-100 rounded-full">
+                                        <CheckCircle2 className="h-6 w-6 text-green-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold">Approve Cancellation</h3>
                                         <p className="text-sm text-gray-600 mt-0.5">
-                                            {leaveRequest.user.name} - {leaveRequest.total_days} {leaveRequest.total_days === 1 ? 'day' : 'days'}
+                                            Restore {leaveRequest.total_days} days to balance
                                         </p>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => setShowApproveModal(false)}
-                                    className="p-1 hover:bg-gray-100 rounded-md transition-colors"
-                                >
-                                    <XIcon className="h-5 w-5 text-gray-500" />
+                                <button onClick={() => setShowApproveCancelModal(false)}>
+                                    <XIcon className="h-5 w-5" />
                                 </button>
                             </div>
-
-                            <form onSubmit={handleHrApprove} className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="hr_comments">Comments (Optional)</Label>
+                            <form onSubmit={handleApproveCancellation} className="space-y-4">
+                                <div>
+                                    <Label>Comments (Optional)</Label>
                                     <Textarea
-                                        id="hr_comments"
-                                        value={hrApproveData.hr_comments}
-                                        onChange={(e) => setHrApproveData('hr_comments', e.target.value)}
+                                        value={cancelApproveData.cancellation_hr_comments}
+                                        onChange={(e) => setCancelApproveData('cancellation_hr_comments', e.target.value)}
                                         placeholder="Add any comments for the employee..."
                                         rows={3}
                                     />
                                 </div>
-
                                 <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                                     <p className="text-sm text-green-800">
                                         <strong>This will:</strong>
-                                        <br />• Approve the leave request (FINAL)
-                                        <br />• Deduct {leaveRequest.total_days} {leaveRequest.total_days === 1 ? 'day' : 'days'} from balance
-                                        <br />• Send email notification to employee
+                                        <br />• Cancel the approved leave
+                                        <br />• Restore {leaveRequest.total_days} days to balance
+                                        <br />• Notify employee of approval
                                     </p>
                                 </div>
-
                                 <div className="flex gap-3">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => setShowApproveModal(false)}
-                                        className="flex-1"
-                                    >
+                                    <Button type="button" variant="outline" onClick={() => setShowApproveCancelModal(false)} className="flex-1">
                                         Cancel
                                     </Button>
-                                    <Button
-                                        type="submit"
-                                        disabled={hrApproveProcessing}
-                                        className="flex-1 bg-green-600 hover:bg-green-700"
-                                    >
-                                        {hrApproveProcessing ? (
-                                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Approving...</>
-                                        ) : (
-                                            <><UserCheck className="h-4 w-4 mr-2" />Approve</>
-                                        )}
+                                    <Button type="submit" disabled={cancelApproveProcessing} className="flex-1 bg-green-600">
+                                        {cancelApproveProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Approve Cancellation'}
                                     </Button>
                                 </div>
                             </form>
@@ -722,154 +950,53 @@ export default function Show({ auth, leaveRequest }) {
                 </>
             )}
 
-            {/* ✅ MANAGER REJECT MODAL */}
-            {showRejectModal && approvalType === 'manager' && (
+            {/* ✅ NEW: Reject Cancellation Modal */}
+            {showRejectCancelModal && (
                 <>
-                    <div 
-                        className="fixed inset-0 bg-black/50 z-50 animate-fade-in"
-                        onClick={() => setShowRejectModal(false)}
-                    />
+                    <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setShowRejectCancelModal(false)} />
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md animate-scale-in">
+                        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
                             <div className="flex items-start justify-between mb-4">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-red-100 rounded-full">
-                                        <UserX className="h-6 w-6 text-red-600" />
+                                        <XCircle className="h-6 w-6 text-red-600" />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-semibold text-gray-900">Reject Leave Request</h3>
+                                        <h3 className="text-lg font-semibold">Reject Cancellation</h3>
                                         <p className="text-sm text-gray-600 mt-0.5">
-                                            {leaveRequest.user.name} - {leaveRequest.total_days} {leaveRequest.total_days === 1 ? 'day' : 'days'}
+                                            Leave will remain approved
                                         </p>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => setShowRejectModal(false)}
-                                    className="p-1 hover:bg-gray-100 rounded-md transition-colors"
-                                >
-                                    <XIcon className="h-5 w-5 text-gray-500" />
+                                <button onClick={() => setShowRejectCancelModal(false)}>
+                                    <XIcon className="h-5 w-5" />
                                 </button>
                             </div>
-
-                            <form onSubmit={handleManagerReject} className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="manager_reject_comments">Rejection Reason *</Label>
+                            <form onSubmit={handleRejectCancellation} className="space-y-4">
+                                <div>
+                                    <Label>Rejection Reason *</Label>
                                     <Textarea
-                                        id="manager_reject_comments"
-                                        value={managerRejectData.manager_comments}
-                                        onChange={(e) => setManagerRejectData('manager_comments', e.target.value)}
-                                        placeholder="Please provide a reason for rejection..."
-                                        rows={3}
+                                        value={cancelRejectData.cancellation_hr_comments}
+                                        onChange={(e) => setCancelRejectData('cancellation_hr_comments', e.target.value)}
+                                        placeholder="Explain why cancellation is not allowed..."
                                         required
+                                        rows={3}
                                     />
                                 </div>
-
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                                     <p className="text-sm text-red-800">
                                         <strong>This will:</strong>
-                                        <br />• Reject the leave request (FINAL)
-                                        <br />• Send notification to employee
-                                        <br />• No appeals allowed
+                                        <br />• Reject the cancellation request
+                                        <br />• Leave remains approved
+                                        <br />• Employee must take the leave
                                     </p>
                                 </div>
-
                                 <div className="flex gap-3">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => setShowRejectModal(false)}
-                                        className="flex-1"
-                                    >
+                                    <Button type="button" variant="outline" onClick={() => setShowRejectCancelModal(false)} className="flex-1">
                                         Cancel
                                     </Button>
-                                    <Button
-                                        type="submit"
-                                        disabled={managerRejectProcessing}
-                                        className="flex-1 bg-red-600 hover:bg-red-700"
-                                    >
-                                        {managerRejectProcessing ? (
-                                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Rejecting...</>
-                                        ) : (
-                                            <><UserX className="h-4 w-4 mr-2" />Reject</>
-                                        )}
-                                    </Button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </>
-            )}
-
-            {/* ✅ HR REJECT MODAL */}
-            {showRejectModal && approvalType === 'hr' && (
-                <>
-                    <div 
-                        className="fixed inset-0 bg-black/50 z-50 animate-fade-in"
-                        onClick={() => setShowRejectModal(false)}
-                    />
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md animate-scale-in">
-                            <div className="flex items-start justify-between mb-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-red-100 rounded-full">
-                                        <UserX className="h-6 w-6 text-red-600" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-gray-900">Final HR Rejection</h3>
-                                        <p className="text-sm text-gray-600 mt-0.5">
-                                            {leaveRequest.user.name} - {leaveRequest.total_days} {leaveRequest.total_days === 1 ? 'day' : 'days'}
-                                        </p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setShowRejectModal(false)}
-                                    className="p-1 hover:bg-gray-100 rounded-md transition-colors"
-                                >
-                                    <XIcon className="h-5 w-5 text-gray-500" />
-                                </button>
-                            </div>
-
-                            <form onSubmit={handleHrReject} className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="hr_reject_comments">Rejection Reason *</Label>
-                                    <Textarea
-                                        id="hr_reject_comments"
-                                        value={hrRejectData.hr_comments}
-                                        onChange={(e) => setHrRejectData('hr_comments', e.target.value)}
-                                        placeholder="Please provide a reason for rejection..."
-                                        rows={3}
-                                        required
-                                    />
-                                </div>
-
-                                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                                    <p className="text-sm text-red-800">
-                                        <strong>This will:</strong>
-                                        <br />• Reject the leave request (FINAL)
-                                        <br />• Balance will NOT be deducted
-                                        <br />• Send email notification to employee
-                                    </p>
-                                </div>
-
-                                <div className="flex gap-3">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => setShowRejectModal(false)}
-                                        className="flex-1"
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button
-                                        type="submit"
-                                        disabled={hrRejectProcessing}
-                                        className="flex-1 bg-red-600 hover:bg-red-700"
-                                    >
-                                        {hrRejectProcessing ? (
-                                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Rejecting...</>
-                                        ) : (
-                                            <><UserX className="h-4 w-4 mr-2" />Reject</>
-                                        )}
+                                    <Button type="submit" disabled={cancelRejectProcessing} variant="destructive" className="flex-1">
+                                        {cancelRejectProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Reject Cancellation'}
                                     </Button>
                                 </div>
                             </form>

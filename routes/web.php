@@ -115,6 +115,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/{leave}', [LeaveRequestController::class, 'update'])->name('update');
         Route::get('/{leave}', [LeaveRequestController::class, 'show'])->name('show');
         Route::post('/{leave}/cancel', [LeaveRequestController::class, 'cancel'])->name('cancel');
+        Route::post('/{leave}/request-cancel', [LeaveRequestController::class, 'requestCancellation'])->name('request-cancel');
         Route::post('/{leave}/appeal', [LeaveRequestController::class, 'appeal'])->name('appeal');
     });
 
@@ -188,6 +189,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // HR Approval Routes
         Route::post('/{leave}/hr-approve', [LeaveApprovalController::class, 'hrApprove'])->name('hr-approve');
         Route::post('/{leave}/hr-reject', [LeaveApprovalController::class, 'hrReject'])->name('hr-reject');
+        
+        // ✅ NEW: Cancellation Approval Routes (HR only)
+        Route::post('/{leave}/approve-cancellation', [LeaveApprovalController::class, 'approveCancellation'])->name('approve-cancellation');
+        Route::post('/{leave}/reject-cancellation', [LeaveApprovalController::class, 'rejectCancellation'])->name('reject-cancellation');
     });
 
     // ============================================
