@@ -15,6 +15,9 @@ use App\Http\Controllers\LeaveApprovalController;
 use App\Http\Controllers\LeaveTypeController;
 use App\Http\Controllers\EmployeeDashboardController;
 use App\Http\Controllers\EmployeeAssetController;
+use App\Http\Controllers\Onboarding\OnboardingInviteController;
+use App\Http\Controllers\Onboarding\GuestOnboardingController;
+use App\Http\Controllers\Onboarding\OnboardingSubmissionController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -62,6 +65,20 @@ Route::get('/', function () {
 Route::middleware('auth')->get('/account/pending', function () {
     return Inertia::render('Auth/PendingApproval');
 })->name('account.pending');
+
+// ============================================
+// 👤 GUEST ONBOARDING ROUTES (No authentication required)
+// ============================================
+Route::prefix('onboarding')->name('guest.onboarding.')->group(function () {
+    Route::get('/{token}', [GuestOnboardingController::class, 'show'])->name('show');
+    Route::get('/{token}/checklist', [GuestOnboardingController::class, 'checklist'])->name('checklist');
+    Route::post('/{token}/personal-info', [GuestOnboardingController::class, 'updatePersonalInfo'])->name('update-personal-info');
+    Route::post('/{token}/government-ids', [GuestOnboardingController::class, 'updateGovernmentIds'])->name('update-government-ids');
+    Route::post('/{token}/emergency-contact', [GuestOnboardingController::class, 'updateEmergencyContact'])->name('update-emergency-contact');
+    Route::post('/{token}/upload-document', [GuestOnboardingController::class, 'uploadDocument'])->name('upload-document');
+    Route::delete('/{token}/documents/{document}', [GuestOnboardingController::class, 'deleteDocument'])->name('delete-document');
+    Route::post('/{token}/submit', [GuestOnboardingController::class, 'submit'])->name('submit');
+});
 
 Route::middleware(['auth', 'verified'])->group(function () {
     
@@ -111,7 +128,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [LeaveRequestController::class, 'index'])->name('index');
         Route::get('/apply', [LeaveRequestController::class, 'create'])->name('apply');
         Route::post('/', [LeaveRequestController::class, 'store'])->name('store');
-        Route::get('/{leave}/edit', [LeaveRequestController::class, 'edit'])->name('edit'); // ✅ EDIT must come BEFORE show
+        Route::get('/{leave}/edit', [LeaveRequestController::class, 'edit'])->name('edit');
         Route::put('/{leave}', [LeaveRequestController::class, 'update'])->name('update');
         Route::get('/{leave}', [LeaveRequestController::class, 'show'])->name('show');
         Route::post('/{leave}/cancel', [LeaveRequestController::class, 'cancel'])->name('cancel');
@@ -173,7 +190,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // 📋 LEAVE MANAGEMENT ROUTES
     // ============================================
     Route::prefix('leaves')->name('leaves.')->group(function () {
-        // ✅ Pending Approvals (Hierarchical - MUST come BEFORE {leave} routes)
+        // Pending Approvals (Hierarchical - MUST come BEFORE {leave} routes)
         Route::get('/pending-approvals', [LeaveApprovalController::class, 'pendingApprovals'])->name('pending-approvals');
         
         // Basic CRUD
@@ -190,7 +207,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{leave}/hr-approve', [LeaveApprovalController::class, 'hrApprove'])->name('hr-approve');
         Route::post('/{leave}/hr-reject', [LeaveApprovalController::class, 'hrReject'])->name('hr-reject');
         
-        // ✅ NEW: Cancellation Approval Routes (HR only)
+        // Cancellation Approval Routes (HR only)
         Route::post('/{leave}/approve-cancellation', [LeaveApprovalController::class, 'approveCancellation'])->name('approve-cancellation');
         Route::post('/{leave}/reject-cancellation', [LeaveApprovalController::class, 'rejectCancellation'])->name('reject-cancellation');
     });
@@ -206,6 +223,33 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/{leaveType}', [LeaveTypeController::class, 'update'])->name('update');
         Route::patch('/{leaveType}/toggle', [LeaveTypeController::class, 'toggleActive'])->name('toggle');
         Route::delete('/{leaveType}', [LeaveTypeController::class, 'destroy'])->name('destroy');
+    });
+
+    // ============================================
+    // 📋 ONBOARDING MANAGEMENT (HR/Admin only)
+    // ============================================
+    Route::prefix('onboarding')->name('onboarding.')->group(function () {
+        // Invites Management
+        Route::prefix('invites')->name('invites.')->group(function () {
+            Route::get('/', [OnboardingInviteController::class, 'index'])->name('index');
+            Route::get('/create', [OnboardingInviteController::class, 'create'])->name('create');
+            Route::post('/', [OnboardingInviteController::class, 'store'])->name('store');
+            Route::get('/{invite}', [OnboardingInviteController::class, 'show'])->name('show');
+            Route::post('/{invite}/resend', [OnboardingInviteController::class, 'resend'])->name('resend');
+            Route::post('/{invite}/extend', [OnboardingInviteController::class, 'extend'])->name('extend');
+            Route::post('/{invite}/cancel', [OnboardingInviteController::class, 'cancel'])->name('cancel');
+            Route::post('/{invite}/convert-to-user', [OnboardingInviteController::class, 'convertToUser'])->name('convert-to-user');
+        });
+        
+        // Submissions Review
+        Route::prefix('submissions')->name('submissions.')->group(function () {
+            Route::get('/', [OnboardingSubmissionController::class, 'index'])->name('index');
+            Route::get('/{submission}/review', [OnboardingSubmissionController::class, 'review'])->name('review');
+            Route::post('/{submission}/approve', [OnboardingSubmissionController::class, 'approve'])->name('approve');
+            Route::post('/{submission}/reject', [OnboardingSubmissionController::class, 'reject'])->name('reject');
+            Route::post('/documents/{document}/approve', [OnboardingSubmissionController::class, 'approveDocument'])->name('approve-document');
+            Route::post('/documents/{document}/reject', [OnboardingSubmissionController::class, 'rejectDocument'])->name('reject-document');
+        });
     });
 });
 
