@@ -111,7 +111,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [LeaveRequestController::class, 'index'])->name('index');
         Route::get('/apply', [LeaveRequestController::class, 'create'])->name('apply');
         Route::post('/', [LeaveRequestController::class, 'store'])->name('store');
-        Route::get('/{leave}/edit', [LeaveRequestController::class, 'edit'])->name('edit');
+        Route::get('/{leave}/edit', [LeaveRequestController::class, 'edit'])->name('edit'); // ✅ EDIT must come BEFORE show
         Route::put('/{leave}', [LeaveRequestController::class, 'update'])->name('update');
         Route::get('/{leave}', [LeaveRequestController::class, 'show'])->name('show');
         Route::post('/{leave}/cancel', [LeaveRequestController::class, 'cancel'])->name('cancel');
@@ -173,7 +173,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // 📋 LEAVE MANAGEMENT ROUTES
     // ============================================
     Route::prefix('leaves')->name('leaves.')->group(function () {
-        // Pending Approvals (Hierarchical - MUST come BEFORE {leave} routes)
+        // ✅ Pending Approvals (Hierarchical - MUST come BEFORE {leave} routes)
         Route::get('/pending-approvals', [LeaveApprovalController::class, 'pendingApprovals'])->name('pending-approvals');
         
         // Basic CRUD
