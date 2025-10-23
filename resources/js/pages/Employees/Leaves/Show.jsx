@@ -1,11 +1,13 @@
 // resources/js/Pages/Employees/Leaves/Show.jsx
 import { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Badge } from '@/Components/ui/badge';
 import { Alert, AlertDescription } from '@/Components/ui/alert';
+import { Textarea } from '@/Components/ui/textarea';
+import { Label } from '@/Components/ui/label';
 import {
     Dialog,
     DialogContent,
@@ -29,14 +31,22 @@ import {
     X as XIcon,
     Edit2,
     Users,
+    AlertTriangle,
 } from 'lucide-react';
 
 export default function Show({ auth, leaveRequest }) {
     const [showCancelModal, setShowCancelModal] = useState(false);
+    const [showRequestCancelModal, setShowRequestCancelModal] = useState(false);
     const [cancelling, setCancelling] = useState(false);
+    const [requestingCancel, setRequestingCancel] = useState(false);
+    const [cancellationReason, setCancellationReason] = useState('');
+    const { flash } = usePage().props;
 
     const canCancel = ['pending_manager', 'pending_hr'].includes(leaveRequest?.status);
+    const canRequestCancellation = leaveRequest?.status === 'approved' && 
+                                   new Date(leaveRequest?.start_date) > new Date();
     const canEdit = leaveRequest?.status === 'pending_manager';
+    const isPendingCancellation = leaveRequest?.status === 'pending_cancellation';
 
     const handleCancel = () => {
         setCancelling(true);
@@ -52,6 +62,27 @@ export default function Show({ auth, leaveRequest }) {
         });
     };
 
+    const handleRequestCancellation = () => {
+        if (!cancellationReason.trim()) {
+            return;
+        }
+
+        setRequestingCancel(true);
+        router.post(route('my-leaves.request-cancel', leaveRequest.id), {
+            cancellation_reason: cancellationReason
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowRequestCancelModal(false);
+                setRequestingCancel(false);
+                setCancellationReason('');
+            },
+            onError: () => {
+                setRequestingCancel(false);
+            }
+        });
+    };
+
     const getStatusBadge = (status) => {
         const styles = {
             'pending_manager': { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-200', icon: Clock },
@@ -60,6 +91,7 @@ export default function Show({ auth, leaveRequest }) {
             'rejected_by_manager': { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200', icon: XCircle },
             'rejected_by_hr': { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200', icon: XCircle },
             'cancelled': { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-200', icon: XCircle },
+            'pending_cancellation': { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200', icon: AlertTriangle },
         };
         return styles[status] || styles.pending_manager;
     };
@@ -78,6 +110,7 @@ export default function Show({ auth, leaveRequest }) {
                                 Back to My Leaves
                             </Link>
                         </Button>
+                        <div className="h-8 w-px bg-gray-300" />
                         <div className="flex items-center gap-3">
                             <div 
                                 className="p-2 rounded-lg"
@@ -118,6 +151,16 @@ export default function Show({ auth, leaveRequest }) {
                                 Cancel Request
                             </Button>
                         )}
+                        {canRequestCancellation && (
+                            <Button 
+                                variant="outline"
+                                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-300"
+                                onClick={() => setShowRequestCancelModal(true)}
+                            >
+                                <AlertTriangle className="h-4 w-4 mr-2" />
+                                Request Cancellation
+                            </Button>
+                        )}
                     </div>
                 </div>
             }
@@ -127,6 +170,24 @@ export default function Show({ auth, leaveRequest }) {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Content */}
                 <div className="lg:col-span-2 space-y-6">
+                    {/* Flash Messages */}
+                    {flash?.success && (
+                        <Alert className="bg-green-50 border-green-200 animate-fade-in">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            <AlertDescription className="text-green-800 font-medium">
+                                {flash.success}
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                    {flash?.error && (
+                        <Alert className="bg-red-50 border-red-200 animate-fade-in">
+                            <AlertCircle className="h-4 w-4 text-red-600" />
+                            <AlertDescription className="text-red-800 font-medium">
+                                {flash.error}
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
                     {/* Status Alerts */}
                     {leaveRequest?.status === 'pending_manager' && (
                         <Alert className="bg-yellow-50 border-yellow-300 animate-fade-in">
@@ -142,6 +203,15 @@ export default function Show({ auth, leaveRequest }) {
                             <Clock className="h-5 w-5 text-blue-600" />
                             <AlertDescription className="text-blue-800">
                                 <strong>Pending HR Approval:</strong> Your manager has approved. Waiting for HR final decision.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                    {isPendingCancellation && (
+                        <Alert className="bg-orange-50 border-orange-300 animate-fade-in">
+                            <AlertTriangle className="h-5 w-5 text-orange-600" />
+                            <AlertDescription className="text-orange-800">
+                                <strong>Cancellation Pending:</strong> Your cancellation request is being reviewed by HR. Your leave remains approved until HR makes a decision.
                             </AlertDescription>
                         </Alert>
                     )}
@@ -171,6 +241,46 @@ export default function Show({ auth, leaveRequest }) {
                                 <strong>Request Approved:</strong> Your leave request has been approved! Leave days have been deducted from your balance.
                             </AlertDescription>
                         </Alert>
+                    )}
+
+                    {leaveRequest?.status === 'cancelled' && leaveRequest?.cancellation_reason && (
+                        <Alert className="bg-gray-50 border-gray-300 animate-fade-in">
+                            <XCircle className="h-5 w-5 text-gray-600" />
+                            <AlertDescription className="text-gray-800">
+                                <strong>Request Cancelled:</strong> This leave request was cancelled. Balance has been restored.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                    {/* Cancellation Info (if pending or approved) */}
+                    {(isPendingCancellation || (leaveRequest?.status === 'cancelled' && leaveRequest?.cancellation_reason)) && (
+                        <Card className="border-orange-200 bg-orange-50 animate-fade-in">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-orange-800">
+                                    <AlertTriangle className="h-5 w-5" />
+                                    Cancellation Request
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div>
+                                    <p className="text-sm text-orange-700 font-medium mb-1">Reason for Cancellation:</p>
+                                    <div className="p-3 bg-white rounded-lg border border-orange-200">
+                                        <p className="text-gray-900 whitespace-pre-wrap">{leaveRequest.cancellation_reason}</p>
+                                    </div>
+                                </div>
+                                <div className="text-sm text-orange-700">
+                                    <p>Requested on: {new Date(leaveRequest.cancellation_requested_at).toLocaleString()}</p>
+                                </div>
+                                {leaveRequest?.cancellation_hr_comments && (
+                                    <div>
+                                        <p className="text-sm text-orange-700 font-medium mb-1">HR Response:</p>
+                                        <div className="p-3 bg-white rounded-lg border border-orange-200">
+                                            <p className="text-gray-900">{leaveRequest.cancellation_hr_comments}</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
                     )}
 
                     {/* Leave Details */}
@@ -337,7 +447,7 @@ export default function Show({ auth, leaveRequest }) {
                                 </div>
 
                                 {/* HR Approval */}
-                                {['pending_hr', 'approved', 'rejected_by_hr'].includes(leaveRequest?.status) && (
+                                {['pending_hr', 'approved', 'rejected_by_hr', 'pending_cancellation', 'cancelled'].includes(leaveRequest?.status) && (
                                     <div className="flex items-start gap-4">
                                         <div className={`flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 ${
                                             leaveRequest?.hr_approved_at ? 'bg-green-100' : 
@@ -462,7 +572,7 @@ export default function Show({ auth, leaveRequest }) {
                 </div>
             </div>
 
-            {/* Cancel Confirmation Modal */}
+            {/* Cancel Pending Request Modal */}
             <Dialog open={showCancelModal} onOpenChange={setShowCancelModal}>
                 <DialogContent>
                     <DialogHeader>
@@ -473,11 +583,11 @@ export default function Show({ auth, leaveRequest }) {
                             <DialogTitle className="text-xl">Cancel Leave Request</DialogTitle>
                         </div>
                         <DialogDescription className="text-base pt-2">
-                            Are you sure you want to cancel this leave request?
+                            Are you sure you want to cancel this pending leave request?
                             <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
                                 <p className="text-sm text-red-800">
                                     <strong>This action cannot be undone.</strong>
-                                    <br />• Your leave request will be cancelled
+                                    <br />• Your leave request will be cancelled immediately
                                     <br />• You'll need to submit a new request if needed
                                 </p>
                             </div>
@@ -500,6 +610,74 @@ export default function Show({ auth, leaveRequest }) {
                                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Cancelling...</>
                             ) : (
                                 <><XCircle className="h-4 w-4 mr-2" />Cancel Request</>
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Request Cancellation Modal (for approved leaves) */}
+            <Dialog open={showRequestCancelModal} onOpenChange={setShowRequestCancelModal}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-2 bg-orange-100 rounded-lg">
+                                <AlertTriangle className="h-6 w-6 text-orange-600" />
+                            </div>
+                            <DialogTitle className="text-xl">Request Cancellation</DialogTitle>
+                        </div>
+                        <DialogDescription className="text-base pt-2">
+                            Your leave has already been approved. To cancel it, you need HR approval.
+                            <div className="mt-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                                <p className="text-sm text-orange-800">
+                                    <strong>After submitting:</strong>
+                                    <br />• Your request will be sent to HR for review
+                                    <br />• Your leave remains approved until HR decides
+                                    <br />• Balance will be restored if approved
+                                </p>
+                            </div>
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="cancellation_reason">
+                                Reason for Cancellation <span className="text-red-600">*</span>
+                            </Label>
+                            <Textarea
+                                id="cancellation_reason"
+                                placeholder="Please explain why you need to cancel this approved leave..."
+                                value={cancellationReason}
+                                onChange={(e) => setCancellationReason(e.target.value)}
+                                rows={4}
+                                className="resize-none"
+                            />
+                            <p className="text-xs text-gray-500">
+                                Be specific - this helps HR make a decision
+                            </p>
+                        </div>
+                    </div>
+
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setShowRequestCancelModal(false);
+                                setCancellationReason('');
+                            }}
+                            disabled={requestingCancel}
+                        >
+                            Close
+                        </Button>
+                        <Button
+                            onClick={handleRequestCancellation}
+                            disabled={requestingCancel || !cancellationReason.trim()}
+                            className="bg-orange-600 hover:bg-orange-700"
+                        >
+                            {requestingCancel ? (
+                                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting...</>
+                            ) : (
+                                <><Send className="h-4 w-4 mr-2" />Submit Request</>
                             )}
                         </Button>
                     </DialogFooter>

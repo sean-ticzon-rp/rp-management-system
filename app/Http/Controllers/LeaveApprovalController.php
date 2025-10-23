@@ -133,6 +133,7 @@ class LeaveApprovalController extends Controller
 
     /**
      * ✅ Manager approves a leave request
+     * WITH DYNAMIC FLOW - checks if HR approval needed
      */
     public function managerApprove(Request $request, LeaveRequest $leave)
     {
@@ -160,24 +161,53 @@ class LeaveApprovalController extends Controller
             'manager_comments' => 'nullable|string|max:1000',
         ]);
 
-        // Approve and forward to HR
-        $leave->approveByManager(
-            auth()->id(),
-            $validated['manager_comments'] ?? null
-        );
+        // ✅ DYNAMIC: Check if HR approval is required for this leave type
+        $leaveType = $leave->leaveType;
+
+        if ($leaveType->requires_hr_approval) {
+            // ✅ FORWARD TO HR (Standard flow)
+            $leave->update([
+                'status' => 'pending_hr',
+                'manager_approved_by' => auth()->id(),
+                'manager_approved_at' => now(),
+                'manager_comments' => $validated['manager_comments'] ?? null,
+            ]);
+
+            $successMessage = 'Leave request approved and forwarded to HR for final approval.';
+            
+        } else {
+            // ✅ FINAL APPROVAL - No HR needed
+            $leave->update([
+                'status' => 'approved',
+                'manager_approved_by' => auth()->id(),
+                'manager_approved_at' => now(),
+                'manager_comments' => $validated['manager_comments'] ?? null,
+                'hr_approved_by' => auth()->id(),
+                'hr_approved_at' => now(),
+                'hr_comments' => 'HR approval not required for this leave type',
+            ]);
+
+            // Deduct from balance
+            $balance = \App\Models\LeaveBalance::where('user_id', $leave->user_id)
+                ->where('leave_type_id', $leave->leave_type_id)
+                ->where('year', $leave->start_date->year)
+                ->first();
+
+            if ($balance) {
+                $balance->deductDays($leave->total_days);
+            }
+
+            $successMessage = "Leave request APPROVED (HR approval not required)! Balance has been updated.";
+        }
 
         // ✅ SMART REDIRECT
         $referer = $request->header('referer');
         
         if ($referer && str_contains($referer, '/leaves/pending-approvals')) {
-            return redirect()->route('leaves.pending-approvals')->with('success', 
-                "Leave request approved and forwarded to HR for final approval."
-            );
+            return redirect()->route('leaves.pending-approvals')->with('success', $successMessage);
         }
         
-        return back()->with('success', 
-            "Leave request approved and forwarded to HR for final approval."
-        );
+        return back()->with('success', $successMessage);
     }
 
     /**
@@ -227,5 +257,71 @@ class LeaveApprovalController extends Controller
         return back()->with('success', 
             "Leave request has been rejected. This is the final decision."
         );
+    }
+
+    /**
+     * ✅ HR approves employee's cancellation request
+     */
+    public function approveCancellation(Request $request, LeaveRequest $leave)
+    {
+        // Check HR permission
+        $user = auth()->user();
+        if (!$user->roles->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->count()) {
+            abort(403, 'Only HR can approve cancellation requests.');
+        }
+
+        if ($leave->status !== 'pending_cancellation') {
+            return back()->with('error', 'This leave is not pending cancellation approval.');
+        }
+
+        $validated = $request->validate([
+            'cancellation_hr_comments' => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            $leave->approveCancellation(
+                auth()->id(),
+                $validated['cancellation_hr_comments'] ?? null
+            );
+            
+            return back()->with('success', 
+                "Cancellation approved! {$leave->total_days} days have been restored to {$leave->user->name}'s balance."
+            );
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * ✅ HR rejects employee's cancellation request (leave stays approved)
+     */
+    public function rejectCancellation(Request $request, LeaveRequest $leave)
+    {
+        // Check HR permission
+        $user = auth()->user();
+        if (!$user->roles->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->count()) {
+            abort(403, 'Only HR can reject cancellation requests.');
+        }
+
+        if ($leave->status !== 'pending_cancellation') {
+            return back()->with('error', 'This leave is not pending cancellation approval.');
+        }
+
+        $validated = $request->validate([
+            'cancellation_hr_comments' => 'required|string|max:1000',
+        ]);
+
+        try {
+            $leave->rejectCancellation(
+                auth()->id(),
+                $validated['cancellation_hr_comments']
+            );
+            
+            return back()->with('success', 
+                "Cancellation rejected. {$leave->user->name}'s leave remains approved."
+            );
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
     }
 }
