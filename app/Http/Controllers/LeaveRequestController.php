@@ -18,7 +18,7 @@ class LeaveRequestController extends Controller
     {
         $user = auth()->user();
         
-        $query = LeaveRequest::with(['leaveType', 'manager'])
+        $query = LeaveRequest::with(['leaveType', 'managerApprover'])
             ->where('user_id', $user->id);
 
         // Filter by status
@@ -44,7 +44,7 @@ class LeaveRequestController extends Controller
             ->orderBy('year', 'desc')
             ->pluck('year');
 
-        return Inertia::render('Employees/Leaves/MyLeaves', [  // ✅ Changed
+        return Inertia::render('Employees/Leaves/MyLeaves', [
             'leaveRequests' => $leaveRequests,
             'leaveBalances' => $leaveBalances,
             'availableYears' => $availableYears,
@@ -74,22 +74,16 @@ class LeaveRequestController extends Controller
             ->get()
             ->keyBy('leave_type_id');
 
-        // Get all active users except current user as potential managers
-        $managers = User::where('employment_status', 'active')
-            ->where('id', '!=', $user->id)
-            ->orderBy('name')
-            ->get(['id', 'name', 'position', 'department']);
-
-        return Inertia::render('Employees/Leaves/Apply', [  // ✅ Changed
+        return Inertia::render('Employees/Leaves/Apply', [
             'leaveTypes' => $leaveTypes,
             'leaveBalances' => $leaveBalances,
-            'user' => $user->load('manager'),
-            'managers' => $managers,
+            'user' => $user,
         ]);
     }
 
     /**
      * Store a newly created leave request
+     * ✅ WITH DYNAMIC APPROVAL FLOW
      */
     public function store(Request $request)
     {
@@ -104,12 +98,14 @@ class LeaveRequestController extends Controller
             'custom_end_time' => 'nullable|required_if:duration,custom_hours|date_format:H:i|after:custom_start_time',
             'reason' => 'required|string|max:1000',
             'attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'emergency_contact_name' => 'nullable|required_if:use_default_emergency_contact,false|string|max:255',
-            'emergency_contact_phone' => 'nullable|required_if:use_default_emergency_contact,false|string|max:20',
+            'emergency_contact_name' => 'nullable|string|max:255',
+            'emergency_contact_phone' => 'nullable|string|max:20',
             'use_default_emergency_contact' => 'boolean',
             'availability' => 'nullable|in:reachable,offline,emergency_only',
-            'manager_id' => 'required|exists:users,id', // ✅ ADD THIS - Manager is now required
         ]);
+
+        // ✅ GET LEAVE TYPE TO CHECK APPROVAL REQUIREMENTS
+        $leaveType = LeaveType::findOrFail($validated['leave_type_id']);
 
         // Calculate total days
         $totalDays = $this->calculateTotalDays(
@@ -143,18 +139,57 @@ class LeaveRequestController extends Controller
             $validated['emergency_contact_phone'] = $user->emergency_contact_phone;
         }
 
+        // ✅ DYNAMIC APPROVAL FLOW BASED ON LEAVE TYPE CONFIGURATION
+        $initialStatus = 'pending_manager'; // Default
+        $successMessage = 'Leave request submitted successfully! Waiting for approval.';
+
+        if (!$leaveType->requires_manager_approval && !$leaveType->requires_hr_approval) {
+            // ✅ NO APPROVAL NEEDED - AUTO APPROVE
+            $initialStatus = 'approved';
+            $successMessage = 'Leave request auto-approved! Your balance has been updated.';
+            
+            // Deduct balance immediately
+            $balance->deductDays($totalDays);
+            
+            // Set approval data
+            $validated['manager_approved_by'] = $user->id;
+            $validated['manager_approved_at'] = now();
+            $validated['manager_comments'] = 'Auto-approved (no manager approval required)';
+            $validated['hr_approved_by'] = $user->id;
+            $validated['hr_approved_at'] = now();
+            $validated['hr_comments'] = 'Auto-approved (no HR approval required)';
+            
+        } elseif (!$leaveType->requires_manager_approval && $leaveType->requires_hr_approval) {
+            // ✅ SKIP MANAGER - GO STRAIGHT TO HR
+            $initialStatus = 'pending_hr';
+            $successMessage = 'Leave request submitted! Waiting for HR approval (manager approval not required).';
+            
+            // Mark manager as auto-approved
+            $validated['manager_approved_by'] = $user->id;
+            $validated['manager_approved_at'] = now();
+            $validated['manager_comments'] = 'Skipped (no manager approval required for this leave type)';
+            
+        } elseif ($leaveType->requires_manager_approval && !$leaveType->requires_hr_approval) {
+            // ✅ MANAGER ONLY - NO HR NEEDED
+            $initialStatus = 'pending_manager';
+            $successMessage = 'Leave request submitted! Waiting for manager approval (HR approval not required).';
+            
+        } else {
+            // ✅ STANDARD FLOW - BOTH APPROVALS REQUIRED
+            $initialStatus = 'pending_manager';
+            $successMessage = 'Leave request submitted successfully! Waiting for manager approval.';
+        }
+
         // Create leave request
         LeaveRequest::create([
             ...$validated,
             'user_id' => $user->id,
             'total_days' => $totalDays,
-            'status' => 'pending_manager',
+            'status' => $initialStatus,
+            'manager_id' => null, // Open queue system
         ]);
 
-        // ✅ FIXED: Redirect to employee's own leave page
-        return redirect()->route('my-leaves.index')->with('success', 
-            'Leave request submitted successfully! Your manager will review it.'
-        );
+        return redirect()->route('my-leaves.index')->with('success', $successMessage);
     }
 
     /**
@@ -162,21 +197,142 @@ class LeaveRequestController extends Controller
      */
     public function show(LeaveRequest $leave)
     {
-        // Ensure user can only view their own requests
         if ($leave->user_id !== auth()->id()) {
             abort(403, 'Unauthorized access to this leave request.');
         }
 
         $leave->load([
             'leaveType',
-            'manager',
             'managerApprover',
             'hrApprover'
         ]);
 
-        return Inertia::render('Employees/Leaves/Show', [  // ✅ Changed
+        return Inertia::render('Employees/Leaves/Show', [
             'leaveRequest' => $leave,
         ]);
+    }
+
+    /**
+     * Show the form for editing a leave request
+     */
+    public function edit(LeaveRequest $leave)
+    {
+        $user = auth()->user();
+        
+        if ($leave->user_id !== $user->id) {
+            abort(403, 'Unauthorized access to this leave request.');
+        }
+
+        if ($leave->status !== 'pending_manager') {
+            return redirect()->route('my-leaves.show', $leave->id)
+                ->with('error', 'You can only edit leave requests that are pending review.');
+        }
+
+        $leave->load(['leaveType', 'user']);
+
+        $leaveTypes = LeaveType::active()
+            ->ordered()
+            ->get()
+            ->filter(function($leaveType) use ($user) {
+                return $leaveType->isEligibleForUser($user);
+            })
+            ->values();
+
+        $leaveBalances = LeaveBalance::where('user_id', $user->id)
+            ->where('year', now()->year)
+            ->with('leaveType')
+            ->get()
+            ->keyBy('leave_type_id');
+
+        return Inertia::render('Employees/Leaves/Edit', [
+            'leaveRequest' => $leave,
+            'leaveTypes' => $leaveTypes,
+            'leaveBalances' => $leaveBalances,
+            'user' => $user,
+        ]);
+    }
+
+    /**
+     * Update a leave request
+     */
+    public function update(Request $request, LeaveRequest $leave)
+    {
+        $user = auth()->user();
+        
+        if ($leave->user_id !== $user->id) {
+            abort(403, 'Unauthorized access to this leave request.');
+        }
+
+        if ($leave->status !== 'pending_manager') {
+            return back()->with('error', 'You can only edit leave requests that are pending review.');
+        }
+
+        $validated = $request->validate([
+            'leave_type_id' => 'required|exists:leave_types,id',
+            'start_date' => 'required|date|after_or_equal:today',
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'duration' => 'required|in:full_day,half_day_am,half_day_pm,custom_hours',
+            'custom_start_time' => 'nullable|required_if:duration,custom_hours|date_format:H:i',
+            'custom_end_time' => 'nullable|required_if:duration,custom_hours|date_format:H:i|after:custom_start_time',
+            'reason' => 'required|string|max:1000',
+            'attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'emergency_contact_name' => 'nullable|string|max:255',
+            'emergency_contact_phone' => 'nullable|string|max:20',
+            'use_default_emergency_contact' => 'boolean',
+            'availability' => 'nullable|in:reachable,offline,emergency_only',
+        ]);
+
+        $totalDays = $this->calculateTotalDays(
+            $validated['start_date'],
+            $validated['end_date'],
+            $validated['duration']
+        );
+
+        if ($validated['leave_type_id'] != $leave->leave_type_id || $totalDays != $leave->total_days) {
+            $balance = LeaveBalance::where('user_id', $user->id)
+                ->where('leave_type_id', $validated['leave_type_id'])
+                ->where('year', now()->year)
+                ->first();
+
+            if (!$balance || !$balance->hasSufficientBalance($totalDays)) {
+                return back()->withInput()->with('error', 
+                    'Insufficient leave balance. You have ' . 
+                    ($balance ? $balance->remaining_days : 0) . 
+                    ' days remaining but requested ' . $totalDays . ' days.'
+                );
+            }
+        }
+
+        if ($request->hasFile('attachment')) {
+            if ($leave->attachment) {
+                \Storage::disk('private')->delete($leave->attachment);
+            }
+            $validated['attachment'] = $request->file('attachment')->store('leave-attachments', 'private');
+        }
+
+        if ($validated['use_default_emergency_contact']) {
+            $validated['emergency_contact_name'] = $user->emergency_contact_name;
+            $validated['emergency_contact_phone'] = $user->emergency_contact_phone;
+        }
+
+        $leave->update([
+            'leave_type_id' => $validated['leave_type_id'],
+            'start_date' => $validated['start_date'],
+            'end_date' => $validated['end_date'],
+            'duration' => $validated['duration'],
+            'custom_start_time' => $validated['custom_start_time'] ?? null,
+            'custom_end_time' => $validated['custom_end_time'] ?? null,
+            'reason' => $validated['reason'],
+            'attachment' => $validated['attachment'] ?? $leave->attachment,
+            'emergency_contact_name' => $validated['emergency_contact_name'],
+            'emergency_contact_phone' => $validated['emergency_contact_phone'],
+            'availability' => $validated['availability'],
+            'total_days' => $totalDays,
+        ]);
+
+        return redirect()->route('my-leaves.show', $leave->id)->with('success', 
+            'Leave request updated successfully!'
+        );
     }
 
     /**
@@ -184,7 +340,6 @@ class LeaveRequestController extends Controller
      */
     public function cancel(LeaveRequest $leave)
     {
-        // Ensure user can only cancel their own requests
         if ($leave->user_id !== auth()->id()) {
             abort(403, 'Unauthorized access to this leave request.');
         }
@@ -195,32 +350,36 @@ class LeaveRequestController extends Controller
 
         $leave->update(['status' => 'cancelled']);
 
-        return back()->with('success', 'Leave request cancelled successfully.');
+        return redirect()->route('my-leaves.index')->with('success', 'Leave request cancelled successfully.');
     }
-
     /**
-     * Appeal a rejected leave request
-     */
-    public function appeal(Request $request, LeaveRequest $leave)
+    * Request cancellation for an approved leave
+    */
+    public function requestCancellation(Request $request, LeaveRequest $leave)
     {
-        // Ensure user can only appeal their own requests
         if ($leave->user_id !== auth()->id()) {
             abort(403, 'Unauthorized access to this leave request.');
         }
 
-        if (!$leave->canBeAppealed()) {
-            return back()->with('error', 'This leave request cannot be appealed.');
+        if (!$leave->canRequestCancellation()) {
+            return back()->with('error', 
+                'This leave cannot be cancelled. It may have already started or is not in approved status.'
+            );
         }
 
         $validated = $request->validate([
-            'appeal_reason' => 'required|string|max:1000',
+            'cancellation_reason' => 'required|string|max:1000',
         ]);
 
-        $leave->appeal($validated['appeal_reason']);
-
-        return back()->with('success', 
-            'Your appeal has been submitted to HR for review.'
-        );
+        try {
+            $leave->requestCancellation($validated['cancellation_reason']);
+            
+            return redirect()->route('my-leaves.index')->with('success', 
+                'Cancellation request submitted! HR will review your request.'
+            );
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
     }
 
     /**
@@ -231,10 +390,8 @@ class LeaveRequestController extends Controller
         $start = \Carbon\Carbon::parse($startDate);
         $end = \Carbon\Carbon::parse($endDate);
 
-        // Get number of days between dates (inclusive)
         $daysBetween = $start->diffInDays($end) + 1;
 
-        // Calculate based on duration type
         switch ($duration) {
             case 'half_day_am':
             case 'half_day_pm':

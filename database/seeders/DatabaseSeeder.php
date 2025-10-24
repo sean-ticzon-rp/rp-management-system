@@ -16,7 +16,11 @@ class DatabaseSeeder extends Seeder
         // ✅ Run RoleSeeder FIRST so roles exist
         $this->call([
             RoleSeeder::class,
-            PermissionSeeder::class, // ✅ NEW - Create permissions and assign to roles
+        ]);
+
+        // ✅ Run PermissionSeeder SECOND to create permissions and assign to roles
+        $this->call([
+            PermissionSeeder::class, // ← ADD THIS LINE
         ]);
 
         // ✅ Create Super Admin User
@@ -41,7 +45,7 @@ class DatabaseSeeder extends Seeder
             AssetSeeder::class,
             ProjectSeeder::class,
             LeaveTypeSeeder::class,
-            TestUsersSeeder::class, // ← ADD THIS LINE
+            TestUsersSeeder::class,
             LeaveRequestSeeder::class,
         ]);
     }

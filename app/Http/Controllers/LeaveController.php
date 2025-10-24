@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\User;
-use App\Models\LeaveBalance; // ✅ ADD THIS LINE
+use App\Models\LeaveBalance;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -103,50 +103,83 @@ class LeaveController extends Controller
     }
 
     /**
-     * Show the form for creating a new leave request
+     * Show the form for creating a new leave request (Admin version)
+     * ✅ UPDATED: Support filing for other employees
      */
     public function create()
     {
-        $user = auth()->user();
+        $currentUser = auth()->user();
         
-        // Get available leave types for this user (considering gender)
-        $leaveTypes = LeaveType::active()
-            ->ordered()
-            ->get()
-            ->filter(function($leaveType) use ($user) {
-                return $leaveType->isEligibleForUser($user);
-            })
-            ->values(); // Reset array keys
+        // ✅ Check if user is HR/Admin
+        $isHROrAdmin = $currentUser->roles->whereIn('slug', [
+            'super-admin',
+            'admin',
+            'hr-manager'
+        ])->count() > 0;
 
-        // Get current year balances
-        $leaveBalances = LeaveBalance::where('user_id', $user->id)
+        // Get available leave types
+        $leaveTypes = LeaveType::active()->ordered()->get();
+
+        // Get current user's balances (for when filing for self)
+        $leaveBalances = LeaveBalance::where('user_id', $currentUser->id)
             ->where('year', now()->year)
             ->with('leaveType')
             ->get()
             ->keyBy('leave_type_id');
 
-        // Get all active users as potential managers (exclude current user)
+        // Get all active users as potential managers
         $managers = User::where('employment_status', 'active')
-            ->where('id', '!=', $user->id)
+            ->where('id', '!=', $currentUser->id)
             ->orderBy('name')
             ->get(['id', 'name', 'position', 'department']);
+
+        // ✅ NEW: Get all employees (for HR/Admin to file on behalf of)
+        $allUsers = [];
+        if ($isHROrAdmin) {
+            $allUsers = User::where('employment_status', 'active')
+                ->with(['leaveBalances' => function($query) {
+                    $query->where('year', now()->year)->with('leaveType');
+                }])
+                ->orderBy('name')
+                ->get(['id', 'name', 'position', 'department', 'manager_id', 'emergency_contact_name', 'emergency_contact_phone']);
+        }
 
         return Inertia::render('Admin/Leaves/Apply', [
             'leaveTypes' => $leaveTypes,
             'leaveBalances' => $leaveBalances,
-            'user' => $user->load('manager'),
+            'user' => $currentUser->load('manager'),
             'managers' => $managers,
+            'allUsers' => $allUsers, // ✅ NEW: For proxy filing
         ]);
     }
 
     /**
-     * Store a newly created leave request
+     * Store a newly created leave request (Admin version)
+     * ✅ UPDATED: Support proxy filing
      */
     public function store(Request $request)
     {
-        $user = auth()->user();
+        $currentUser = auth()->user();
+        
+        // ✅ Check if filing for another user
+        $isHROrAdmin = $currentUser->roles->whereIn('slug', [
+            'super-admin',
+            'admin',
+            'hr-manager'
+        ])->count() > 0;
+
+        // ✅ Validate user_id if provided (HR/Admin only)
+        if ($request->has('user_id') && $request->user_id != $currentUser->id) {
+            if (!$isHROrAdmin) {
+                abort(403, 'You are not authorized to file leave for other employees.');
+            }
+            $targetUserId = $request->user_id;
+        } else {
+            $targetUserId = $currentUser->id;
+        }
 
         $validated = $request->validate([
+            'user_id' => 'nullable|exists:users,id', // ✅ NEW: Allow HR to file for others
             'leave_type_id' => 'required|exists:leave_types,id',
             'start_date' => 'required|date|after_or_equal:today',
             'end_date' => 'required|date|after_or_equal:start_date',
@@ -159,7 +192,7 @@ class LeaveController extends Controller
             'emergency_contact_phone' => 'nullable|required_if:use_default_emergency_contact,false|string|max:20',
             'use_default_emergency_contact' => 'boolean',
             'availability' => 'nullable|in:reachable,offline,emergency_only',
-            'manager_id' => 'required|exists:users,id', // Manager selection
+            'manager_id' => 'required|exists:users,id',
         ]);
 
         // Calculate total days
@@ -169,15 +202,16 @@ class LeaveController extends Controller
             $validated['duration']
         );
 
-        // Check if user has sufficient balance
-        $balance = LeaveBalance::where('user_id', $user->id)
+        // ✅ Check balance for the TARGET user (not current user)
+        $balance = LeaveBalance::where('user_id', $targetUserId)
             ->where('leave_type_id', $validated['leave_type_id'])
             ->where('year', now()->year)
             ->first();
 
         if (!$balance || !$balance->hasSufficientBalance($totalDays)) {
+            $targetUser = User::find($targetUserId);
             return back()->withInput()->with('error', 
-                'Insufficient leave balance. You have ' . 
+                'Insufficient leave balance. ' . ($targetUser->id === $currentUser->id ? 'You have' : $targetUser->name . ' has') . ' ' .
                 ($balance ? $balance->remaining_days : 0) . 
                 ' days remaining but requested ' . $totalDays . ' days.'
             );
@@ -189,22 +223,26 @@ class LeaveController extends Controller
         }
 
         // Set default emergency contact if requested
+        $targetUser = User::find($targetUserId);
         if ($validated['use_default_emergency_contact']) {
-            $validated['emergency_contact_name'] = $user->emergency_contact_name;
-            $validated['emergency_contact_phone'] = $user->emergency_contact_phone;
+            $validated['emergency_contact_name'] = $targetUser->emergency_contact_name;
+            $validated['emergency_contact_phone'] = $targetUser->emergency_contact_phone;
         }
 
         // Create leave request
         LeaveRequest::create([
             ...$validated,
-            'user_id' => $user->id,
+            'user_id' => $targetUserId, // ✅ Use target user ID
             'total_days' => $totalDays,
             'status' => 'pending_manager',
         ]);
 
-        return redirect()->route('leaves.index')->with('success', 
-            'Leave request submitted successfully! Your manager will review it.'
-        );
+        // ✅ Different success messages
+        $successMessage = $targetUserId === $currentUser->id
+            ? 'Leave request submitted successfully! Your manager will review it.'
+            : "Leave request for {$targetUser->name} submitted successfully!";
+
+        return redirect()->route('leaves.index')->with('success', $successMessage);
     }
 
     /**
