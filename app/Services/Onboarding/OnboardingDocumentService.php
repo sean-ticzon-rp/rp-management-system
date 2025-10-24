@@ -18,10 +18,8 @@ class OnboardingDocumentService
         string $documentType,
         ?string $description = null
     ) {
-        // Store file
         $path = $file->store('onboarding-documents', 'private');
         
-        // Create document record
         $document = OnboardingDocument::create([
             'submission_id' => $submission->id,
             'document_type' => $documentType,
@@ -33,10 +31,7 @@ class OnboardingDocumentService
             'status' => 'pending',
         ]);
         
-        // Update submission completion
         $submission->calculateCompletion();
-        
-        // Mark invite as in progress
         $submission->invite->markAsInProgress();
         
         return $document;
@@ -49,19 +44,15 @@ class OnboardingDocumentService
         OnboardingDocument $document,
         UploadedFile $newFile
     ) {
-        // Delete old file
         $document->deleteFile();
-        
-        // Store new file
         $path = $newFile->store('onboarding-documents', 'private');
         
-        // Update document record
         $document->update([
             'filename' => $newFile->getClientOriginalName(),
             'path' => $path,
             'mime_type' => $newFile->getClientMimeType(),
             'size' => $newFile->getSize(),
-            'status' => 'pending', // Reset to pending after reupload
+            'status' => 'pending',
             'rejection_reason' => null,
             'verified_at' => null,
             'verified_by' => null,
@@ -75,16 +66,9 @@ class OnboardingDocumentService
      */
     public function deleteDocument(OnboardingDocument $document)
     {
-        // Delete file from storage
         $document->deleteFile();
-        
-        // Get submission before deleting
         $submission = $document->submission;
-        
-        // Delete record
         $document->delete();
-        
-        // Recalculate completion
         $submission->calculateCompletion();
         
         return true;
@@ -96,7 +80,6 @@ class OnboardingDocumentService
     public function approveDocument(OnboardingDocument $document)
     {
         $document->approve();
-        
         return $document;
     }
 
@@ -106,9 +89,7 @@ class OnboardingDocumentService
     public function rejectDocument(OnboardingDocument $document, string $reason)
     {
         $document->reject($reason);
-        
         // TODO: Send notification to candidate
-        
         return $document;
     }
 
@@ -127,23 +108,11 @@ class OnboardingDocumentService
     }
 
     /**
-     * Get required documents list
+     * ✅ UPDATED: Only NBI and PNP Clearance required
      */
     public function getRequiredDocumentTypes()
     {
         return [
-            'resume' => [
-                'label' => 'Resume / CV',
-                'required' => true,
-                'description' => 'Your updated resume or curriculum vitae',
-                'accepted' => '.pdf, .doc, .docx',
-            ],
-            'government_id' => [
-                'label' => 'Government ID',
-                'required' => true,
-                'description' => 'Any valid government-issued ID',
-                'accepted' => '.pdf, .jpg, .png',
-            ],
             'nbi_clearance' => [
                 'label' => 'NBI Clearance',
                 'required' => true,
@@ -156,52 +125,17 @@ class OnboardingDocumentService
                 'description' => 'Valid PNP/Police clearance certificate',
                 'accepted' => '.pdf, .jpg, .png',
             ],
-            'medical_certificate' => [
-                'label' => 'Medical Certificate',
-                'required' => true,
-                'description' => 'Recent medical examination results',
-                'accepted' => '.pdf, .jpg, .png',
-            ],
-            'sss_id' => [
-                'label' => 'SSS ID',
+            // ✅ Optional documents (if they want to upload early)
+            'resume' => [
+                'label' => 'Resume / CV (Optional)',
                 'required' => false,
-                'description' => 'SSS UMID or E-card',
-                'accepted' => '.pdf, .jpg, .png',
+                'description' => 'Your updated resume - can be submitted later',
+                'accepted' => '.pdf, .doc, .docx',
             ],
-            'tin_id' => [
-                'label' => 'TIN ID',
+            'government_id' => [
+                'label' => 'Government ID (Optional)',
                 'required' => false,
-                'description' => 'TIN card or BIR certificate',
-                'accepted' => '.pdf, .jpg, .png',
-            ],
-            'philhealth_id' => [
-                'label' => 'PhilHealth ID',
-                'required' => false,
-                'description' => 'PhilHealth member card',
-                'accepted' => '.pdf, .jpg, .png',
-            ],
-            'hdmf_pagibig_id' => [
-                'label' => 'HDMF / Pag-IBIG ID',
-                'required' => false,
-                'description' => 'Pag-IBIG member card',
-                'accepted' => '.pdf, .jpg, .png',
-            ],
-            'diploma' => [
-                'label' => 'Diploma',
-                'required' => false,
-                'description' => 'Highest educational attainment',
-                'accepted' => '.pdf, .jpg, .png',
-            ],
-            'transcript' => [
-                'label' => 'Transcript of Records',
-                'required' => false,
-                'description' => 'Official transcript',
-                'accepted' => '.pdf',
-            ],
-            'birth_certificate' => [
-                'label' => 'Birth Certificate',
-                'required' => false,
-                'description' => 'PSA birth certificate',
+                'description' => 'Any valid ID - can be submitted later',
                 'accepted' => '.pdf, .jpg, .png',
             ],
         ];

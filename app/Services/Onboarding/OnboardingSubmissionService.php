@@ -8,9 +8,6 @@ use Illuminate\Support\Facades\DB;
 
 class OnboardingSubmissionService
 {
-    /**
-     * Update personal information section
-     */
     public function updatePersonalInfo(OnboardingSubmission $submission, array $data)
     {
         $submission->update([
@@ -22,9 +19,6 @@ class OnboardingSubmissionService
         return $submission;
     }
 
-    /**
-     * Update government IDs section
-     */
     public function updateGovernmentIds(OnboardingSubmission $submission, array $data)
     {
         $submission->update([
@@ -36,9 +30,6 @@ class OnboardingSubmissionService
         return $submission;
     }
 
-    /**
-     * Update emergency contact section
-     */
     public function updateEmergencyContact(OnboardingSubmission $submission, array $data)
     {
         $submission->update([
@@ -50,9 +41,6 @@ class OnboardingSubmissionService
         return $submission;
     }
 
-    /**
-     * Submit the onboarding form (final submission)
-     */
     public function submitOnboarding(OnboardingSubmission $submission)
     {
         if (!$submission->isComplete()) {
@@ -72,8 +60,50 @@ class OnboardingSubmissionService
     }
 
     /**
-     * Get checklist of requirements
+     * ✅ NEW: Approve submission (HR action)
      */
+    public function approveSubmission(OnboardingSubmission $submission, ?string $hrNotes = null)
+    {
+        if ($submission->status !== 'submitted') {
+            throw new \Exception('Can only approve submitted submissions.');
+        }
+
+        $submission->update([
+            'status' => 'approved',
+            'reviewed_at' => now(),
+            'reviewed_by' => auth()->id(),
+            'hr_notes' => $hrNotes,
+        ]);
+
+        // TODO: Send approval email to candidate
+
+        return $submission;
+    }
+
+    /**
+     * ✅ NEW: Reject submission (request revisions)
+     */
+    public function rejectSubmission(OnboardingSubmission $submission, string $reason)
+    {
+        if ($submission->status !== 'submitted') {
+            throw new \Exception('Can only reject submitted submissions.');
+        }
+
+        $submission->update([
+            'status' => 'draft', // Send back to draft for revisions
+            'reviewed_at' => now(),
+            'reviewed_by' => auth()->id(),
+            'hr_notes' => $reason,
+        ]);
+
+        // Set invite back to in_progress
+        $submission->invite->update(['status' => 'in_progress']);
+
+        // TODO: Send revision request email to candidate
+
+        return $submission;
+    }
+
     public function getRequirementsChecklist(OnboardingSubmission $submission)
     {
         return [

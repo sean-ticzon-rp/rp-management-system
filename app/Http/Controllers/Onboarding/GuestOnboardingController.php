@@ -28,24 +28,21 @@ class GuestOnboardingController extends Controller
     public function show($token)
     {
         $invite = OnboardingInvite::where('token', $token)
-            ->with(['submission.documents']) // ✅ Load documents relationship
+            ->with(['submission.documents'])
             ->firstOrFail();
 
-        // Check if invite is valid
         if (!$invite->isValid()) {
             return Inertia::render('Guest/Onboarding/Expired', [
                 'invite' => $invite,
             ]);
         }
 
-        // Check if already approved
         if ($invite->status === 'approved') {
             return Inertia::render('Guest/Onboarding/Completed', [
                 'invite' => $invite,
             ]);
         }
 
-        // ✅ Load submission with documents and add document_type_label
         $submission = $invite->submission;
         if ($submission && $submission->documents) {
             $submission->documents->each(function($doc) {
@@ -90,7 +87,7 @@ class GuestOnboardingController extends Controller
         $invite = OnboardingInvite::where('token', $token)->firstOrFail();
 
         if (!$invite->isValid()) {
-            return response()->json(['error' => 'Invite expired or invalid'], 403);
+            return back()->with('error', 'Invite expired or invalid');
         }
 
         $validated = $request->validate([
@@ -124,7 +121,7 @@ class GuestOnboardingController extends Controller
         $invite = OnboardingInvite::where('token', $token)->firstOrFail();
 
         if (!$invite->isValid()) {
-            return response()->json(['error' => 'Invite expired or invalid'], 403);
+            return back()->with('error', 'Invite expired or invalid');
         }
 
         $validated = $request->validate([
@@ -132,7 +129,6 @@ class GuestOnboardingController extends Controller
             'tin_number' => 'nullable|string|max:20',
             'hdmf_number' => 'nullable|string|max:12',
             'philhealth_number' => 'nullable|string|max:15',
-            'payroll_account' => 'nullable|string|max:12',
         ]);
 
         $this->submissionService->updateGovernmentIds($invite->submission, $validated);
@@ -148,7 +144,7 @@ class GuestOnboardingController extends Controller
         $invite = OnboardingInvite::where('token', $token)->firstOrFail();
 
         if (!$invite->isValid()) {
-            return response()->json(['error' => 'Invite expired or invalid'], 403);
+            return back()->with('error', 'Invite expired or invalid');
         }
 
         $validated = $request->validate([
@@ -164,7 +160,7 @@ class GuestOnboardingController extends Controller
     }
 
     /**
-     * Upload document
+     * ✅ UPDATED: Upload document - Only allow NBI & PNP clearance (+ optional docs)
      */
     public function uploadDocument(Request $request, $token)
     {
@@ -175,8 +171,9 @@ class GuestOnboardingController extends Controller
         }
 
         $validated = $request->validate([
-            'document_type' => 'required|string|in:resume,government_id,sss_id,tin_id,philhealth_id,hdmf_pagibig_id,birth_certificate,nbi_clearance,pnp_clearance,police_clearance,medical_certificate,diploma,transcript,previous_employment_coe,other',
-            'file' => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:10240', // 10MB
+            // ✅ Updated to only include required + optional documents
+            'document_type' => 'required|string|in:nbi_clearance,pnp_clearance,resume,government_id',
+            'file' => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:10240',
             'description' => 'nullable|string|max:500',
         ]);
 
@@ -191,6 +188,11 @@ class GuestOnboardingController extends Controller
             return back()->with('success', 'Document uploaded successfully!');
             
         } catch (\Exception $e) {
+            \Log::error('Document upload failed', [
+                'error' => $e->getMessage(),
+                'token' => $token,
+            ]);
+            
             return back()->with('error', 'Upload failed: ' . $e->getMessage());
         }
     }

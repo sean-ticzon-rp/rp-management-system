@@ -23,6 +23,9 @@ import {
     UserCheck,
     CheckSquare,
     Layers,
+    UserPlus,
+    FileCheck,
+    Mail,
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -40,7 +43,6 @@ export default function AuthenticatedLayout({ header, children }) {
     const { auth } = usePage().props;
     const currentUrl = usePage().url;
     
-    // Toggle section expansion
     const toggleSection = (sectionName) => {
         setExpandedSections(prev => ({
             ...prev,
@@ -48,17 +50,15 @@ export default function AuthenticatedLayout({ header, children }) {
         }));
     };
 
-    // Check if a section has any active items
     const sectionHasActiveItem = (items) => {
         return items.some(item => isActive(item.href));
     };
 
-    // ✅ Build navigation based on user permissions
     const buildNavigation = () => {
         const nav = [];
 
         // ============================================
-        // EVERYONE - Personal (Always Expanded, No Accordion)
+        // EVERYONE - Personal Dashboard
         // ============================================
         nav.push({ 
             type: 'items',
@@ -87,6 +87,24 @@ export default function AuthenticatedLayout({ header, children }) {
                 type: 'items',
                 items: [
                     { name: 'Pending Approvals', href: '/users/pending-approvals', icon: UserCheck, badge: 'new' },
+                ]
+            });
+        }
+
+        // ============================================
+        // ✅ NEW: ONBOARDING (HR/Admin only)
+        // ============================================
+        const isHROrAdmin = auth.user?.can_manage_users;
+
+
+        if (auth.user?.can_manage_users) {
+            nav.push({
+                type: 'accordion',
+                name: 'Onboarding',
+                icon: UserPlus,
+                items: [
+                    { name: 'Invites', href: '/onboarding/invites', icon: Mail },
+                    { name: 'Submissions', href: '/onboarding/submissions', icon: FileCheck, badge: 'pending' },
                 ]
             });
         }
@@ -126,7 +144,6 @@ export default function AuthenticatedLayout({ header, children }) {
                     icon: CheckSquare, 
                     badge: 'pending' 
                 });
-                // ❌ REMOVED: Appealed Requests
                 leaveItems.push({ 
                     name: 'Leave Types', 
                     href: '/leave-types', 
@@ -202,13 +219,15 @@ export default function AuthenticatedLayout({ header, children }) {
         if (cleanHref === '/individual-assets' && cleanUrl.startsWith('/individual-assets/')) return true;
         if (cleanHref === '/projects' && cleanUrl.startsWith('/projects/')) return true;
         if (cleanHref === '/tasks' && cleanUrl.startsWith('/tasks/')) return true;
+        if (cleanHref === '/onboarding/invites' && cleanUrl.startsWith('/onboarding/')) return true;
+        if (cleanHref === '/onboarding/submissions' && cleanUrl.startsWith('/onboarding/')) return true;
         
         return false;
     };
 
     useState(() => {
         const initialExpanded = {};
-        navigation.forEach((section, idx) => {
+        navigation.forEach((section) => {
             if (section.type === 'accordion') {
                 initialExpanded[section.name] = sectionHasActiveItem(section.items);
             }

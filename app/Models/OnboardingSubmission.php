@@ -137,11 +137,11 @@ class OnboardingSubmission extends Model
     }
 
     /**
-     * Check if all required documents are uploaded
+     * ✅ UPDATED: Check if REQUIRED documents are uploaded (only NBI & PNP)
      */
     public function hasRequiredDocuments()
     {
-        $requiredTypes = ['resume', 'government_id', 'nbi_clearance', 'pnp_clearance', 'medical_certificate'];
+        $requiredTypes = ['nbi_clearance', 'pnp_clearance']; // Only these 2!
         $uploadedTypes = $this->documents()->pluck('document_type')->toArray();
         
         foreach ($requiredTypes as $type) {
@@ -154,16 +154,13 @@ class OnboardingSubmission extends Model
     }
 
     /**
-     * Get missing required documents
+     * ✅ UPDATED: Get missing required documents
      */
     public function getMissingDocuments()
     {
         $requiredTypes = [
-            'resume' => 'Resume / CV',
-            'government_id' => 'Government ID',
             'nbi_clearance' => 'NBI Clearance',
             'pnp_clearance' => 'PNP Clearance',
-            'medical_certificate' => 'Medical Certificate',
         ];
         
         $uploadedTypes = $this->documents()->pluck('document_type')->toArray();
@@ -176,7 +173,7 @@ class OnboardingSubmission extends Model
         }
         
         return $missing;
-    }
+    }   
 
     /**
      * Mark section as completed
