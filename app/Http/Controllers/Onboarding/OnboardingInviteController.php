@@ -18,7 +18,7 @@ class OnboardingInviteController extends Controller
     }
 
     /**
-     * ✅ Display all onboarding invites (HR view)
+     * Display all onboarding invites (HR view)
      */
     public function index(Request $request)
     {
@@ -67,14 +67,17 @@ class OnboardingInviteController extends Controller
             abort(403, 'Only HR can create onboarding invites.');
         }
 
+        // ✅ Get all roles from database (not hardcoded)
         $roles = \App\Models\Role::orderBy('name')->get(['id', 'name', 'slug', 'description']);
 
+        // ✅ Get unique departments from users
         $departments = \App\Models\User::whereNotNull('department')
             ->distinct()
             ->pluck('department')
             ->sort()
             ->values();
 
+        // ✅ Add common departments if none exist
         if ($departments->isEmpty()) {
             $departments = collect([
                 'Engineering',
@@ -104,13 +107,14 @@ class OnboardingInviteController extends Controller
             abort(403, 'Only HR can create onboarding invites.');
         }
 
+        // ✅ Get valid role slugs from database
         $validRoles = \App\Models\Role::pluck('slug')->toArray();
 
         $validated = $request->validate([
             'email' => 'required|email|unique:onboarding_invites,email',
             'first_name' => 'nullable|string|max:255',
             'last_name' => 'nullable|string|max:255',
-            'position' => ['required', 'string', 'in:' . implode(',', $validRoles)],
+            'position' => ['required', 'string', 'in:' . implode(',', $validRoles)], // ✅ Dynamic validation
             'department' => 'required|string|max:255',
         ]);
 
@@ -118,7 +122,7 @@ class OnboardingInviteController extends Controller
             $invite = $this->inviteService->createInvite($validated);
             
             return redirect()->route('onboarding.invites.index')
-                ->with('success', "Onboarding invite sent to {$invite->email}!");
+                ->with('success', "Onboarding invite sent to {$invite->email}! Guest link: {$invite->guest_url}");
                 
         } catch (\Exception $e) {
             return back()->withInput()->with('error', 'Failed to create invite: ' . $e->getMessage());
@@ -147,6 +151,7 @@ class OnboardingInviteController extends Controller
      */
     public function resend(OnboardingInvite $invite)
     {
+        // Check permission
         if (!auth()->user()->roles->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->count()) {
             abort(403);
         }
@@ -166,6 +171,7 @@ class OnboardingInviteController extends Controller
      */
     public function extend(Request $request, OnboardingInvite $invite)
     {
+        // Check permission
         if (!auth()->user()->roles->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->count()) {
             abort(403);
         }
@@ -189,6 +195,7 @@ class OnboardingInviteController extends Controller
      */
     public function cancel(OnboardingInvite $invite)
     {
+        // Check permission
         if (!auth()->user()->roles->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->count()) {
             abort(403);
         }
@@ -209,6 +216,7 @@ class OnboardingInviteController extends Controller
      */
     public function convertToUser(OnboardingInvite $invite)
     {
+        // Check permission
         if (!auth()->user()->roles->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->count()) {
             abort(403);
         }
@@ -217,7 +225,7 @@ class OnboardingInviteController extends Controller
             $user = $this->inviteService->convertToUser($invite);
             
             return redirect()->route('users.show', $user->id)
-                ->with('success', "User account created for {$user->name}! Work email: {$user->email}");
+                ->with('success', "User account created for {$user->name}! Temporary password sent via email.");
                 
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());

@@ -1,6 +1,4 @@
 // resources/js/Pages/Guest/Onboarding/Form.jsx
-// ✅ FINAL VERSION - With proper Alert Dialog and no console logs
-
 import { useState } from 'react';
 import { Head, useForm, router } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
@@ -12,16 +10,6 @@ import { Alert, AlertDescription } from '@/Components/ui/alert';
 import { Progress } from '@/Components/ui/progress';
 import { Badge } from '@/Components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/Components/ui/alert-dialog';
 import {
     UserPlus,
     Building2,
@@ -37,14 +25,10 @@ import {
     Phone,
     CreditCard,
     Loader2,
-    AlertTriangle,
 } from 'lucide-react';
 
 export default function Form({ invite, submission, requiredDocuments }) {
     const [currentStep, setCurrentStep] = useState(1);
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [documentToDelete, setDocumentToDelete] = useState(null);
-    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const totalSteps = 4;
 
     // Personal Info Form
@@ -66,7 +50,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
         country: submission?.personal_info?.country || 'Philippines',
     });
 
-    // Government IDs Form
+    // Government IDs Form (NO payroll_account)
     const govIdForm = useForm({
         sss_number: submission?.government_ids?.sss_number || '',
         tin_number: submission?.government_ids?.tin_number || '',
@@ -117,76 +101,23 @@ export default function Form({ invite, submission, requiredDocuments }) {
         });
     };
 
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        
-        if (file) {
-            // Validate file size
-            if (file.size > 10 * 1024 * 1024) {
-                alert('File is too large. Maximum size is 10MB.');
-                e.target.value = '';
-                return;
-            }
-            
-            setSelectedFile(file);
-            documentForm.setData('file', file);
-        }
-    };
-
     const handleUploadDocument = (e) => {
         e.preventDefault();
-        
-        if (!documentForm.data.file) {
-            alert('Please select a file to upload');
-            return;
-        }
-        
-        if (!documentForm.data.document_type) {
-            alert('Please select a document type');
-            return;
-        }
-        
         documentForm.post(route('guest.onboarding.upload-document', invite.token), {
-            forceFormData: true,
             preserveScroll: true,
-            onSuccess: () => {
-                // Reset form
-                documentForm.reset();
-                setSelectedFile(null);
-                
-                // Reset file input
-                const fileInput = document.getElementById('file-upload-input');
-                if (fileInput) fileInput.value = '';
-            },
-            onError: (errors) => {
-                alert('Upload failed: ' + (errors.file?.[0] || errors.document_type?.[0] || 'Unknown error'));
-            },
+            onSuccess: () => documentForm.reset(),
         });
     };
 
-    const openDeleteDialog = (doc) => {
-        setDocumentToDelete(doc);
-        setShowDeleteDialog(true);
-    };
-
-    const confirmDelete = () => {
-        if (documentToDelete) {
-            router.delete(route('guest.onboarding.delete-document', [invite.token, documentToDelete.id]), {
+    const handleDeleteDocument = (documentId) => {
+        if (confirm('Are you sure you want to delete this document?')) {
+            router.delete(route('guest.onboarding.delete-document', [invite.token, documentId]), {
                 preserveScroll: true,
-                onSuccess: () => {
-                    setShowDeleteDialog(false);
-                    setDocumentToDelete(null);
-                },
             });
         }
     };
 
     const handleFinalSubmit = () => {
-        if (!submission || submission.completion_percentage < 100) {
-            alert('Please complete all sections before submitting.');
-            return;
-        }
-        
         router.post(route('guest.onboarding.submit', invite.token), {}, {
             onSuccess: () => {
                 // Will redirect to checklist page
@@ -216,6 +147,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                             </div>
                         </div>
                         
+                        {/* Position Badge */}
                         {invite.position && (
                             <div className="flex items-center justify-center gap-2 mt-4">
                                 <Badge className="bg-blue-100 text-blue-700 border-blue-200 border px-4 py-1.5 text-base">
@@ -474,7 +406,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                         </Card>
                     )}
 
-                    {/* Step 2: Government IDs */}
+                    {/* Step 2: Government IDs (NO Payroll Account) */}
                     {currentStep === 2 && (
                         <Card className="animate-fade-in">
                             <CardHeader>
@@ -702,22 +634,10 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                         <div className="space-y-2">
                                             <Label>Upload File *</Label>
                                             <Input
-                                                id="file-upload-input"
                                                 type="file"
                                                 accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                                                onChange={handleFileChange}
+                                                onChange={(e) => documentForm.setData('file', e.target.files[0])}
                                             />
-                                            {selectedFile && (
-                                                <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-md border border-blue-200">
-                                                    <FileText className="h-5 w-5 text-blue-600" />
-                                                    <div className="flex-1">
-                                                        <p className="text-sm font-medium text-blue-900">{selectedFile.name}</p>
-                                                        <p className="text-xs text-blue-700">
-                                                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            )}
                                             <p className="text-xs text-gray-500">
                                                 Accepted: PDF, JPG, PNG, DOC, DOCX • Max 10MB
                                             </p>
@@ -733,18 +653,10 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             />
                                         </div>
 
-                                        {documentForm.errors.file && (
-                                            <Alert className="border-red-200 bg-red-50">
-                                                <AlertDescription className="text-red-800">
-                                                    {documentForm.errors.file}
-                                                </AlertDescription>
-                                            </Alert>
-                                        )}
-
                                         <Button 
                                             type="submit" 
-                                            disabled={documentForm.processing || !documentForm.data.file || !documentForm.data.document_type}
-                                            className="w-full bg-blue-600 hover:bg-blue-700"
+                                            disabled={documentForm.processing || !documentForm.data.file}
+                                            className="w-full"
                                         >
                                             {documentForm.processing ? (
                                                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Uploading...</>
@@ -765,7 +677,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                     {submission?.documents && submission.documents.length > 0 ? (
                                         <div className="space-y-3">
                                             {submission.documents.map((doc) => (
-                                                <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors">
+                                                <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
                                                     <div className="flex items-center gap-3 flex-1">
                                                         <FileText className="h-5 w-5 text-blue-600" />
                                                         <div className="flex-1">
@@ -783,7 +695,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={() => openDeleteDialog(doc)}
+                                                        onClick={() => handleDeleteDocument(doc.id)}
                                                         className="text-red-600 hover:bg-red-50"
                                                     >
                                                         <Trash2 className="h-4 w-4" />
@@ -795,7 +707,6 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                         <div className="text-center py-8 text-gray-500">
                                             <FileText className="h-12 w-12 mx-auto mb-2 text-gray-400" />
                                             <p>No documents uploaded yet</p>
-                                            <p className="text-sm mt-1">Upload your first document using the form above</p>
                                         </div>
                                     )}
                                 </CardContent>
@@ -811,16 +722,16 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                         </Button>
                                         <Button 
                                             onClick={handleFinalSubmit}
-                                            disabled={!submission || submission?.completion_percentage < 100}
+                                            disabled={submission?.completion_percentage < 100}
                                             className="bg-green-600 hover:bg-green-700"
                                         >
                                             <Send className="h-4 w-4 mr-2" />
                                             Submit to HR
                                         </Button>
                                     </div>
-                                    {submission && submission.completion_percentage < 100 && (
+                                    {submission?.completion_percentage < 100 && (
                                         <p className="text-sm text-orange-600 text-center mt-3">
-                                            Complete all sections ({submission.completion_percentage}% complete)
+                                            Complete all sections ({submission.completion_percentage}%)
                                         </p>
                                     )}
                                 </CardContent>
@@ -837,39 +748,6 @@ export default function Form({ invite, submission, requiredDocuments }) {
                     </Alert>
                 </div>
             </div>
-
-            {/* ✅ Delete Confirmation Dialog */}
-            <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="flex items-center gap-2">
-                            <AlertTriangle className="h-5 w-5 text-red-600" />
-                            Delete Document?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to delete <strong>{documentToDelete?.document_type_label}</strong>?
-                            <br />
-                            <span className="text-sm text-gray-600">({documentToDelete?.filename})</span>
-                            <br /><br />
-                            This action cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => {
-                            setShowDeleteDialog(false);
-                            setDocumentToDelete(null);
-                        }}>
-                            Cancel
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={confirmDelete}
-                            className="bg-red-600 hover:bg-red-700"
-                        >
-                            Delete Document
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </>
     );
 }

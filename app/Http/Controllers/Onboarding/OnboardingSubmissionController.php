@@ -24,7 +24,7 @@ class OnboardingSubmissionController extends Controller
     }
 
     /**
-     * ✅ Display all submissions for HR review
+     * Display all submissions for HR review
      */
     public function index(Request $request)
     {
@@ -68,7 +68,7 @@ class OnboardingSubmissionController extends Controller
     }
 
     /**
-     * ✅ Review a specific submission
+     * Review a specific submission
      */
     public function review(OnboardingSubmission $submission)
     {
@@ -96,6 +96,7 @@ class OnboardingSubmissionController extends Controller
      */
     public function approveDocument(OnboardingDocument $document)
     {
+        // Check permission
         if (!auth()->user()->roles->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->count()) {
             abort(403);
         }
@@ -115,6 +116,7 @@ class OnboardingSubmissionController extends Controller
      */
     public function rejectDocument(Request $request, OnboardingDocument $document)
     {
+        // Check permission
         if (!auth()->user()->roles->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->count()) {
             abort(403);
         }
@@ -138,6 +140,7 @@ class OnboardingSubmissionController extends Controller
      */
     public function approve(Request $request, OnboardingSubmission $submission)
     {
+        // Check permission
         if (!auth()->user()->roles->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->count()) {
             abort(403);
         }
@@ -161,6 +164,7 @@ class OnboardingSubmissionController extends Controller
      */
     public function reject(Request $request, OnboardingSubmission $submission)
     {
+        // Check permission
         if (!auth()->user()->roles->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->count()) {
             abort(403);
         }

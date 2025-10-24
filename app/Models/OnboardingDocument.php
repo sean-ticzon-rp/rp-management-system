@@ -78,19 +78,11 @@ class OnboardingDocument extends Model
     // ============================================
 
     /**
-     * ✅ Get SECURE document URL (routes through controller)
+     * Get the document URL
      */
     public function getUrlAttribute()
     {
-        return route('onboarding.documents.view', $this->id);
-    }
-
-    /**
-     * ✅ Get SECURE download URL
-     */
-    public function getDownloadUrlAttribute()
-    {
-        return route('onboarding.documents.download', $this->id);
+        return Storage::url($this->path);
     }
 
     /**
@@ -163,12 +155,12 @@ class OnboardingDocument extends Model
     }
 
     /**
-     * ✅ Delete document file from PRIVATE storage
+     * Delete document file from storage
      */
     public function deleteFile()
     {
-        if ($this->path && Storage::disk('private')->exists($this->path)) {
-            Storage::disk('private')->delete($this->path);
+        if ($this->path && Storage::exists($this->path)) {
+            Storage::delete($this->path);
         }
     }
 

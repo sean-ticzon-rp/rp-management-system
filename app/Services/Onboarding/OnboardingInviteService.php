@@ -19,12 +19,13 @@ class OnboardingInviteService
         DB::beginTransaction();
         
         try {
+            // Generate unique token
             $token = $this->generateUniqueToken();
             
-            // ✅ CHANGED: No expiration (set to null or very far future)
-            $expiresAt = null; // No expiration
-            // OR: $expiresAt = now()->addYear(); // 1 year expiration
+            // Set expiration (14 days from now)
+            $expiresAt = now()->addDays(14);
             
+            // Create invite
             $invite = OnboardingInvite::create([
                 'email' => $data['email'],
                 'first_name' => $data['first_name'] ?? null,
@@ -37,12 +38,14 @@ class OnboardingInviteService
                 'created_by' => auth()->id(),
             ]);
             
+            // Create empty submission for the invite
             OnboardingSubmission::create([
                 'invite_id' => $invite->id,
                 'status' => 'draft',
                 'completion_percentage' => 0,
             ]);
             
+            // Send invitation email
             $this->sendInviteEmail($invite);
             
             DB::commit();
@@ -55,6 +58,9 @@ class OnboardingInviteService
         }
     }
 
+    /**
+     * Generate unique token for guest access
+     */
     private function generateUniqueToken()
     {
         do {
@@ -65,30 +71,31 @@ class OnboardingInviteService
     }
 
     /**
-     * ✅ UPDATED: Email message without expiration mention
+     * Send invitation email to candidate
      */
     public function sendInviteEmail(OnboardingInvite $invite)
     {
-        $message = "Hello {$invite->full_name},\n\n" .
+        // TODO: Create proper Mailable class
+        // For now, simple email
+        Mail::raw(
+            "Hello {$invite->full_name},\n\n" .
             "Welcome to Rocket Partners!\n\n" .
             "You've been invited to complete your pre-onboarding requirements.\n\n" .
             "Please click the link below to get started:\n" .
-            "{$invite->guest_url}\n\n";
-        
-        // ✅ Only mention expiration if it exists
-        if ($invite->expires_at) {
-            $message .= "This link is valid until " . $invite->expires_at->format('F d, Y') . "\n\n";
-        }
-        
-        $message .= "Best regards,\n" .
-            "Rocket Partners HR Team";
-        
-        Mail::raw($message, function ($mail) use ($invite) {
-            $mail->to($invite->email)
-                 ->subject('Welcome to Rocket Partners - Complete Your Onboarding');
-        });
+            "{$invite->guest_url}\n\n" .
+            "This link is valid until " . $invite->expires_at->format('F d, Y') . "\n\n" .
+            "Best regards,\n" .
+            "Rocket Partners HR Team",
+            function ($message) use ($invite) {
+                $message->to($invite->email)
+                        ->subject('Welcome to Rocket Partners - Complete Your Onboarding');
+            }
+        );
     }
 
+    /**
+     * Resend invitation email
+     */
     public function resendInvite(OnboardingInvite $invite)
     {
         if (!$invite->isValid()) {
@@ -96,9 +103,13 @@ class OnboardingInviteService
         }
         
         $this->sendInviteEmail($invite);
+        
         return true;
     }
 
+    /**
+     * Extend invite expiration
+     */
     public function extendExpiration(OnboardingInvite $invite, int $days = 7)
     {
         $newExpiration = $invite->expires_at 
@@ -107,12 +118,15 @@ class OnboardingInviteService
         
         $invite->update([
             'expires_at' => $newExpiration,
-            'status' => 'pending',
+            'status' => 'pending', // Reset from expired if needed
         ]);
         
         return $invite;
     }
 
+    /**
+     * Cancel an invite
+     */
     public function cancelInvite(OnboardingInvite $invite)
     {
         if (in_array($invite->status, ['approved', 'submitted'])) {
@@ -120,9 +134,13 @@ class OnboardingInviteService
         }
         
         $invite->update(['status' => 'cancelled']);
+        
         return true;
     }
 
+    /**
+     * Mark expired invites (cron job helper)
+     */
     public function markExpiredInvites()
     {
         $expiredInvites = OnboardingInvite::where('expires_at', '<=', now())
@@ -137,8 +155,7 @@ class OnboardingInviteService
     }
 
     /**
-     * ✅ Convert approved submission to User account
-     * This creates their work email and login credentials
+     * Convert approved submission to User account
      */
     public function convertToUser(OnboardingInvite $invite)
     {
@@ -153,32 +170,13 @@ class OnboardingInviteService
         DB::beginTransaction();
         
         try {
+            // Convert submission data to user array
             $userData = $invite->submission->toUserArray();
-            
-            // ✅ Create work email based on name
-            $firstName = strtolower($userData['first_name']);
-            $lastName = strtolower($userData['last_name']);
-            $workEmail = "{$firstName}.{$lastName}@rocketpartners.ph";
-            
-            // Check if email exists, add number if needed
-            $counter = 1;
-            while (User::where('email', $workEmail)->exists()) {
-                $workEmail = "{$firstName}.{$lastName}{$counter}@rocketpartners.ph";
-                $counter++;
-            }
-            
-            $userData['email'] = $workEmail;
-            $userData['work_email'] = $workEmail;
             
             // Create user account
             $user = User::create($userData);
             
-            // ✅ Assign role based on position from invite
-            $role = \App\Models\Role::where('slug', $invite->position)->first();
-            if ($role) {
-                $user->roles()->attach($role->id);
-            }
-            
+            // Update invite
             $invite->update([
                 'status' => 'approved',
                 'approved_at' => now(),
@@ -186,13 +184,15 @@ class OnboardingInviteService
                 'converted_user_id' => $user->id,
             ]);
             
+            // Update submission
             $invite->submission->update([
                 'status' => 'approved',
                 'reviewed_at' => now(),
                 'reviewed_by' => auth()->id(),
             ]);
             
-            // TODO: Send welcome email with work email and temp password
+            // TODO: Send welcome email with credentials
+            // TODO: Initialize leave balances
             
             DB::commit();
             
@@ -204,6 +204,9 @@ class OnboardingInviteService
         }
     }
 
+    /**
+     * Get invite statistics
+     */
     public function getStatistics()
     {
         return [
