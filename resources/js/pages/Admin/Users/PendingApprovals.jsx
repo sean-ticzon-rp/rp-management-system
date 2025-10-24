@@ -1,5 +1,5 @@
 // resources/js/Pages/Admin/Users/PendingApprovals.jsx
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
@@ -35,6 +35,34 @@ import {
 
 export default function PendingApprovals({ auth, users, filters }) {
     const [search, setSearch] = useState(filters.search || '');
+
+    const [selected, setSelected] = useState([]);
+    const selectAllRef = useRef(null);
+    const allChecked = selected.length === users.data.length && selected.length > 0;
+    const isIndeterminate = selected.length > 0 && selected.length < users.length;
+
+    useEffect(() => {
+        if (selectAllRef.current) {
+            selectAllRef.current.indeterminate = isIndeterminate;
+        }
+    }, [isIndeterminate]);
+
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            setSelected(users.data.map(user => user.id));
+        } else {
+            setSelected([]);
+        }
+    };
+
+    const handleItemToggle = (itemId) => {
+        setSelected(prev =>
+            prev.includes(itemId)
+                ? prev.filter(id => id !== itemId)
+                : [...prev, itemId]
+        );
+    };
+
     const { flash } = usePage().props;
 
     const handleSearch = (e) => {
@@ -50,10 +78,31 @@ export default function PendingApprovals({ auth, users, filters }) {
     };
 
     const handleApprove = (user) => {
-        if (confirm(`Are you sure you want to approve ${user.name}?`)) {
-            router.post(route('users.approve', user.id), {}, {
+        if (confirm(`Are you sure you want to approve ${user.name}? They will be able to access the system.`)) {
+            router.post(route('users.approve', user), {}, {
                 preserveScroll: true,
             });
+        }
+    };
+
+    const handleBulkApprove = () => {
+        if (selected.length === 0) {
+            alert("Please select at least one user.");
+            return;
+        }
+        if (confirm(`Are you sure you want to approve ${selected}?`)) {
+            router.post(
+                route('users.bulkApprove'),
+                {
+                    userIds: selected,
+                },
+                {
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        setSelected([]);
+                    },
+                },
+            );
         }
     };
 
@@ -62,6 +111,27 @@ export default function PendingApprovals({ auth, users, filters }) {
             router.post(route('users.reject', user.id), {}, {
                 preserveScroll: true,
             });
+        }
+    };
+
+    const handleBulkReject = () => {
+        if (selected.length === 0) {
+            alert("Please select at least one user.");
+            return;
+        }
+        if (confirm(`Are you sure you want to reject ${selected}? They will need to register again.`)) {
+            router.post(
+                route('users.bulkReject'),
+                {
+                    userIds: selected,
+                },
+                {
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        setSelected([]);
+                    },
+                },
+            );
         }
     };
 
@@ -155,10 +225,38 @@ export default function PendingApprovals({ auth, users, filters }) {
 
                 {/* Users Table */}
                 <Card className="shadow-sm animate-fade-in animation-delay-200">
+                    <div className="flex items-center justify-end gap-2 px-6">
+                        <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => handleBulkApprove()}
+                        >
+                            <UserCheck className="h-4 w-4 mr-1" />
+                            Approve
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-300"
+                            onClick={() => handleBulkReject(selected)}
+                        >
+                            <UserX className="h-4 w-4 mr-1" />
+                            Reject
+                        </Button>
+                    </div>
                     <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow className="bg-gray-50 hover:bg-gray-50 border-b-2">
+                                    <TableHead className="font-semibold text-gray-700 h-12">
+                                        <input
+                                            ref={selectAllRef}
+                                            type="checkbox"
+                                            checked={allChecked}
+                                            onChange={handleSelectAll}
+                                            className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                        />
+                                    </TableHead>
                                     <TableHead className="font-semibold text-gray-700 h-12">User</TableHead>
                                     <TableHead className="font-semibold text-gray-700 h-12">Contact</TableHead>
                                     <TableHead className="font-semibold text-gray-700 h-12">Roles</TableHead>
@@ -170,6 +268,14 @@ export default function PendingApprovals({ auth, users, filters }) {
                                 {users.data.length > 0 ? (
                                     users.data.map((user) => (
                                         <TableRow key={user.id} className="hover:bg-yellow-50/30 border-b bg-yellow-50/20">
+                                            <TableCell className="py-4 align-middle">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selected.includes(user.id)}
+                                                    onChange={() => handleItemToggle(user.id)}
+                                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                                />
+                                            </TableCell>
                                             <TableCell className="py-4 align-middle">
                                                 <div className="flex items-center gap-3">
                                                     {user.profile_picture ? (
@@ -273,8 +379,8 @@ export default function PendingApprovals({ auth, users, filters }) {
                                                 </div>
                                                 <p className="text-gray-900 font-medium text-lg mb-1">All caught up!</p>
                                                 <p className="text-gray-500 text-sm">
-                                                    {hasFilters 
-                                                        ? 'No pending users match your search' 
+                                                    {hasFilters
+                                                        ? 'No pending users match your search'
                                                         : 'There are no pending user approvals at the moment'}
                                                 </p>
                                             </div>

@@ -18,6 +18,11 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
         ]);
 
+        // ✅ Run PermissionSeeder SECOND to create permissions and assign to roles
+        $this->call([
+            PermissionSeeder::class, // ← ADD THIS LINE
+        ]);
+
         // ✅ Create Super Admin User
         $admin = User::factory()->create([
             'name' => 'Admin User',
@@ -40,7 +45,7 @@ class DatabaseSeeder extends Seeder
             AssetSeeder::class,
             ProjectSeeder::class,
             LeaveTypeSeeder::class,
-            TestUsersSeeder::class, // ← ADD THIS LINE
+            TestUsersSeeder::class,
             LeaveRequestSeeder::class,
         ]);
     }
