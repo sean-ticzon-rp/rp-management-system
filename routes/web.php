@@ -120,7 +120,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ============================================
     // 👔 ADMIN/HR ROUTES (Manage All)
     // ============================================
-    
+
     // Inventory
     Route::post('/inventory/delete-assets', [InventoryController::class, 'deleteSelectedAssets'])->name('inventory.delete-assets');
     Route::resource('inventory', InventoryController::class);
@@ -133,9 +133,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     // Pending Approvals (for Senior/Lead/PM)
     Route::get('/users/pending-approvals', [UserController::class, 'pendingApprovals'])->name('users.pending-approvals');
-    
+
     // User Approval Routes (BEFORE resource routes)
     Route::post('/users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
+    Route::post('/users/bulk-approve', [UserController::class, 'bulkApprove'])->name('users.bulkApprove');
     Route::post('/users/{user}/reject', [UserController::class, 'reject'])->name('users.reject');
     Route::resource('users', UserController::class);
 
