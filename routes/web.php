@@ -33,7 +33,7 @@ Route::get('/', function () {
 
 // ============================================
 // 👤 GUEST ONBOARDING ROUTES (No authentication required)
-// ✅ MUST BE OUTSIDE auth middleware and BEFORE authenticated routes
+// ✅ MUST BE OUTSIDE auth middleware - Using /guest prefix to avoid conflicts
 // ============================================
 Route::prefix('guest/onboarding')->name('guest.onboarding.')->group(function () {
     Route::get('/{token}', [GuestOnboardingController::class, 'show'])->name('show');
@@ -47,19 +47,8 @@ Route::prefix('guest/onboarding')->name('guest.onboarding.')->group(function () 
 });
 
 // ============================================
-// 👤 GUEST ONBOARDING ROUTES (No authentication required)
+// 🔐 AUTHENTICATED ROUTES
 // ============================================
-Route::prefix('onboarding')->name('guest.onboarding.')->group(function () {
-    Route::get('/{token}', [GuestOnboardingController::class, 'show'])->name('show');
-    Route::get('/{token}/checklist', [GuestOnboardingController::class, 'checklist'])->name('checklist');
-    Route::post('/{token}/personal-info', [GuestOnboardingController::class, 'updatePersonalInfo'])->name('update-personal-info');
-    Route::post('/{token}/government-ids', [GuestOnboardingController::class, 'updateGovernmentIds'])->name('update-government-ids');
-    Route::post('/{token}/emergency-contact', [GuestOnboardingController::class, 'updateEmergencyContact'])->name('update-emergency-contact');
-    Route::post('/{token}/upload-document', [GuestOnboardingController::class, 'uploadDocument'])->name('upload-document');
-    Route::delete('/{token}/documents/{document}', [GuestOnboardingController::class, 'deleteDocument'])->name('delete-document');
-    Route::post('/{token}/submit', [GuestOnboardingController::class, 'submit'])->name('submit');
-});
-
 Route::middleware(['auth', 'verified'])->group(function () {
     
     // Pending Approval Page
@@ -82,12 +71,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         }
     })->name('dashboard');
 
-    // Profile
+    // ============================================
+    // ⚙️ PROFILE & SETTINGS
+    // ============================================
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // Settings
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('/', [SettingsController::class, 'index'])->name('index');
         Route::post('/profile', [SettingsController::class, 'updateProfile'])->name('update-profile');
@@ -103,7 +93,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // ============================================
-    // 👤 EMPLOYEE LEAVE ROUTES (Self-Service)
+    // 📋 EMPLOYEE LEAVE ROUTES (Self-Service)
     // ============================================
     Route::prefix('my-leaves')->name('my-leaves.')->group(function () {
         Route::get('/', [LeaveRequestController::class, 'index'])->name('index');
@@ -114,19 +104,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{leave}', [LeaveRequestController::class, 'show'])->name('show');
         Route::post('/{leave}/cancel', [LeaveRequestController::class, 'cancel'])->name('cancel');
         Route::post('/{leave}/request-cancel', [LeaveRequestController::class, 'requestCancellation'])->name('request-cancel');
-        Route::post('/{leave}/appeal', [LeaveRequestController::class, 'appeal'])->name('appeal');
     });
 
     // ============================================
-    // 👔 ADMIN/HR ROUTES (Manage All)
-    // ============================================
-
-    // Inventory
-    Route::post('/inventory/delete-assets', [InventoryController::class, 'deleteSelectedAssets'])->name('inventory.delete-assets');
-    Route::resource('inventory', InventoryController::class);
-
-    // ============================================
-    // 👥 USER MANAGEMENT ROUTES
+    // 👥 USER MANAGEMENT ROUTES (Admin/HR)
     // ============================================
     Route::get('/users/import', [UserImportController::class, 'show'])->name('users.import');
     Route::post('/users/import', [UserImportController::class, 'import'])->name('users.import.store');
@@ -136,23 +117,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // User Approval Routes (BEFORE resource routes)
     Route::post('/users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
-    Route::post('/users/bulk-approve', [UserController::class, 'bulkApprove'])->name('users.bulkApprove');
     Route::post('/users/{user}/reject', [UserController::class, 'reject'])->name('users.reject');
+    
     Route::resource('users', UserController::class);
 
-    // Projects
-    Route::resource('projects', ProjectController::class);
-
-    // Tasks
-    Route::prefix('tasks')->name('tasks.')->group(function () {
-        Route::get('/', [TaskController::class, 'index'])->name('index');
-        Route::get('/kanban', [TaskController::class, 'kanban'])->name('kanban');
-        Route::get('/create', [TaskController::class, 'create'])->name('create');
-        Route::post('/', [TaskController::class, 'store'])->name('store');
-        Route::put('/{task}', [TaskController::class, 'update'])->name('update');
-        Route::patch('/{task}/status', [TaskController::class, 'updateStatus'])->name('updateStatus');
-        Route::delete('/{task}', [TaskController::class, 'destroy'])->name('destroy');
-    });
+    // ============================================
+    // 📦 INVENTORY MANAGEMENT
+    // ============================================
+    Route::post('/inventory/delete-assets', [InventoryController::class, 'deleteSelectedAssets'])->name('inventory.delete-assets');
+    Route::resource('inventory', InventoryController::class);
 
     // Individual Assets
     Route::prefix('individual-assets')->name('individual-assets.')->group(function () {
@@ -167,64 +140,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // ============================================
-    // 📋 LEAVE MANAGEMENT ROUTES
+    // 📋 LEAVE MANAGEMENT ROUTES (Admin/HR)
     // ============================================
     Route::prefix('leaves')->name('leaves.')->group(function () {
         // Pending Approvals (Hierarchical - MUST come BEFORE {leave} routes)
         Route::get('/pending-approvals', [LeaveApprovalController::class, 'pendingApprovals'])->name('pending-approvals');
+        
         Route::get('/', [LeaveController::class, 'index'])->name('index');
         Route::get('/apply', [LeaveController::class, 'create'])->name('apply');
         Route::post('/', [LeaveController::class, 'store'])->name('store');
         Route::get('/{leave}', [LeaveController::class, 'show'])->name('show');
+        
+        // Manager Approval
         Route::post('/{leave}/manager-approve', [LeaveApprovalController::class, 'managerApprove'])->name('manager-approve');
         Route::post('/{leave}/manager-reject', [LeaveApprovalController::class, 'managerReject'])->name('manager-reject');
+        
+        // HR Approval
         Route::post('/{leave}/hr-approve', [LeaveApprovalController::class, 'hrApprove'])->name('hr-approve');
         Route::post('/{leave}/hr-reject', [LeaveApprovalController::class, 'hrReject'])->name('hr-reject');
-        Route::post('/{leave}/approve-cancellation', [LeaveApprovalController::class, 'approveCancellation'])->name('approve-cancellation');
-        Route::post('/{leave}/reject-cancellation', [LeaveApprovalController::class, 'rejectCancellation'])->name('reject-cancellation');
-    });
-
-    // ============================================
-    // 📋 LEAVE TYPES MANAGEMENT
-    // ============================================
-    Route::prefix('leave-types')->name('leave-types.')->group(function () {
-        Route::get('/', [LeaveTypeController::class, 'index'])->name('index');
-        Route::get('/create', [LeaveTypeController::class, 'create'])->name('create');
-        Route::post('/', [LeaveTypeController::class, 'store'])->name('store');
-        Route::get('/{leaveType}/edit', [LeaveTypeController::class, 'edit'])->name('edit');
-        Route::put('/{leaveType}', [LeaveTypeController::class, 'update'])->name('update');
-        Route::patch('/{leaveType}/toggle', [LeaveTypeController::class, 'toggleActive'])->name('toggle');
-        Route::delete('/{leaveType}', [LeaveTypeController::class, 'destroy'])->name('destroy');
-    });
-
-    // ============================================
-    // 📋 ONBOARDING MANAGEMENT (HR/Admin only)
-    // ✅ AUTHENTICATED onboarding routes
-    // ============================================
-    Route::prefix('onboarding')->name('onboarding.')->group(function () {
-        // Invites Management
-        Route::prefix('invites')->name('invites.')->group(function () {
-            Route::get('/', [OnboardingInviteController::class, 'index'])->name('index');
-            Route::get('/create', [OnboardingInviteController::class, 'create'])->name('create');
-            Route::post('/', [OnboardingInviteController::class, 'store'])->name('store');
-            Route::get('/{invite}', [OnboardingInviteController::class, 'show'])->name('show');
-            Route::post('/{invite}/resend', [OnboardingInviteController::class, 'resend'])->name('resend');
-            Route::post('/{invite}/extend', [OnboardingInviteController::class, 'extend'])->name('extend');
-            Route::post('/{invite}/cancel', [OnboardingInviteController::class, 'cancel'])->name('cancel');
-            Route::post('/{invite}/convert-to-user', [OnboardingInviteController::class, 'convertToUser'])->name('convert-to-user');
-        });
         
-        // Submissions Review
-        Route::prefix('submissions')->name('submissions.')->group(function () {
-            Route::get('/', [OnboardingSubmissionController::class, 'index'])->name('index');
-            Route::get('/{submission}/review', [OnboardingSubmissionController::class, 'review'])->name('review');
-            Route::post('/{submission}/approve', [OnboardingSubmissionController::class, 'approve'])->name('approve');
-            Route::post('/{submission}/reject', [OnboardingSubmissionController::class, 'reject'])->name('reject');
-            Route::post('/documents/{document}/approve', [OnboardingSubmissionController::class, 'approveDocument'])->name('approve-document');
-            Route::post('/documents/{document}/reject', [OnboardingSubmissionController::class, 'rejectDocument'])->name('reject-document');
-        });
-        
-        // Cancellation Approval Routes (HR only)
+        // Cancellation Approval (HR only)
         Route::post('/{leave}/approve-cancellation', [LeaveApprovalController::class, 'approveCancellation'])->name('approve-cancellation');
         Route::post('/{leave}/reject-cancellation', [LeaveApprovalController::class, 'rejectCancellation'])->name('reject-cancellation');
     });
@@ -243,9 +178,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // ============================================
-    // 📋 ONBOARDING MANAGEMENT (HR/Admin only)
+    // 🎓 ONBOARDING MANAGEMENT (HR/Admin only)
     // ============================================
     Route::prefix('onboarding')->name('onboarding.')->group(function () {
+        
         // Invites Management
         Route::prefix('invites')->name('invites.')->group(function () {
             Route::get('/', [OnboardingInviteController::class, 'index'])->name('index');
@@ -267,6 +203,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/documents/{document}/approve', [OnboardingSubmissionController::class, 'approveDocument'])->name('approve-document');
             Route::post('/documents/{document}/reject', [OnboardingSubmissionController::class, 'rejectDocument'])->name('reject-document');
         });
+    });
+
+    // ============================================
+    // 📁 PROJECT MANAGEMENT
+    // ============================================
+    Route::resource('projects', ProjectController::class);
+
+    Route::prefix('tasks')->name('tasks.')->group(function () {
+        Route::get('/', [TaskController::class, 'index'])->name('index');
+        Route::get('/kanban', [TaskController::class, 'kanban'])->name('kanban');
+        Route::get('/create', [TaskController::class, 'create'])->name('create');
+        Route::post('/', [TaskController::class, 'store'])->name('store');
+        Route::put('/{task}', [TaskController::class, 'update'])->name('update');
+        Route::patch('/{task}/status', [TaskController::class, 'updateStatus'])->name('updateStatus');
+        Route::delete('/{task}', [TaskController::class, 'destroy'])->name('destroy');
     });
 });
 

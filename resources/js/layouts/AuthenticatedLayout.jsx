@@ -92,6 +92,25 @@ export default function AuthenticatedLayout({ header, children }) {
         }
 
         // ============================================
+        // ONBOARDING MANAGEMENT (HR/Admin only)
+        // ============================================
+        const isHROrAdmin = auth.user?.roles?.some(r => 
+            ['super-admin', 'admin', 'hr-manager'].includes(r.slug)
+        );
+
+        if (isHROrAdmin) {
+            nav.push({
+                type: 'accordion',
+                name: 'Onboarding',
+                icon: UserPlus,
+                items: [
+                    { name: 'Invites', href: '/onboarding/invites', icon: Mail },
+                    { name: 'Submissions', href: '/onboarding/submissions', icon: FileCheck },
+                ]
+            });
+        }
+
+        // ============================================
         // LEAVE MANAGEMENT
         // ============================================
         if (auth.user?.can_approve_leaves) {
@@ -126,7 +145,6 @@ export default function AuthenticatedLayout({ header, children }) {
                     icon: CheckSquare, 
                     badge: 'pending' 
                 });
-                // ❌ REMOVED: Appealed Requests
                 leaveItems.push({ 
                     name: 'Leave Types', 
                     href: '/leave-types', 
