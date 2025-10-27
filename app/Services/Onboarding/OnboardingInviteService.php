@@ -5,6 +5,7 @@ namespace App\Services\Onboarding;
 use App\Models\OnboardingInvite;
 use App\Models\OnboardingSubmission;
 use App\Models\User;
+use App\Mail\Onboarding\GuestInviteMail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -45,7 +46,7 @@ class OnboardingInviteService
                 'completion_percentage' => 0,
             ]);
             
-            // Send invitation email
+            // Send invitation email using Mailable
             $this->sendInviteEmail($invite);
             
             DB::commit();
@@ -71,26 +72,11 @@ class OnboardingInviteService
     }
 
     /**
-     * Send invitation email to candidate
+     * Send invitation email to candidate using Mailable
      */
     public function sendInviteEmail(OnboardingInvite $invite)
     {
-        // TODO: Create proper Mailable class
-        // For now, simple email
-        Mail::raw(
-            "Hello {$invite->full_name},\n\n" .
-            "Welcome to Rocket Partners!\n\n" .
-            "You've been invited to complete your pre-onboarding requirements.\n\n" .
-            "Please click the link below to get started:\n" .
-            "{$invite->guest_url}\n\n" .
-            "This link is valid until " . $invite->expires_at->format('F d, Y') . "\n\n" .
-            "Best regards,\n" .
-            "Rocket Partners HR Team",
-            function ($message) use ($invite) {
-                $message->to($invite->email)
-                        ->subject('Welcome to Rocket Partners - Complete Your Onboarding');
-            }
-        );
+        Mail::to($invite->email)->send(new GuestInviteMail($invite));
     }
 
     /**

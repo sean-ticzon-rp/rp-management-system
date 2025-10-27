@@ -122,10 +122,11 @@ class OnboardingInvite extends Model
 
     /**
      * Get the guest onboarding URL
+     * ✅ FIXED: Use /guest/onboarding/ prefix to match routes
      */
     public function getGuestUrlAttribute()
     {
-        return url("/onboarding/{$this->token}");
+        return url("/guest/onboarding/{$this->token}");
     }
 
     /**

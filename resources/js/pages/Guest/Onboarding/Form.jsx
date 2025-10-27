@@ -25,6 +25,8 @@ import {
     Phone,
     CreditCard,
     Loader2,
+    Rocket,
+    Clock,
 } from 'lucide-react';
 
 export default function Form({ invite, submission, requiredDocuments }) {
@@ -50,7 +52,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
         country: submission?.personal_info?.country || 'Philippines',
     });
 
-    // Government IDs Form (NO payroll_account)
+    // Government IDs Form
     const govIdForm = useForm({
         sss_number: submission?.government_ids?.sss_number || '',
         tin_number: submission?.government_ids?.tin_number || '',
@@ -66,10 +68,10 @@ export default function Form({ invite, submission, requiredDocuments }) {
         relationship: submission?.emergency_contact?.relationship || '',
     });
 
-    // Document Upload Form
+    // Document Upload Form - FIXED: Allow multiple files
     const documentForm = useForm({
         document_type: '',
-        file: null,
+        files: [], // Changed from 'file' to 'files' array
         description: '',
     });
 
@@ -101,11 +103,28 @@ export default function Form({ invite, submission, requiredDocuments }) {
         });
     };
 
+    // FIXED: Upload multiple files
     const handleUploadDocument = (e) => {
         e.preventDefault();
+        
+        // Upload each file separately
+        const files = documentForm.data.files;
+        if (files.length === 0) return;
+
+        // Upload first file
+        const formData = new FormData();
+        formData.append('document_type', documentForm.data.document_type);
+        formData.append('file', files[0]);
+        formData.append('description', documentForm.data.description);
+
         documentForm.post(route('guest.onboarding.upload-document', invite.token), {
             preserveScroll: true,
-            onSuccess: () => documentForm.reset(),
+            data: formData,
+            onSuccess: () => {
+                // Reset form
+                documentForm.reset();
+                setUploadedFiles({});
+            },
         });
     };
 
@@ -129,39 +148,64 @@ export default function Form({ invite, submission, requiredDocuments }) {
         <>
             <Head title="Complete Your Onboarding" />
 
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 px-4">
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-sky-50 py-12 px-4">
                 <div className="max-w-4xl mx-auto space-y-6">
-                    {/* Header */}
+                    
+                    {/* Header with Logo */}
                     <div className="text-center animate-fade-in">
-                        <div className="flex items-center justify-center gap-3 mb-4">
-                            <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
-                                <UserPlus className="h-8 w-8 text-white" />
+                        <div className="flex flex-col items-center justify-center mb-6">
+                            {/* Logo with Black Background */}
+                            <div className="bg-black px-8 py-4 rounded-xl shadow-xl mb-4">
+                                <img 
+                                    src="https://i.postimg.cc/RV82nPB5/image.png" 
+                                    alt="Rocket Partners" 
+                                    className="h-12 w-auto"
+                                />
                             </div>
-                            <div className="text-left">
+                            
+                            {/* Title */}
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="p-3 bg-[#2596be] rounded-xl shadow-lg">
+                                    <Rocket className="h-8 w-8 text-white" />
+                                </div>
                                 <h1 className="text-4xl font-bold text-gray-900">
-                                    Welcome to Rocket Partners!
+                                    Onboarding Portal
                                 </h1>
-                                <p className="text-lg text-gray-600 mt-1">
-                                    {invite.full_name || 'Complete your onboarding'}
-                                </p>
                             </div>
+                            
+                            <p className="text-lg text-gray-600">
+                                Welcome, {invite.full_name || 'New Team Member'}!
+                            </p>
                         </div>
                         
                         {/* Position Badge */}
                         {invite.position && (
                             <div className="flex items-center justify-center gap-2 mt-4">
-                                <Badge className="bg-blue-100 text-blue-700 border-blue-200 border px-4 py-1.5 text-base">
+                                <Badge className="bg-[#2596be] text-white border-[#2596be] px-4 py-1.5 text-base">
                                     <Briefcase className="h-4 w-4 mr-2" />
                                     {invite.position}
                                 </Badge>
                                 {invite.department && (
-                                    <Badge className="bg-purple-100 text-purple-700 border-purple-200 border px-4 py-1.5 text-base">
+                                    <Badge className="bg-gray-100 text-gray-700 border-gray-300 px-4 py-1.5 text-base">
                                         <Building2 className="h-4 w-4 mr-2" />
                                         {invite.department}
                                     </Badge>
                                 )}
                             </div>
                         )}
+
+                        {/* Expiration Warning */}
+                        <Alert className="mt-6 border-amber-300 bg-amber-50">
+                            <Clock className="h-4 w-4 text-amber-600" />
+                            <AlertDescription className="text-amber-800">
+                                <strong>Expires:</strong> {new Date(invite.expires_at).toLocaleDateString('en-US', { 
+                                    weekday: 'long', 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                })}
+                            </AlertDescription>
+                        </Alert>
                     </div>
 
                     {/* Progress Steps */}
@@ -178,7 +222,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             <div className="flex flex-col items-center flex-1">
                                                 <div className={`flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all ${
                                                     isCompleted ? 'bg-green-600 border-green-600' :
-                                                    isActive ? 'bg-blue-600 border-blue-600' :
+                                                    isActive ? 'bg-[#2596be] border-[#2596be]' :
                                                     'bg-gray-100 border-gray-300'
                                                 }`}>
                                                     {isCompleted ? (
@@ -188,7 +232,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                     )}
                                                 </div>
                                                 <p className={`text-sm mt-2 font-medium ${
-                                                    isActive ? 'text-blue-600' : 
+                                                    isActive ? 'text-[#2596be]' : 
                                                     isCompleted ? 'text-green-600' : 
                                                     'text-gray-500'
                                                 }`}>
@@ -212,7 +256,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                     {currentStep === 1 && (
                         <Card className="animate-fade-in">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 text-[#2596be]">
                                     <UserPlus className="h-5 w-5" />
                                     Personal Information
                                 </CardTitle>
@@ -227,6 +271,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.first_name}
                                                 onChange={(e) => personalForm.setData('first_name', e.target.value)}
                                                 placeholder="John"
+                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
                                                 required
                                             />
                                         </div>
@@ -236,6 +281,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.middle_name}
                                                 onChange={(e) => personalForm.setData('middle_name', e.target.value)}
                                                 placeholder="Michael"
+                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -244,6 +290,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.last_name}
                                                 onChange={(e) => personalForm.setData('last_name', e.target.value)}
                                                 placeholder="Doe"
+                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
                                                 required
                                             />
                                         </div>
@@ -256,7 +303,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.suffix} 
                                                 onValueChange={(value) => personalForm.setData('suffix', value)}
                                             >
-                                                <SelectTrigger>
+                                                <SelectTrigger className="focus:ring-[#2596be]">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -277,6 +324,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.birthday}
                                                 onChange={(e) => personalForm.setData('birthday', e.target.value)}
                                                 max={new Date().toISOString().split('T')[0]}
+                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
                                                 required
                                             />
                                         </div>
@@ -287,7 +335,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.gender} 
                                                 onValueChange={(value) => personalForm.setData('gender', value)}
                                             >
-                                                <SelectTrigger>
+                                                <SelectTrigger className="focus:ring-[#2596be]">
                                                     <SelectValue placeholder="Select..." />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -306,7 +354,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             value={personalForm.data.civil_status} 
                                             onValueChange={(value) => personalForm.setData('civil_status', value)}
                                         >
-                                            <SelectTrigger>
+                                            <SelectTrigger className="focus:ring-[#2596be]">
                                                 <SelectValue placeholder="Select..." />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -327,6 +375,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.phone_number}
                                                 onChange={(e) => personalForm.setData('phone_number', e.target.value)}
                                                 placeholder="09XX XXX XXXX"
+                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
                                                 required
                                             />
                                         </div>
@@ -337,6 +386,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.mobile_number}
                                                 onChange={(e) => personalForm.setData('mobile_number', e.target.value)}
                                                 placeholder="09XX XXX XXXX"
+                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
                                             />
                                         </div>
                                     </div>
@@ -347,6 +397,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             value={personalForm.data.address_line_1}
                                             onChange={(e) => personalForm.setData('address_line_1', e.target.value)}
                                             placeholder="House/Unit No., Street Name"
+                                            className="focus:ring-[#2596be] focus:border-[#2596be]"
                                             required
                                         />
                                     </div>
@@ -357,6 +408,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             value={personalForm.data.address_line_2}
                                             onChange={(e) => personalForm.setData('address_line_2', e.target.value)}
                                             placeholder="Barangay, Subdivision"
+                                            className="focus:ring-[#2596be] focus:border-[#2596be]"
                                         />
                                     </div>
 
@@ -367,6 +419,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.city}
                                                 onChange={(e) => personalForm.setData('city', e.target.value)}
                                                 placeholder="Quezon City"
+                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
                                                 required
                                             />
                                         </div>
@@ -376,6 +429,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.state}
                                                 onChange={(e) => personalForm.setData('state', e.target.value)}
                                                 placeholder="Metro Manila"
+                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -384,6 +438,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.postal_code}
                                                 onChange={(e) => personalForm.setData('postal_code', e.target.value)}
                                                 placeholder="1100"
+                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
                                             />
                                         </div>
                                     </div>
@@ -392,7 +447,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                         <Button 
                                             type="submit" 
                                             disabled={personalForm.processing}
-                                            className="bg-blue-600 hover:bg-blue-700"
+                                            className="bg-[#2596be] hover:bg-[#1e7a9f]"
                                         >
                                             {personalForm.processing ? (
                                                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>
@@ -406,11 +461,11 @@ export default function Form({ invite, submission, requiredDocuments }) {
                         </Card>
                     )}
 
-                    {/* Step 2: Government IDs (NO Payroll Account) */}
+                    {/* Step 2: Government IDs */}
                     {currentStep === 2 && (
                         <Card className="animate-fade-in">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 text-[#2596be]">
                                     <CreditCard className="h-5 w-5" />
                                     Government IDs
                                 </CardTitle>
@@ -418,10 +473,10 @@ export default function Form({ invite, submission, requiredDocuments }) {
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <form onSubmit={(e) => { e.preventDefault(); handleSaveGovIds(); }} className="space-y-4">
-                                    <Alert className="border-blue-200 bg-blue-50">
-                                        <Info className="h-4 w-4 text-blue-600" />
+                                    <Alert className="border-[#2596be] bg-blue-50">
+                                        <Info className="h-4 w-4 text-[#2596be]" />
                                         <AlertDescription className="text-blue-800">
-                                            <strong>Note:</strong> All fields are optional for now. You can provide these details later if you don't have them yet.
+                                            <strong>Note:</strong> All fields are optional. You can provide these details later if you don't have them yet.
                                         </AlertDescription>
                                     </Alert>
 
@@ -433,6 +488,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             onChange={(e) => govIdForm.setData('sss_number', e.target.value)}
                                             placeholder="XX-XXXXXXX-X"
                                             maxLength={15}
+                                            className="focus:ring-[#2596be] focus:border-[#2596be]"
                                         />
                                         <p className="text-xs text-gray-500">Format: XX-XXXXXXX-X (10 digits)</p>
                                     </div>
@@ -445,6 +501,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             onChange={(e) => govIdForm.setData('tin_number', e.target.value)}
                                             placeholder="XXX-XXX-XXX-XXX"
                                             maxLength={20}
+                                            className="focus:ring-[#2596be] focus:border-[#2596be]"
                                         />
                                         <p className="text-xs text-gray-500">Tax Identification Number</p>
                                     </div>
@@ -457,6 +514,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             onChange={(e) => govIdForm.setData('hdmf_number', e.target.value)}
                                             placeholder="XXXXXXXXXXXX"
                                             maxLength={12}
+                                            className="focus:ring-[#2596be] focus:border-[#2596be]"
                                         />
                                         <p className="text-xs text-gray-500">12 digits</p>
                                     </div>
@@ -469,6 +527,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             onChange={(e) => govIdForm.setData('philhealth_number', e.target.value)}
                                             placeholder="XXXX-XXXXX-XX"
                                             maxLength={15}
+                                            className="focus:ring-[#2596be] focus:border-[#2596be]"
                                         />
                                         <p className="text-xs text-gray-500">Format: XXXX-XXXXX-XX</p>
                                     </div>
@@ -485,7 +544,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                         <Button 
                                             type="submit" 
                                             disabled={govIdForm.processing}
-                                            className="bg-blue-600 hover:bg-blue-700"
+                                            className="bg-[#2596be] hover:bg-[#1e7a9f]"
                                         >
                                             {govIdForm.processing ? (
                                                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>
@@ -503,7 +562,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                     {currentStep === 3 && (
                         <Card className="animate-fade-in">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 text-[#2596be]">
                                     <Phone className="h-5 w-5" />
                                     Emergency Contact
                                 </CardTitle>
@@ -518,6 +577,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             value={emergencyForm.data.name}
                                             onChange={(e) => emergencyForm.setData('name', e.target.value)}
                                             placeholder="Jane Doe"
+                                            className="focus:ring-[#2596be] focus:border-[#2596be]"
                                             required
                                         />
                                     </div>
@@ -531,6 +591,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={emergencyForm.data.phone}
                                                 onChange={(e) => emergencyForm.setData('phone', e.target.value)}
                                                 placeholder="09XX XXX XXXX"
+                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
                                                 required
                                             />
                                         </div>
@@ -543,6 +604,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={emergencyForm.data.mobile}
                                                 onChange={(e) => emergencyForm.setData('mobile', e.target.value)}
                                                 placeholder="09XX XXX XXXX"
+                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
                                             />
                                         </div>
                                     </div>
@@ -553,7 +615,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             value={emergencyForm.data.relationship} 
                                             onValueChange={(value) => emergencyForm.setData('relationship', value)}
                                         >
-                                            <SelectTrigger>
+                                            <SelectTrigger className="focus:ring-[#2596be]">
                                                 <SelectValue placeholder="Select relationship..." />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -579,7 +641,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                         <Button 
                                             type="submit" 
                                             disabled={emergencyForm.processing}
-                                            className="bg-blue-600 hover:bg-blue-700"
+                                            className="bg-[#2596be] hover:bg-[#1e7a9f]"
                                         >
                                             {emergencyForm.processing ? (
                                                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>
@@ -593,17 +655,17 @@ export default function Form({ invite, submission, requiredDocuments }) {
                         </Card>
                     )}
 
-                    {/* Step 4: Upload Documents */}
+                    {/* Step 4: Upload Documents - FIXED MULTI-FILE UPLOAD */}
                     {currentStep === 4 && (
                         <div className="space-y-6 animate-fade-in">
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
+                                    <CardTitle className="flex items-center gap-2 text-[#2596be]">
                                         <Upload className="h-5 w-5" />
                                         Upload Required Documents
                                     </CardTitle>
                                     <CardDescription>
-                                        Upload your requirements (Resume, IDs, NBI & PNP Clearance, Medical Cert)
+                                        Upload your requirements one at a time
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
@@ -614,7 +676,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={documentForm.data.document_type} 
                                                 onValueChange={(value) => documentForm.setData('document_type', value)}
                                             >
-                                                <SelectTrigger>
+                                                <SelectTrigger className="focus:ring-[#2596be]">
                                                     <SelectValue placeholder="Select document type..." />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -633,14 +695,34 @@ export default function Form({ invite, submission, requiredDocuments }) {
 
                                         <div className="space-y-2">
                                             <Label>Upload File *</Label>
-                                            <Input
-                                                type="file"
-                                                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                                                onChange={(e) => documentForm.setData('file', e.target.files[0])}
-                                            />
-                                            <p className="text-xs text-gray-500">
-                                                Accepted: PDF, JPG, PNG, DOC, DOCX • Max 10MB
-                                            </p>
+                                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-[#2596be] transition-colors">
+                                                <Input
+                                                    type="file"
+                                                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files[0];
+                                                        if (file) {
+                                                            documentForm.setData('files', [file]);
+                                                        }
+                                                    }}
+                                                    className="hidden"
+                                                    id="file-upload"
+                                                />
+                                                <label htmlFor="file-upload" className="cursor-pointer">
+                                                    <Upload className="h-10 w-10 text-gray-400 mx-auto mb-2" />
+                                                    <p className="text-sm font-medium text-gray-700">
+                                                        Click to upload or drag and drop
+                                                    </p>
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                        PDF, JPG, PNG, DOC, DOCX • Max 10MB
+                                                    </p>
+                                                    {documentForm.data.files.length > 0 && (
+                                                        <p className="text-sm text-[#2596be] font-medium mt-2">
+                                                            ✓ {documentForm.data.files[0].name}
+                                                        </p>
+                                                    )}
+                                                </label>
+                                            </div>
                                         </div>
 
                                         <div className="space-y-2">
@@ -648,15 +730,16 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             <Textarea
                                                 value={documentForm.data.description}
                                                 onChange={(e) => documentForm.setData('description', e.target.value)}
-                                                placeholder="Additional notes..."
+                                                placeholder="Additional notes about this document..."
                                                 rows={2}
+                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
                                             />
                                         </div>
 
                                         <Button 
                                             type="submit" 
-                                            disabled={documentForm.processing || !documentForm.data.file}
-                                            className="w-full"
+                                            disabled={documentForm.processing || documentForm.data.files.length === 0}
+                                            className="w-full bg-[#2596be] hover:bg-[#1e7a9f]"
                                         >
                                             {documentForm.processing ? (
                                                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Uploading...</>
@@ -671,15 +754,22 @@ export default function Form({ invite, submission, requiredDocuments }) {
                             {/* Uploaded Documents */}
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Uploaded Documents ({submission?.documents?.length || 0})</CardTitle>
+                                    <CardTitle className="flex items-center justify-between">
+                                        <span>Uploaded Documents ({submission?.documents?.length || 0})</span>
+                                        <Badge className="bg-[#2596be] text-white">
+                                            {submission?.completion_percentage || 0}% Complete
+                                        </Badge>
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     {submission?.documents && submission.documents.length > 0 ? (
                                         <div className="space-y-3">
                                             {submission.documents.map((doc) => (
-                                                <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                                                <div key={doc.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border hover:border-[#2596be] transition-colors">
                                                     <div className="flex items-center gap-3 flex-1">
-                                                        <FileText className="h-5 w-5 text-blue-600" />
+                                                        <div className="p-2 bg-[#2596be] rounded-lg">
+                                                            <FileText className="h-5 w-5 text-white" />
+                                                        </div>
                                                         <div className="flex-1">
                                                             <p className="font-medium text-gray-900">{doc.document_type_label}</p>
                                                             <p className="text-sm text-gray-500">{doc.filename}</p>
@@ -689,14 +779,20 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                             doc.status === 'pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
                                                             'bg-red-100 text-red-700 border-red-200'
                                                         }`}>
-                                                            {doc.status}
+                                                            {doc.status === 'approved' ? (
+                                                                <><CheckCircle2 className="h-3 w-3 mr-1" /> Approved</>
+                                                            ) : doc.status === 'pending' ? (
+                                                                <><Clock className="h-3 w-3 mr-1" /> Pending</>
+                                                            ) : (
+                                                                <>Rejected</>
+                                                            )}
                                                         </Badge>
                                                     </div>
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
                                                         onClick={() => handleDeleteDocument(doc.id)}
-                                                        className="text-red-600 hover:bg-red-50"
+                                                        className="text-red-600 hover:bg-red-50 ml-2"
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>
@@ -704,17 +800,30 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             ))}
                                         </div>
                                     ) : (
-                                        <div className="text-center py-8 text-gray-500">
-                                            <FileText className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                                            <p>No documents uploaded yet</p>
+                                        <div className="text-center py-12 text-gray-500">
+                                            <Upload className="h-16 w-16 mx-auto mb-3 text-gray-300" />
+                                            <p className="text-lg font-medium">No documents uploaded yet</p>
+                                            <p className="text-sm mt-1">Upload your first document above</p>
                                         </div>
                                     )}
                                 </CardContent>
                             </Card>
 
-                            {/* Submit */}
-                            <Card>
+                            {/* Submit Final */}
+                            <Card className="border-2 border-[#2596be] bg-gradient-to-br from-blue-50 to-white">
                                 <CardContent className="pt-6">
+                                    <div className="text-center mb-6">
+                                        <div className="inline-flex items-center justify-center w-16 h-16 bg-[#2596be] rounded-full mb-4">
+                                            <Send className="h-8 w-8 text-white" />
+                                        </div>
+                                        <h3 className="text-xl font-bold text-gray-900 mb-2">
+                                            Ready to Submit?
+                                        </h3>
+                                        <p className="text-gray-600">
+                                            Review your information and submit to HR for approval
+                                        </p>
+                                    </div>
+                                    
                                     <div className="flex justify-between">
                                         <Button variant="outline" onClick={() => setCurrentStep(3)}>
                                             <ChevronLeft className="h-4 w-4 mr-2" />
@@ -730,24 +839,38 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                         </Button>
                                     </div>
                                     {submission?.completion_percentage < 100 && (
-                                        <p className="text-sm text-orange-600 text-center mt-3">
-                                            Complete all sections ({submission.completion_percentage}%)
-                                        </p>
+                                        <Alert className="mt-4 border-orange-300 bg-orange-50">
+                                            <Info className="h-4 w-4 text-orange-600" />
+                                            <AlertDescription className="text-orange-800">
+                                                Please complete all required sections ({submission.completion_percentage}% done)
+                                            </AlertDescription>
+                                        </Alert>
                                     )}
                                 </CardContent>
                             </Card>
                         </div>
                     )}
-
-                    {/* Footer */}
-                    <Alert className="border-blue-200 bg-blue-50">
-                        <Info className="h-4 w-4 text-blue-600" />
-                        <AlertDescription className="text-blue-800">
-                            <strong>Auto-saved.</strong> Valid until {new Date(invite.expires_at).toLocaleDateString()}.
-                        </AlertDescription>
-                    </Alert>
                 </div>
             </div>
+
+            <style jsx>{`
+                @keyframes fade-in {
+                    from {
+                        opacity: 0;
+                        transform: translateY(10px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+                .animate-fade-in {
+                    animation: fade-in 0.5s ease-out;
+                }
+                .animation-delay-100 {
+                    animation-delay: 0.1s;
+                }
+            `}</style>
         </>
     );
 }
