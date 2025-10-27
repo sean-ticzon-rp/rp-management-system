@@ -292,6 +292,97 @@ npm run format
 npm run lint
 ```
 
+### Code Generation (Laravel Make Commands)
+
+```bash
+# Controllers
+php artisan make:controller UserController
+php artisan make:controller Admin/ProductController --resource  # With CRUD methods
+php artisan make:controller Api/UserController --api            # API resource controller
+
+# Models
+php artisan make:model Product
+php artisan make:model Product -m          # With migration
+php artisan make:model Product -mfs        # With migration, factory, seeder
+php artisan make:model Product -a          # All (migration, factory, seeder, policy, controller)
+
+# Migrations
+php artisan make:migration create_products_table
+php artisan make:migration add_status_to_users_table
+php artisan make:migration create_products_table --create=products
+php artisan make:migration add_price_to_products --table=products
+
+# Seeders
+php artisan make:seeder ProductSeeder
+php artisan make:seeder UserSeeder
+
+# Factories
+php artisan make:factory ProductFactory
+
+# Middleware
+php artisan make:middleware CheckAdmin
+php artisan make:middleware EnsureUserIsActive
+
+# Requests (Form Validation)
+php artisan make:request StoreProductRequest
+php artisan make:request UpdateUserRequest
+
+# Resources (API Transformers)
+php artisan make:resource ProductResource
+php artisan make:resource ProductCollection
+
+# Policies (Authorization)
+php artisan make:policy ProductPolicy
+php artisan make:policy ProductPolicy --model=Product
+
+# Commands (Console Commands)
+php artisan make:command SendEmailReport
+php artisan make:command ProcessOrders
+
+# Events & Listeners
+php artisan make:event OrderShipped
+php artisan make:listener SendShipmentNotification
+
+# Jobs (Queue)
+php artisan make:job ProcessPodcast
+php artisan make:job SendWelcomeEmail
+
+# Notifications
+php artisan make:notification InvoicePaid
+php artisan make:notification OrderShipped
+
+# Service Providers
+php artisan make:provider PaymentServiceProvider
+
+# Tests
+php artisan make:test UserTest           # Feature test
+php artisan make:test UserTest --unit    # Unit test
+
+# View Components
+php artisan make:component Alert
+php artisan make:component Forms/Input
+```
+
+### Quick Scaffolding Examples
+
+```bash
+# Complete CRUD for a resource (Model + Migration + Controller + Factory + Seeder + Policy)
+php artisan make:model Product -a
+
+# API Resource with everything
+php artisan make:model Product -a --api
+
+# Model with migration and seeder only
+php artisan make:model Category -ms
+
+# Controller with all CRUD methods
+php artisan make:controller ProductController --resource
+
+# Create Request classes for validation
+php artisan make:request StoreProductRequest
+php artisan make:request UpdateProductRequest
+```
+
 ---
 
 ## Troubleshooting
