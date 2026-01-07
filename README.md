@@ -3,10 +3,10 @@
 ## Local Development URLs
 
 **Using Laravel Herd or Valet:**
-- http://rp-management-system.test/
+- http://rp-management-system.test/login
 
 **Using `php artisan serve`:**
-- http://127.0.0.1:8000
+- http://127.0.0.1:8000/login
 
 ## Prerequisites
 * PHP 8.2+
