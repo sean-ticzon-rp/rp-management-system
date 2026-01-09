@@ -18,45 +18,28 @@ class OnboardingDocumentService
         string $documentType,
         ?string $description = null
     ) {
-        \Log::info('Service: Starting upload', [
+        // Store file
+        $path = $file->store('onboarding-documents', 'private');
+
+        // Create document record
+        $document = OnboardingDocument::create([
+            'submission_id' => $submission->id,
             'document_type' => $documentType,
             'filename' => $file->getClientOriginalName(),
+            'path' => $path,
+            'mime_type' => $file->getClientMimeType(),
+            'size' => $file->getSize(),
+            'description' => $description,
+            'status' => 'pending',
         ]);
 
-        try {
-            // Store file
-            $path = $file->store('onboarding-documents', 'private');
+        // Update submission completion
+        $submission->calculateCompletion();
 
-            // Create document record
-            $document = OnboardingDocument::create([
-                'submission_id' => $submission->id,
-                'document_type' => $documentType,
-                'filename' => $file->getClientOriginalName(),
-                'path' => $path,
-                'mime_type' => $file->getClientMimeType(),
-                'size' => $file->getSize(),
-                'description' => $description,
-                'status' => 'approved',
-            ]);
-            \Log::info('Service: Document created', ['document_id' => $document->id]);
+        // Mark invite as in progress
+        $submission->invite->markAsInProgress();
 
-            // Update submission completion
-            $submission->calculateCompletion();
-            \Log::info('Service: Completion calculated');
-
-            // Mark invite as in progress
-            $submission->invite->markAsInProgress();
-            \Log::info('Service: Upload complete');
-
-            return $document;
-
-        } catch (\Exception $e) {
-            \Log::error('Service: Upload failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            throw $e;
-        }
+        return $document;
     }
 
     /**
