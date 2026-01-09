@@ -18,28 +18,46 @@ class OnboardingDocumentService
         string $documentType,
         ?string $description = null
     ) {
-        // Store file
-        $path = $file->store('onboarding-documents', 'private');
-        
-        // Create document record
-        $document = OnboardingDocument::create([
-            'submission_id' => $submission->id,
+        \Log::info('Service: Starting upload', [
             'document_type' => $documentType,
             'filename' => $file->getClientOriginalName(),
-            'path' => $path,
-            'mime_type' => $file->getClientMimeType(),
-            'size' => $file->getSize(),
-            'description' => $description,
-            'status' => 'pending',
         ]);
-        
-        // Update submission completion
-        $submission->calculateCompletion();
-        
-        // Mark invite as in progress
-        $submission->invite->markAsInProgress();
-        
-        return $document;
+
+        try {
+            // Store file
+            $path = $file->store('onboarding-documents', 'private');
+            \Log::info('Service: File stored', ['path' => $path]);
+
+            // Create document record
+            $document = OnboardingDocument::create([
+                'submission_id' => $submission->id,
+                'document_type' => $documentType,
+                'filename' => $file->getClientOriginalName(),
+                'path' => $path,
+                'mime_type' => $file->getClientMimeType(),
+                'size' => $file->getSize(),
+                'description' => $description,
+                'status' => 'approved',
+            ]);
+            \Log::info('Service: Document created', ['document_id' => $document->id]);
+
+            // Update submission completion
+            $submission->calculateCompletion();
+            \Log::info('Service: Completion calculated');
+
+            // Mark invite as in progress
+            $submission->invite->markAsInProgress();
+            \Log::info('Service: Upload complete');
+
+            return $document;
+
+        } catch (\Exception $e) {
+            \Log::error('Service: Upload failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
+        }
     }
 
     /**
@@ -51,10 +69,10 @@ class OnboardingDocumentService
     ) {
         // Delete old file
         $document->deleteFile();
-        
+
         // Store new file
         $path = $newFile->store('onboarding-documents', 'private');
-        
+
         // Update document record
         $document->update([
             'filename' => $newFile->getClientOriginalName(),
@@ -66,7 +84,7 @@ class OnboardingDocumentService
             'verified_at' => null,
             'verified_by' => null,
         ]);
-        
+
         return $document;
     }
 
@@ -77,16 +95,16 @@ class OnboardingDocumentService
     {
         // Delete file from storage
         $document->deleteFile();
-        
+
         // Get submission before deleting
         $submission = $document->submission;
-        
+
         // Delete record
         $document->delete();
-        
+
         // Recalculate completion
         $submission->calculateCompletion();
-        
+
         return true;
     }
 
@@ -96,7 +114,7 @@ class OnboardingDocumentService
     public function approveDocument(OnboardingDocument $document)
     {
         $document->approve();
-        
+
         return $document;
     }
 
@@ -106,9 +124,9 @@ class OnboardingDocumentService
     public function rejectDocument(OnboardingDocument $document, string $reason)
     {
         $document->reject($reason);
-        
+
         // TODO: Send notification to candidate
-        
+
         return $document;
     }
 
@@ -118,11 +136,11 @@ class OnboardingDocumentService
     public function bulkApproveDocuments(array $documentIds)
     {
         $documents = OnboardingDocument::whereIn('id', $documentIds)->get();
-        
+
         foreach ($documents as $document) {
             $document->approve();
         }
-        
+
         return $documents->count();
     }
 
