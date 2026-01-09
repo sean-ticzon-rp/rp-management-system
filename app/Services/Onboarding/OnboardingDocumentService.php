@@ -26,7 +26,6 @@ class OnboardingDocumentService
         try {
             // Store file
             $path = $file->store('onboarding-documents', 'private');
-            \Log::info('Service: File stored', ['path' => $path]);
 
             // Create document record
             $document = OnboardingDocument::create([

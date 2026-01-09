@@ -38,14 +38,12 @@ class GuestOnboardingController extends Controller
             ]);
         }
 
-        // Check if already approved
         if ($invite->status === 'approved') {
             return Inertia::render('Guest/Onboarding/Completed', [
                 'invite' => $invite,
             ]);
         }
 
-        // ✅ Load submission with documents and add document_type_label
         $submission = $invite->submission;
         if ($submission && $submission->documents) {
             $submission->documents->each(function($doc) {

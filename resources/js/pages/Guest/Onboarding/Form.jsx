@@ -843,17 +843,6 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                             type="button"
                                                             onClick={(e) => {
                                                                 e.preventDefault();
-                                                                if (!documentForm.data.file) {
-                                                                    console.log('No file selected');
-                                                                    return;
-                                                                }
-
-                                                                console.log('Uploading:', {
-                                                                    type: documentForm.data.document_type,
-                                                                    filename: documentForm.data.file.name,
-                                                                    size: documentForm.data.file.size
-                                                                });
-
                                                                 const formData = new FormData();
                                                                 formData.append('document_type', documentForm.data.document_type);
                                                                 formData.append('file', documentForm.data.file);
@@ -864,7 +853,6 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                                     data: formData,
                                                                     forceFormData: true, // ← Add this
                                                                     onSuccess: (response) => {
-                                                                        console.log('Upload successful:', response);
                                                                         // Clear only file and description, keep document_type
                                                                         documentForm.setData('file', null);
                                                                         documentForm.setData('description', '');
