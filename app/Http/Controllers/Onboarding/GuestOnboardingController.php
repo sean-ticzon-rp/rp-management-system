@@ -71,6 +71,12 @@ class GuestOnboardingController extends Controller
             return redirect()->route('guest.onboarding.show', $token);
         }
 
+        if ($invite->submission && $invite->submission->documents) {
+            $invite->submission->documents->each(function($doc) {
+                $doc->document_type_label = $doc->getDocumentTypeLabelAttribute();
+            });
+        }
+
         $checklist = $this->submissionService->getRequirementsChecklist($invite->submission);
 
         return Inertia::render('Guest/Onboarding/Checklist', [
