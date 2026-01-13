@@ -1,11 +1,11 @@
 // resources/js/Pages/Tasks/Index.jsx
 import { useState } from 'react';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import AuthenticatedLayout from '@/layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
-import { Button } from '@/Components/ui/button';
-import { Input } from '@/Components/ui/input';
-import { Card, CardContent } from '@/Components/ui/card';
-import { Badge } from '@/Components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
     Table,
     TableBody,
@@ -13,15 +13,15 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from '@/Components/ui/table';
+} from '@/components/ui/table';
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from '@/Components/ui/select';
-import DeleteConfirmationModal from '@/Components/DeleteConfirmationModal';
+} from '@/components/ui/select';
+import DeleteConfirmationModal from '@/components/DeleteConfirmationModal';
 import {
     ClipboardList,
     Plus,

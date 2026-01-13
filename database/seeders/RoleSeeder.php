@@ -10,16 +10,6 @@ class RoleSeeder extends Seeder
 {
     public function run(): void
     {
-        // Disable foreign key checks
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-        
-        // Clear existing roles
-        DB::table('role_user')->truncate();
-        Role::truncate();
-        
-        // Re-enable foreign key checks
-        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
-
         $roles = [
             // ============================================
             // ADMINISTRATIVE ROLES
@@ -85,9 +75,12 @@ class RoleSeeder extends Seeder
         ];
 
         foreach ($roles as $role) {
-            Role::create($role);
+            Role::updateOrCreate(
+                ['slug' => $role['slug']],
+                $role
+            );
         }
 
-        $this->command->info('✅ Created ' . count($roles) . ' roles!');
+        $this->command->info('✅ Created/Updated ' . count($roles) . ' roles!');
     }
 }

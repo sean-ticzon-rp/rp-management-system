@@ -1,13 +1,13 @@
 // resources/js/Pages/Admin/Leaves/Show.jsx
 import { useState } from 'react';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import AuthenticatedLayout from '@/layouts/AuthenticatedLayout';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { Button } from '@/Components/ui/button';
-import { Textarea } from '@/Components/ui/textarea';
-import { Label } from '@/Components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/Components/ui/card';
-import { Badge } from '@/Components/ui/badge';
-import { Alert, AlertDescription } from '@/Components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
     Calendar,
     ArrowLeft,

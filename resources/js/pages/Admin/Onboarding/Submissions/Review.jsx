@@ -1,13 +1,13 @@
 // resources/js/Pages/Admin/Onboarding/Submissions/Review.jsx
 import { useState } from 'react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Button } from '@/Components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/Components/ui/card';
-import { Badge } from '@/Components/ui/badge';
-import { Progress } from '@/Components/ui/progress';
-import { Textarea } from '@/Components/ui/textarea';
-import { Label } from '@/Components/ui/label';
+import AuthenticatedLayout from '@/layouts/AuthenticatedLayout';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -17,7 +17,7 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from '@/Components/ui/alert-dialog';
+} from '@/components/ui/alert-dialog';
 import {
     FileCheck,
     ArrowLeft,

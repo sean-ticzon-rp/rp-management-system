@@ -10,12 +10,12 @@ const appName = import.meta.env.VITE_APP_NAME || 'Your Company';
 createInertiaApp({
     title: (title) => title ? `${title}` : appName,
     resolve: (name) => {
-        const pages = import.meta.glob('./Pages/**/*.jsx', { eager: true });
-        const page = pages[`./Pages/${name}.jsx`];
+        const pages = import.meta.glob('./pages/**/*.{jsx,tsx}', { eager: true });
+        const page = pages[`./pages/${name}.jsx`] || pages[`./pages/${name}.tsx`];
         
         if (!page) {
             console.error('Available pages:', Object.keys(pages));
-            throw new Error(`Page not found: ./Pages/${name}.jsx`);
+            throw new Error(`Page not found: ./pages/${name}.jsx or ./pages/${name}.tsx`);
         }
         
         return page;

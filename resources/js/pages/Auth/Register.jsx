@@ -1,13 +1,13 @@
 // resources/js/Pages/Auth/Register.jsx
 import { useState, useEffect } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { Button } from '@/Components/ui/button';
-import { Input } from '@/Components/ui/input';
-import { Label } from '@/Components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
-import { Alert, AlertDescription } from '@/Components/ui/alert';
-import { Progress } from '@/Components/ui/progress';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { User, Mail, Lock, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, Shield } from 'lucide-react';
 
 const ALLOWED_EMAIL_DOMAINS = ['@rocketpartners.ph', '@rocketpartners.io'];

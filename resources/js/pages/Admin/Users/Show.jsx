@@ -1,12 +1,12 @@
 // resources/js/Pages/Users/Show.jsx
 import { useState } from 'react';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import AuthenticatedLayout from '@/layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
-import { Button } from '@/Components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
-import { Badge } from '@/Components/ui/badge';
-import { Alert, AlertDescription } from '@/Components/ui/alert';
-import DeleteConfirmationModal from '@/Components/DeleteConfirmationModal';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import DeleteConfirmationModal from '@/components/DeleteConfirmationModal';
 import {
     User as UserIcon,
     ArrowLeft,

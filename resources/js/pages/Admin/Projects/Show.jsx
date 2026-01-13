@@ -1,12 +1,12 @@
 // resources/js/Pages/Projects/Show.jsx
 import { useState } from 'react';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import AuthenticatedLayout from '@/layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
-import { Button } from '@/Components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
-import { Badge } from '@/Components/ui/badge';
-import { Progress } from '@/Components/ui/progress';
-import DeleteConfirmationModal from '@/Components/DeleteConfirmationModal';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import DeleteConfirmationModal from '@/components/DeleteConfirmationModal';
 import {
     FolderKanban,
     ArrowLeft,

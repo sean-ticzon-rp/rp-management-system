@@ -1,8 +1,8 @@
 // resources/js/Pages/Auth/VerifyEmail.jsx
 import { Head, Link, useForm } from '@inertiajs/react';
-import { Button } from '@/Components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
-import { Alert, AlertDescription } from '@/Components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Mail, Send, LogOut, CheckCircle2, Inbox } from 'lucide-react';
 
 export default function VerifyEmail({ status }) {

@@ -1,7 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
-import { Button } from '@/Components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
-import { Alert, AlertDescription } from '@/Components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Clock, Mail, CheckCircle2, LogOut } from 'lucide-react';
 
 export default function PendingApproval({ auth }) {

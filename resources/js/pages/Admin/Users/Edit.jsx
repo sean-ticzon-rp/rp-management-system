@@ -1,16 +1,16 @@
 // resources/js/Pages/Users/Edit.jsx
 import { useState } from 'react';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import AuthenticatedLayout from '@/layouts/AuthenticatedLayout';
 import { Head, Link, useForm, router } from '@inertiajs/react';
-import { Button } from '@/Components/ui/button';
-import { Input } from '@/Components/ui/input';
-import { Label } from '@/Components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
-import { Checkbox } from '@/Components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
-import { Badge } from '@/Components/ui/badge';
-import ProfilePictureUpload from '@/Components/ProfilePictureUpload';
-import { SSSInput, TINInput, PhilHealthInput, HDMFInput, PayrollAccountInput } from '@/Components/FormattedInput';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import ProfilePictureUpload from '@/components/ProfilePictureUpload';
+import { SSSInput, TINInput, PhilHealthInput, HDMFInput, PayrollAccountInput } from '@/components/FormattedInput';
 import {
     Users as UsersIcon,
     ArrowLeft,

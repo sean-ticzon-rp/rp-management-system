@@ -1,8 +1,8 @@
 // resources/js/Layouts/AuthenticatedLayout.jsx
 import { useState } from 'react';
 import { Link, usePage } from '@inertiajs/react';
-import { Button } from '@/Components/ui/button';
-import { Badge } from '@/Components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { 
     LayoutDashboard, 
     Users, 
@@ -34,7 +34,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from '@/Components/ui/dropdown-menu';
+} from '@/components/ui/dropdown-menu';
 
 export default function AuthenticatedLayout({ header, children }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);

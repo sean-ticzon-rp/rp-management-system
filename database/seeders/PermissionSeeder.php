@@ -131,10 +131,13 @@ class PermissionSeeder extends Seeder
         ];
 
         foreach ($permissions as $permission) {
-            Permission::create($permission);
+            Permission::updateOrCreate(
+                ['slug' => $permission['slug']],
+                $permission
+            );
         }
 
-        $this->command->info('✅ Created ' . count($permissions) . ' permissions!');
+        $this->command->info('✅ Created/Updated ' . count($permissions) . ' permissions!');
 
         // ============================================
         // ASSIGN PERMISSIONS TO ROLES
@@ -149,14 +152,14 @@ class PermissionSeeder extends Seeder
         // Super Admin - ALL permissions
         $superAdmin = Role::where('slug', 'super-admin')->first();
         if ($superAdmin) {
-            $superAdmin->permissions()->attach(Permission::all()->pluck('id'));
+            $superAdmin->permissions()->sync(Permission::all()->pluck('id'));
             $this->command->info('   ✅ Super Admin → All permissions');
         }
 
         // Admin - Most permissions
         $admin = Role::where('slug', 'admin')->first();
         if ($admin) {
-            $admin->permissions()->attach(
+            $admin->permissions()->sync(
                 Permission::whereIn('slug', [
                     'approve-users', 'manage-users', 'view-all-users',
                     'approve-leaves', 'view-all-leaves',
@@ -170,7 +173,7 @@ class PermissionSeeder extends Seeder
         // HR Manager
         $hrManager = Role::where('slug', 'hr-manager')->first();
         if ($hrManager) {
-            $hrManager->permissions()->attach(
+            $hrManager->permissions()->sync(
                 Permission::whereIn('slug', [
                     'approve-users', 'manage-users', 'view-all-users',
                     'approve-leaves', 'approve-leave-appeals', 'manage-leave-types', 'view-all-leaves',
@@ -183,7 +186,7 @@ class PermissionSeeder extends Seeder
         // Project Manager
         $projectManager = Role::where('slug', 'project-manager')->first();
         if ($projectManager) {
-            $projectManager->permissions()->attach(
+            $projectManager->permissions()->sync(
                 Permission::whereIn('slug', [
                     'approve-users',
                     'approve-leaves',
@@ -196,7 +199,7 @@ class PermissionSeeder extends Seeder
         // Lead Engineer
         $leadEngineer = Role::where('slug', 'lead-engineer')->first();
         if ($leadEngineer) {
-            $leadEngineer->permissions()->attach(
+            $leadEngineer->permissions()->sync(
                 Permission::whereIn('slug', [
                     'approve-users',
                     'approve-leaves',
@@ -209,7 +212,7 @@ class PermissionSeeder extends Seeder
         // Senior Engineer
         $seniorEngineer = Role::where('slug', 'senior-engineer')->first();
         if ($seniorEngineer) {
-            $seniorEngineer->permissions()->attach(
+            $seniorEngineer->permissions()->sync(
                 Permission::whereIn('slug', [
                     'approve-users',
                     'approve-leaves',

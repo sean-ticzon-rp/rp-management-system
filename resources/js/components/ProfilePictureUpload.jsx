@@ -1,6 +1,6 @@
 // resources/js/Components/ProfilePictureUpload.jsx
 import { useState } from 'react';
-import { Button } from '@/Components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Camera, Upload, X, User } from 'lucide-react';
 
 export default function ProfilePictureUpload({ currentImage, onImageChange, onImageRemove }) {

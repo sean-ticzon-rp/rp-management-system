@@ -24,19 +24,22 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // ✅ Create Super Admin User
-        $admin = User::factory()->create([
-            'name' => 'Admin User',
-            'email' => 'admin@example.com',
-            'password' => bcrypt('password'),
-            'account_status' => 'active',
-        ]);
+        $admin = User::firstOrCreate(
+            ['email' => 'admin@example.com'],
+            [
+                'name' => 'Admin User',
+                'password' => bcrypt('password'),
+                'account_status' => 'active',
+                'email_verified_at' => now(),
+            ]
+        );
 
         // ✅ Assign Super Admin role
         $superAdminRole = Role::where('slug', 'super-admin')->first();
-        if ($superAdminRole) {
+        if ($superAdminRole && !$admin->roles()->where('slug', 'super-admin')->exists()) {
             $admin->roles()->attach($superAdminRole->id);
-            $this->command->info('✅ Admin user created with super-admin role!');
         }
+        $this->command->info('✅ Admin user created with super-admin role!');
 
         // ✅ Run remaining seeders
         $this->call([
