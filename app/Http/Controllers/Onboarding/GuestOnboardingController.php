@@ -38,14 +38,12 @@ class GuestOnboardingController extends Controller
             ]);
         }
 
-        // Check if already approved
         if ($invite->status === 'approved') {
             return Inertia::render('Guest/Onboarding/Completed', [
                 'invite' => $invite,
             ]);
         }
 
-        // ✅ Load submission with documents and add document_type_label
         $submission = $invite->submission;
         if ($submission && $submission->documents) {
             $submission->documents->each(function($doc) {
@@ -71,6 +69,12 @@ class GuestOnboardingController extends Controller
 
         if (!$invite->isValid()) {
             return redirect()->route('guest.onboarding.show', $token);
+        }
+
+        if ($invite->submission && $invite->submission->documents) {
+            $invite->submission->documents->each(function($doc) {
+                $doc->document_type_label = $doc->getDocumentTypeLabelAttribute();
+            });
         }
 
         $checklist = $this->submissionService->getRequirementsChecklist($invite->submission);
@@ -175,8 +179,8 @@ class GuestOnboardingController extends Controller
         }
 
         $validated = $request->validate([
-            'document_type' => 'required|string|in:resume,government_id,sss_id,tin_id,philhealth_id,hdmf_pagibig_id,birth_certificate,nbi_clearance,pnp_clearance,police_clearance,medical_certificate,diploma,transcript,previous_employment_coe,other',
-            'file' => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:10240', // 10MB
+            'document_type' => 'required|string|in:resume,government_id,sss_id,tin_id,philhealth_id,hdmf_pagibig_id,birth_certificate,nbi_clearance,pnp_clearance,medical_certificate,diploma,transcript,previous_employment_coe,other',
+            'file' => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:51200', // 50MB
             'description' => 'nullable|string|max:500',
         ]);
 
@@ -189,7 +193,7 @@ class GuestOnboardingController extends Controller
             );
 
             return back()->with('success', 'Document uploaded successfully!');
-            
+
         } catch (\Exception $e) {
             return back()->with('error', 'Upload failed: ' . $e->getMessage());
         }
@@ -210,9 +214,9 @@ class GuestOnboardingController extends Controller
 
         try {
             $this->documentService->deleteDocument($document);
-            
+
             return back()->with('success', 'Document deleted successfully!');
-            
+
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -231,10 +235,10 @@ class GuestOnboardingController extends Controller
 
         try {
             $this->submissionService->submitOnboarding($invite->submission);
-            
+
             return redirect()->route('guest.onboarding.checklist', $token)
                 ->with('success', 'Onboarding submitted successfully! HR will review your submission.');
-                
+
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }

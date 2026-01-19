@@ -68,7 +68,7 @@ export default function Checklist({ invite, submission, checklist }) {
                                 Submission Complete! 🎉
                             </h1>
                             <p className="text-lg text-gray-600">
-                                Thank you, {invite.full_name}!
+                                Thank you, {invite.first_name}!
                             </p>
                         </div>
                     </div>
@@ -103,13 +103,17 @@ export default function Checklist({ invite, submission, checklist }) {
 
                             {/* Checklist Items */}
                             <div className="space-y-4">
-                                {checklist && Object.entries(checklist).map(([section, data]) => (
+                                {checklist && Object.entries(checklist).map(([section, data], index) => (
                                     <div
                                         key={section}
                                         className="p-4 bg-gray-50 rounded-lg border"
                                     >
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-3 flex-1">
+                                                {/* Add number badge */}
+                                                <div className="flex-shrink-0 w-8 h-8 bg-[#2596be] text-white rounded-full flex items-center justify-center font-bold text-sm">
+                                                    {index + 1}
+                                                </div>
                                                 <div className={`p-2 rounded-lg ${
                                                     data.status === 'complete' ? 'bg-green-100' :
                                                         data.status === 'pending' ? 'bg-yellow-100' :
@@ -224,10 +228,13 @@ export default function Checklist({ invite, submission, checklist }) {
                                 </div>
                             </div>
 
-                            <Alert className="mt-4">
+                            <Alert className="mt-4 flex items-center justify-center space-x-2">
                                 <UserCheck className="h-4 w-4" />
-                                <AlertDescription>
-                                    If you have any questions, please contact HR at <strong>hr@rocketpartners.com</strong>
+                                <AlertDescription className="text-center">
+                                    If you have any questions, please contact HR at&nbsp;
+                                    <a href="mailto:hr@rocketpartners.com" className="font-semibold whitespace-nowrap">
+                                        hr@rocketpartners.com
+                                    </a>
                                 </AlertDescription>
                             </Alert>
                         </CardContent>

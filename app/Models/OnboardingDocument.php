@@ -91,7 +91,7 @@ class OnboardingDocument extends Model
     public function getFileSizeAttribute()
     {
         $bytes = $this->size;
-        
+
         if ($bytes >= 1073741824) {
             return number_format($bytes / 1073741824, 2) . ' GB';
         } elseif ($bytes >= 1048576) {
@@ -118,7 +118,6 @@ class OnboardingDocument extends Model
             'birth_certificate' => 'Birth Certificate',
             'nbi_clearance' => 'NBI Clearance',
             'pnp_clearance' => 'PNP Clearance',
-            'police_clearance' => 'Police Clearance',
             'medical_certificate' => 'Medical Certificate',
             'diploma' => 'Diploma',
             'transcript' => 'Transcript of Records',
