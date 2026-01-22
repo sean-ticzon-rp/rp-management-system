@@ -28,15 +28,26 @@ import {
     Rocket,
     Clock,
 } from 'lucide-react';
+import { StatusBadge } from '@/components/onboarding/shared/StatusBadge';
+import {
+    SUFFIX_OPTIONS,
+    GENDER_OPTIONS,
+    CIVIL_STATUS_OPTIONS,
+    RELATIONSHIP_OPTIONS,
+    DEFAULT_COUNTRY,
+} from '@/lib/constants/onboarding/selectOptions';
+import { BRAND_COLORS, BRAND_CLASSES } from '@/lib/constants/theme';
+import { GUEST_ONBOARDING_ROUTES } from '@/lib/constants/onboarding/routes';
+import {
+    countUploadedRequiredTypes,
+    countRequiredDocumentTypes,
+    getDocumentsByType,
+    hasDocumentType,
+} from '@/lib/utils/documentHelpers';
 
 export default function Form({ invite, submission, requiredDocuments }) {
     const [currentStep, setCurrentStep] = useState(1);
     const [selectedDocType, setSelectedDocType] = useState('');
-
-    const getUploadedDocument = (docType) => {
-        return submission?.documents?.find(doc => doc.document_type === docType);
-    };
-
     const totalSteps = 4;
 
     // Personal Info Form
@@ -55,7 +66,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
         city: submission?.personal_info?.city || '',
         state: submission?.personal_info?.state || '',
         postal_code: submission?.personal_info?.postal_code || '',
-        country: submission?.personal_info?.country || 'Philippines',
+        country: submission?.personal_info?.country || DEFAULT_COUNTRY,
     });
 
     // Government IDs Form
@@ -88,21 +99,21 @@ export default function Form({ invite, submission, requiredDocuments }) {
     ];
 
     const handleSavePersonalInfo = () => {
-        personalForm.post(route('guest.onboarding.update-personal-info', invite.token), {
+        personalForm.post(route(GUEST_ONBOARDING_ROUTES.UPDATE_PERSONAL_INFO, invite.token), {
             preserveScroll: true,
             onSuccess: () => setCurrentStep(2),
         });
     };
 
     const handleSaveGovIds = () => {
-        govIdForm.post(route('guest.onboarding.update-government-ids', invite.token), {
+        govIdForm.post(route(GUEST_ONBOARDING_ROUTES.UPDATE_GOVERNMENT_IDS, invite.token), {
             preserveScroll: true,
             onSuccess: () => setCurrentStep(3),
         });
     };
 
     const handleSaveEmergency = () => {
-        emergencyForm.post(route('guest.onboarding.update-emergency-contact', invite.token), {
+        emergencyForm.post(route(GUEST_ONBOARDING_ROUTES.UPDATE_EMERGENCY_CONTACT, invite.token), {
             preserveScroll: true,
             onSuccess: () => setCurrentStep(4),
         });
@@ -110,36 +121,18 @@ export default function Form({ invite, submission, requiredDocuments }) {
 
     const handleDeleteDocument = (documentId) => {
         if (confirm('Are you sure you want to delete this document?')) {
-            router.delete(route('guest.onboarding.delete-document', [invite.token, documentId]), {
+            router.delete(route(GUEST_ONBOARDING_ROUTES.DELETE_DOCUMENT, [invite.token, documentId]), {
                 preserveScroll: true,
             });
         }
     };
 
     const handleFinalSubmit = () => {
-        router.post(route('guest.onboarding.submit', invite.token), {}, {
+        router.post(route(GUEST_ONBOARDING_ROUTES.SUBMIT, invite.token), {}, {
             onSuccess: () => {
                 // Will redirect to checklist page
             },
         });
-    };
-
-    const getDocumentsForType = (docType) => {
-        return submission?.documents?.filter(doc => doc.document_type === docType) || [];
-    };
-
-    const hasUpload = (docType) => {
-        return getDocumentsForType(docType).length > 0;
-    };
-
-    const getRequiredDocsCount = () => {
-        return Object.values(requiredDocuments || {}).filter(doc => doc.required).length;
-    };
-
-    const getUploadedRequiredCount = () => {
-        return Object.keys(requiredDocuments || {})
-            .filter(key => requiredDocuments[key].required && hasUpload(key))
-            .length;
     };
 
     return (
@@ -163,7 +156,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
 
                             {/* Title */}
                             <div className="flex items-center gap-3 mb-2">
-                                <div className="p-3 bg-[#2596be] rounded-xl shadow-lg">
+                                <div className={`p-3 ${BRAND_CLASSES.bgPrimary} rounded-xl shadow-lg`}>
                                     <Rocket className="h-8 w-8 text-white" />
                                 </div>
                                 <h1 className="text-4xl font-bold text-gray-900">
@@ -179,7 +172,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                         {/* Position Badge */}
                         {invite.position && (
                             <div className="flex items-center justify-center gap-2 mt-4">
-                                <Badge className="bg-[#2596be] text-white border-[#2596be] px-4 py-1.5 text-base">
+                                <Badge className={`${BRAND_CLASSES.badgePrimary} px-4 py-1.5 text-base`}>
                                     <Briefcase className="h-4 w-4 mr-2" />
                                     {invite.position}
                                 </Badge>
@@ -220,7 +213,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             <div className="flex flex-col items-center flex-1">
                                                 <div className={`flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all ${
                                                     isCompleted ? 'bg-green-600 border-green-600' :
-                                                        isActive ? 'bg-[#2596be] border-[#2596be]' :
+                                                        isActive ? `${BRAND_CLASSES.bgPrimary} ${BRAND_CLASSES.borderPrimary}` :
                                                             'bg-gray-100 border-gray-300'
                                                 }`}>
                                                     {isCompleted ? (
@@ -230,7 +223,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                     )}
                                                 </div>
                                                 <p className={`text-sm mt-2 font-medium ${
-                                                    isActive ? 'text-[#2596be]' :
+                                                    isActive ? `${BRAND_CLASSES.textPrimary}` :
                                                         isCompleted ? 'text-green-600' :
                                                             'text-gray-500'
                                                 }`}>
@@ -254,7 +247,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                     {currentStep === 1 && (
                         <Card className="animate-fade-in">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-[#2596be]">
+                                <CardTitle className={`flex items-center gap-2 ${BRAND_CLASSES.textPrimary}`}>
                                     <UserPlus className="h-5 w-5" />
                                     Personal Information
                                 </CardTitle>
@@ -269,7 +262,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.first_name}
                                                 onChange={(e) => personalForm.setData('first_name', e.target.value)}
                                                 placeholder="John"
-                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                                className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                                 required
                                             />
                                         </div>
@@ -279,7 +272,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.middle_name}
                                                 onChange={(e) => personalForm.setData('middle_name', e.target.value)}
                                                 placeholder="Michael"
-                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                                className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -288,7 +281,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.last_name}
                                                 onChange={(e) => personalForm.setData('last_name', e.target.value)}
                                                 placeholder="Doe"
-                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                                className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                                 required
                                             />
                                         </div>
@@ -305,12 +298,11 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="none">None</SelectItem>
-                                                    <SelectItem value="Jr.">Jr.</SelectItem>
-                                                    <SelectItem value="Sr.">Sr.</SelectItem>
-                                                    <SelectItem value="II">II</SelectItem>
-                                                    <SelectItem value="III">III</SelectItem>
-                                                    <SelectItem value="IV">IV</SelectItem>
+                                                    {SUFFIX_OPTIONS.map(option => (
+                                                        <SelectItem key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -322,7 +314,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.birthday}
                                                 onChange={(e) => personalForm.setData('birthday', e.target.value)}
                                                 max={new Date().toISOString().split('T')[0]}
-                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                                className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                                 required
                                             />
                                         </div>
@@ -337,10 +329,11 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                     <SelectValue placeholder="Select..." />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="male">Male</SelectItem>
-                                                    <SelectItem value="female">Female</SelectItem>
-                                                    <SelectItem value="other">Other</SelectItem>
-                                                    <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                                                    {GENDER_OPTIONS.map(option => (
+                                                        <SelectItem key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -356,11 +349,11 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 <SelectValue placeholder="Select..." />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="single">Single</SelectItem>
-                                                <SelectItem value="married">Married</SelectItem>
-                                                <SelectItem value="widowed">Widowed</SelectItem>
-                                                <SelectItem value="divorced">Divorced</SelectItem>
-                                                <SelectItem value="separated">Separated</SelectItem>
+                                                {CIVIL_STATUS_OPTIONS.map(option => (
+                                                    <SelectItem key={option.value} value={option.value}>
+                                                        {option.label}
+                                                    </SelectItem>
+                                                ))}
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -373,7 +366,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.phone_number}
                                                 onChange={(e) => personalForm.setData('phone_number', e.target.value)}
                                                 placeholder="09XX XXX XXXX"
-                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                                className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                                 required
                                             />
                                         </div>
@@ -384,7 +377,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.mobile_number}
                                                 onChange={(e) => personalForm.setData('mobile_number', e.target.value)}
                                                 placeholder="09XX XXX XXXX"
-                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                                className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                             />
                                         </div>
                                     </div>
@@ -395,7 +388,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             value={personalForm.data.address_line_1}
                                             onChange={(e) => personalForm.setData('address_line_1', e.target.value)}
                                             placeholder="House/Unit No., Street Name"
-                                            className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                            className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                             required
                                         />
                                     </div>
@@ -406,7 +399,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             value={personalForm.data.address_line_2}
                                             onChange={(e) => personalForm.setData('address_line_2', e.target.value)}
                                             placeholder="Barangay, Subdivision"
-                                            className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                            className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                         />
                                     </div>
 
@@ -417,7 +410,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.city}
                                                 onChange={(e) => personalForm.setData('city', e.target.value)}
                                                 placeholder="Quezon City"
-                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                                className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                                 required
                                             />
                                         </div>
@@ -427,7 +420,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.state}
                                                 onChange={(e) => personalForm.setData('state', e.target.value)}
                                                 placeholder="Metro Manila"
-                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                                className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -436,7 +429,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={personalForm.data.postal_code}
                                                 onChange={(e) => personalForm.setData('postal_code', e.target.value)}
                                                 placeholder="1100"
-                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                                className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                             />
                                         </div>
                                     </div>
@@ -445,7 +438,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                         <Button
                                             type="submit"
                                             disabled={personalForm.processing}
-                                            className="bg-[#2596be] hover:bg-[#1e7a9f]"
+                                            className={BRAND_CLASSES.buttonPrimary}
                                         >
                                             {personalForm.processing ? (
                                                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>
@@ -463,7 +456,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                     {currentStep === 2 && (
                         <Card className="animate-fade-in">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-[#2596be]">
+                                <CardTitle className={`flex items-center gap-2 ${BRAND_CLASSES.textPrimary}`}>
                                     <CreditCard className="h-5 w-5" />
                                     Government IDs
                                 </CardTitle>
@@ -471,7 +464,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <form onSubmit={(e) => { e.preventDefault(); handleSaveGovIds(); }} className="space-y-4">
-                                    <Alert className="border-[#2596be] bg-blue-50">
+                                    <Alert className="${BRAND_CLASSES.borderPrimary} bg-blue-50">
                                         <Info className="h-4 w-4 text-[#2596be]" />
                                         <AlertDescription className="text-blue-800">
                                             <strong>Note:</strong> All fields are optional. You can provide these details later if you don't have them yet.
@@ -486,7 +479,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             onChange={(e) => govIdForm.setData('sss_number', e.target.value)}
                                             placeholder="XX-XXXXXXX-X"
                                             maxLength={15}
-                                            className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                            className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                         />
                                         <p className="text-xs text-gray-500">Format: XX-XXXXXXX-X (10 digits)</p>
                                     </div>
@@ -499,7 +492,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             onChange={(e) => govIdForm.setData('tin_number', e.target.value)}
                                             placeholder="XXX-XXX-XXX-XXX"
                                             maxLength={20}
-                                            className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                            className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                         />
                                         <p className="text-xs text-gray-500">Tax Identification Number</p>
                                     </div>
@@ -512,7 +505,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             onChange={(e) => govIdForm.setData('hdmf_number', e.target.value)}
                                             placeholder="XXXXXXXXXXXX"
                                             maxLength={12}
-                                            className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                            className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                         />
                                         <p className="text-xs text-gray-500">12 digits</p>
                                     </div>
@@ -525,7 +518,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             onChange={(e) => govIdForm.setData('philhealth_number', e.target.value)}
                                             placeholder="XXXX-XXXXX-XX"
                                             maxLength={15}
-                                            className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                            className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                         />
                                         <p className="text-xs text-gray-500">Format: XXXX-XXXXX-XX</p>
                                     </div>
@@ -542,7 +535,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                         <Button
                                             type="submit"
                                             disabled={govIdForm.processing}
-                                            className="bg-[#2596be] hover:bg-[#1e7a9f]"
+                                            className={BRAND_CLASSES.buttonPrimary}
                                         >
                                             {govIdForm.processing ? (
                                                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>
@@ -560,7 +553,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                     {currentStep === 3 && (
                         <Card className="animate-fade-in">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-[#2596be]">
+                                <CardTitle className={`flex items-center gap-2 ${BRAND_CLASSES.textPrimary}`}>
                                     <Phone className="h-5 w-5" />
                                     Emergency Contact
                                 </CardTitle>
@@ -575,7 +568,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             value={emergencyForm.data.name}
                                             onChange={(e) => emergencyForm.setData('name', e.target.value)}
                                             placeholder="Jane Doe"
-                                            className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                            className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                             required
                                         />
                                     </div>
@@ -589,7 +582,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={emergencyForm.data.phone}
                                                 onChange={(e) => emergencyForm.setData('phone', e.target.value)}
                                                 placeholder="09XX XXX XXXX"
-                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                                className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                                 required
                                             />
                                         </div>
@@ -602,7 +595,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 value={emergencyForm.data.mobile}
                                                 onChange={(e) => emergencyForm.setData('mobile', e.target.value)}
                                                 placeholder="09XX XXX XXXX"
-                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                                className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                             />
                                         </div>
                                     </div>
@@ -617,12 +610,11 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                 <SelectValue placeholder="Select relationship..." />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="spouse">Spouse</SelectItem>
-                                                <SelectItem value="parent">Parent</SelectItem>
-                                                <SelectItem value="sibling">Sibling</SelectItem>
-                                                <SelectItem value="child">Child</SelectItem>
-                                                <SelectItem value="relative">Other Relative</SelectItem>
-                                                <SelectItem value="friend">Friend</SelectItem>
+                                                {RELATIONSHIP_OPTIONS.map(option => (
+                                                    <SelectItem key={option.value} value={option.value}>
+                                                        {option.label}
+                                                    </SelectItem>
+                                                ))}
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -639,7 +631,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                         <Button
                                             type="submit"
                                             disabled={emergencyForm.processing}
-                                            className="bg-[#2596be] hover:bg-[#1e7a9f]"
+                                            className={BRAND_CLASSES.buttonPrimary}
                                         >
                                             {emergencyForm.processing ? (
                                                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>
@@ -659,7 +651,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                             {/* Document Type Selector Grid */}
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-[#2596be]">
+                                    <CardTitle className={`flex items-center gap-2 ${BRAND_CLASSES.textPrimary}`}>
                                         <Upload className="h-5 w-5" />
                                         Upload Required Documents
                                     </CardTitle>
@@ -671,7 +663,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                     {/* Document Type Grid with Status Indicators */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
                                         {Object.entries(requiredDocuments || {}).map(([key, doc]) => {
-                                            const documentsForType = getDocumentsForType(key);
+                                            const documentsForType = getDocumentsByType(submission?.documents, key);
                                             const isSelected = selectedDocType === key;
 
                                             return (
@@ -686,7 +678,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                     }}
                                                     className={`p-4 rounded-lg border-2 text-left transition-all ${
                                                         isSelected
-                                                            ? 'border-[#2596be] bg-blue-50'
+                                                            ? '${BRAND_CLASSES.borderPrimary} bg-blue-50'
                                                             : documentsForType.length > 0
                                                                 ? 'border-green-200 bg-green-50 hover:border-green-300'
                                                                 : 'border-gray-200 hover:border-gray-300'
@@ -724,7 +716,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                     {selectedDocType ? (
                                         <div className="space-y-4">
                                             {/* Show existing files for this document type */}
-                                            {getDocumentsForType(selectedDocType).length > 0 && (
+                                            {getDocumentsByType(submission?.documents, selectedDocType).length > 0 && (
                                                 <Card className="border-green-200 bg-green-50">
                                                     <CardHeader className="pb-3">
                                                         <CardTitle className="text-sm flex items-center gap-2">
@@ -733,7 +725,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                         </CardTitle>
                                                     </CardHeader>
                                                     <CardContent className="space-y-2">
-                                                        {getDocumentsForType(selectedDocType).map((doc) => (
+                                                        {getDocumentsByType(submission?.documents, selectedDocType).map((doc) => (
                                                             <div
                                                                 key={doc.id}
                                                                 className="flex items-center justify-between p-3 bg-white rounded-lg border border-green-200"
@@ -752,19 +744,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                                             </p>
                                                                         )}
                                                                     </div>
-                                                                    <Badge className={`flex-shrink-0 ${
-                                                                        doc.status === 'approved' ? 'bg-green-100 text-green-700 border-green-200' :
-                                                                            doc.status === 'pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
-                                                                                'bg-red-100 text-red-700 border-red-200'
-                                                                    }`}>
-                                                                        {doc.status === 'approved' ? (
-                                                                            <><CheckCircle2 className="h-3 w-3 mr-1" /> Approved</>
-                                                                        ) : doc.status === 'pending' ? (
-                                                                            <><Clock className="h-3 w-3 mr-1" /> Pending</>
-                                                                        ) : (
-                                                                            <>Rejected</>
-                                                                        )}
-                                                                    </Badge>
+                                                                    <StatusBadge status={doc.status} variant="document" className="flex-shrink-0" />
                                                                 </div>
                                                                 <Button
                                                                     type="button"
@@ -782,10 +762,10 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             )}
 
                                             {/* Upload New File Form */}
-                                            <Card className="border-2 border-[#2596be]">
+                                            <Card className="border-2 ${BRAND_CLASSES.borderPrimary}">
                                                 <CardHeader>
                                                     <CardTitle className="text-base">
-                                                        {getDocumentsForType(selectedDocType).length > 0
+                                                        {getDocumentsByType(submission?.documents, selectedDocType).length > 0
                                                             ? `Add Another File for ${requiredDocuments[selectedDocType]?.label}`
                                                             : `Upload ${requiredDocuments[selectedDocType]?.label}`
                                                         }
@@ -798,7 +778,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                     <div className="space-y-4">
                                                         <div className="space-y-2">
                                                             <Label>Select File *</Label>
-                                                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-[#2596be] transition-colors">
+                                                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:${BRAND_CLASSES.borderPrimary} transition-colors">
                                                                 <Input
                                                                     type="file"
                                                                     accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
@@ -820,7 +800,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                                         PDF, JPG, PNG, DOC, DOCX • Max 10MB
                                                                     </p>
                                                                     {documentForm.data.file && (
-                                                                        <p className="text-sm text-[#2596be] font-medium mt-2">
+                                                                        <p className={`text-sm ${BRAND_CLASSES.textPrimary} font-medium mt-2`}>
                                                                             ✓ {documentForm.data.file.name}
                                                                         </p>
                                                                     )}
@@ -835,7 +815,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                                 onChange={(e) => documentForm.setData('description', e.target.value)}
                                                                 placeholder="Additional notes about this document..."
                                                                 rows={2}
-                                                                className="focus:ring-[#2596be] focus:border-[#2596be]"
+                                                                className="focus:ring-[#2596be] focus:${BRAND_CLASSES.borderPrimary}" /* Using inline value for Tailwind JIT */
                                                             />
                                                         </div>
 
@@ -848,10 +828,10 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                                 formData.append('file', documentForm.data.file);
                                                                 formData.append('description', documentForm.data.description || '');
 
-                                                                documentForm.post(route('guest.onboarding.upload-document', invite.token), {
+                                                                documentForm.post(route(GUEST_ONBOARDING_ROUTES.UPLOAD_DOCUMENT, invite.token), {
                                                                     preserveScroll: true,
                                                                     data: formData,
-                                                                    forceFormData: true, // ← Add this
+                                                                    forceFormData: true,
                                                                     onSuccess: (response) => {
                                                                         // Clear only file and description, keep document_type
                                                                         documentForm.setData('file', null);
@@ -895,8 +875,8 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                 <CardHeader>
                                     <CardTitle className="flex items-center justify-between">
                                         <span>All Uploaded Documents ({submission?.documents?.length || 0})</span>
-                                        <Badge className="bg-[#2596be] text-white">
-                                            {getUploadedRequiredCount()}/{getRequiredDocsCount()} Required Types
+                                        <Badge className={`${BRAND_CLASSES.badgePrimary}`}>
+                                            {countUploadedRequiredTypes(requiredDocuments, submission?.documents)}/{countRequiredDocumentTypes(requiredDocuments)} Required Types
                                         </Badge>
                                     </CardTitle>
                                 </CardHeader>
@@ -904,7 +884,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                     {submission?.documents && submission.documents.length > 0 ? (
                                         <div className="space-y-4">
                                             {Object.entries(requiredDocuments || {}).map(([key, doc]) => {
-                                                const docsForType = getDocumentsForType(key);
+                                                const docsForType = getDocumentsByType(submission?.documents, key);
                                                 if (docsForType.length === 0) return null;
 
                                                 return (
@@ -923,10 +903,10 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                             {docsForType.map((document) => (
                                                                 <div
                                                                     key={document.id}
-                                                                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border hover:border-[#2596be] transition-colors"
+                                                                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border hover:${BRAND_CLASSES.borderPrimary} transition-colors"
                                                                 >
                                                                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                                        <div className="p-2 bg-[#2596be] rounded-lg flex-shrink-0">
+                                                                        <div className="p-2 ${BRAND_CLASSES.bgPrimary} rounded-lg flex-shrink-0">
                                                                             <FileText className="h-4 w-4 text-white" />
                                                                         </div>
                                                                         <div className="flex-1 min-w-0">
@@ -939,19 +919,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                                                                 </p>
                                                                             )}
                                                                         </div>
-                                                                        <Badge className={`flex-shrink-0 border ${
-                                                                            document.status === 'approved' ? 'bg-green-100 text-green-700 border-green-200' :
-                                                                                document.status === 'pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
-                                                                                    'bg-red-100 text-red-700 border-red-200'
-                                                                        }`}>
-                                                                            {document.status === 'approved' ? (
-                                                                                <><CheckCircle2 className="h-3 w-3 mr-1" /> Approved</>
-                                                                            ) : document.status === 'pending' ? (
-                                                                                <><Clock className="h-3 w-3 mr-1" /> Pending</>
-                                                                            ) : (
-                                                                                <>Rejected</>
-                                                                            )}
-                                                                        </Badge>
+                                                                        <StatusBadge status={document.status} variant="document" className="flex-shrink-0" />
                                                                     </div>
                                                                     <Button
                                                                         type="button"
@@ -980,7 +948,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                             </Card>
 
                             {/* Submit Final */}
-                            <Card className="border-2 border-[#2596be] bg-gradient-to-br from-blue-50 to-white">
+                            <Card className="border-2 ${BRAND_CLASSES.borderPrimary} bg-gradient-to-br from-blue-50 to-white">
                                 <CardContent className="pt-6">
                                     <div className="text-center mb-6">
                                         <div className="inline-flex items-center justify-center w-16 h-16 bg-[#2596be] rounded-full mb-4">
@@ -990,19 +958,19 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                             Ready to Submit?
                                         </h3>
                                         <p className="text-gray-600 mb-4">
-                                            {getUploadedRequiredCount()} of {getRequiredDocsCount()} required document types completed
+                                            {countUploadedRequiredTypes(requiredDocuments, submission?.documents)} of {countRequiredDocumentTypes(requiredDocuments)} required document types completed
                                         </p>
                                     </div>
 
                                     {/* Missing Required Document Types Alert */}
-                                    {getUploadedRequiredCount() < getRequiredDocsCount() && (
+                                    {countUploadedRequiredTypes(requiredDocuments, submission?.documents) < countRequiredDocumentTypes(requiredDocuments) && (
                                         <Alert className="mb-4 border-orange-300 bg-orange-50">
                                             <Info className="h-4 w-4 text-orange-600" />
                                             <AlertDescription className="text-orange-800">
                                                 <strong>Missing required documents:</strong>
                                                 <ul className="list-disc list-inside mt-2">
                                                     {Object.entries(requiredDocuments || {})
-                                                        .filter(([key, doc]) => doc.required && !hasUpload(key))
+                                                        .filter(([key, doc]) => doc.required && !hasDocumentType(submission?.documents, key))
                                                         .map(([key, doc]) => (
                                                             <li key={key}>{doc.label}</li>
                                                         ))
@@ -1019,7 +987,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
                                         </Button>
                                         <Button
                                             onClick={handleFinalSubmit}
-                                            disabled={getUploadedRequiredCount() < getRequiredDocsCount()}
+                                            disabled={countUploadedRequiredTypes(requiredDocuments, submission?.documents) < countRequiredDocumentTypes(requiredDocuments)}
                                             className="bg-green-600 hover:bg-green-700"
                                         >
                                             <Send className="h-4 w-4 mr-2" />
