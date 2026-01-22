@@ -86,6 +86,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // ============================================
+    // 🆘 SUPPORT
+    // ============================================
+    Route::get('/support', function () {
+        return Inertia::render('Support');
+    })->name('support');
+
+    // ============================================
     // 👤 EMPLOYEE SELF-SERVICE ROUTES
     // ============================================
     Route::prefix('employees')->name('employees.')->group(function () {

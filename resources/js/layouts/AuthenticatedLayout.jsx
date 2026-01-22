@@ -3,13 +3,13 @@ import { useState } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Badge } from '@/Components/ui/badge';
-import { 
-    LayoutDashboard, 
-    Users, 
-    Package, 
-    FolderKanban, 
-    Settings, 
-    Bell, 
+import {
+    LayoutDashboard,
+    Users,
+    Package,
+    FolderKanban,
+    Settings,
+    Bell,
     Search,
     Menu,
     X,
@@ -26,6 +26,7 @@ import {
     UserPlus,
     FileCheck,
     Mail,
+    LifeBuoy,
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -194,11 +195,12 @@ export default function AuthenticatedLayout({ header, children }) {
         }
 
         // ============================================
-        // SETTINGS
+        // SUPPORT & SETTINGS
         // ============================================
         nav.push({
             type: 'items',
             items: [
+                { name: 'Support', href: '/support', icon: LifeBuoy },
                 { name: 'Settings', href: '/settings', icon: Settings },
             ]
         });
@@ -287,6 +289,12 @@ export default function AuthenticatedLayout({ header, children }) {
                                 <DropdownMenuContent align="end" className="w-56">
                                     <DropdownMenuLabel>My Account</DropdownMenuLabel>
                                     <DropdownMenuSeparator />
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/support" className="cursor-pointer">
+                                            <LifeBuoy className="mr-2 h-4 w-4" />
+                                            Support
+                                        </Link>
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem asChild>
                                         <Link href={route('settings.index')} className="cursor-pointer">
                                             <Settings className="mr-2 h-4 w-4" />
