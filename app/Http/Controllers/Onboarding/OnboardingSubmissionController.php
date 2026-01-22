@@ -7,7 +7,9 @@ use App\Models\OnboardingSubmission;
 use App\Models\OnboardingDocument;
 use App\Services\Onboarding\OnboardingSubmissionService;
 use App\Services\Onboarding\OnboardingDocumentService;
+use App\Http\Resources\OnboardingChecklistResource;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class OnboardingSubmissionController extends Controller
@@ -28,12 +30,11 @@ class OnboardingSubmissionController extends Controller
      */
     public function index(Request $request)
     {
-        // Check permission
-        if (!auth()->user()->roles->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->count()) {
-            abort(403, 'Only HR can review onboarding submissions.');
-        }
+        // Policy authorization - automatically checks with OnboardingSubmissionPolicy
+        $this->authorize('viewAny', OnboardingSubmission::class);
 
-        $query = OnboardingSubmission::with(['invite', 'documents']);
+        // Build query with eager loading (prevent N+1)
+        $query = OnboardingSubmission::with(['invite', 'documents', 'reviewer']);
 
         // Filter by status
         if ($request->has('status') && $request->status !== 'all') {
@@ -52,11 +53,10 @@ class OnboardingSubmissionController extends Controller
 
         $submissions = $query->latest()->paginate(15)->withQueryString();
 
+        // Get stats (consider caching these for better performance)
         $stats = [
             'total' => OnboardingSubmission::count(),
             'draft' => OnboardingSubmission::draft()->count(),
-            'submitted' => OnboardingSubmission::submitted()->count(),
-            'under_review' => OnboardingSubmission::underReview()->count(),
             'approved' => OnboardingSubmission::approved()->count(),
         ];
 
@@ -72,18 +72,27 @@ class OnboardingSubmissionController extends Controller
      */
     public function review(OnboardingSubmission $submission)
     {
-        // Check permission
-        if (!auth()->user()->roles->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->count()) {
-            abort(403, 'Only HR can review onboarding submissions.');
-        }
+        // Policy authorization
+        $this->authorize('review', $submission);
 
+        // Eager load relationships to prevent N+1 queries
         $submission->load([
             'invite',
             'documents',
             'reviewer'
         ]);
 
-        $checklist = $this->submissionService->getRequirementsChecklist($submission);
+        // Transform documents for frontend
+        $submission->documents->each(function($doc) {
+            // These accessors are already defined in model
+            $doc->append(['file_size', 'document_type_label']);
+
+            // Add URLs (consider moving to API Resource)
+            $doc->download_url = route('onboarding.submissions.download-document', $doc->id);
+            $doc->view_url = route('onboarding.submissions.view-document', $doc->id);
+        });
+
+        $checklist = new OnboardingChecklistResource($submission);
 
         return Inertia::render('Admin/Onboarding/Submissions/Review', [
             'submission' => $submission,
@@ -96,40 +105,14 @@ class OnboardingSubmissionController extends Controller
      */
     public function approveDocument(OnboardingDocument $document)
     {
-        // Check permission
-        if (!auth()->user()->roles->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->count()) {
-            abort(403);
-        }
+        // Policy authorization
+        $this->authorize('approveDocument', OnboardingSubmission::class);
 
         try {
             $this->documentService->approveDocument($document);
-            
+
             return back()->with('success', 'Document approved!');
-            
-        } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
-        }
-    }
 
-    /**
-     * Reject a document
-     */
-    public function rejectDocument(Request $request, OnboardingDocument $document)
-    {
-        // Check permission
-        if (!auth()->user()->roles->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->count()) {
-            abort(403);
-        }
-
-        $validated = $request->validate([
-            'rejection_reason' => 'required|string|max:500',
-        ]);
-
-        try {
-            $this->documentService->rejectDocument($document, $validated['rejection_reason']);
-            
-            return back()->with('success', 'Document rejected. Candidate will be notified.');
-            
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -140,44 +123,58 @@ class OnboardingSubmissionController extends Controller
      */
     public function approve(Request $request, OnboardingSubmission $submission)
     {
-        // Check permission
-        if (!auth()->user()->roles->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->count()) {
-            abort(403);
-        }
+        // Policy authorization
+        $this->authorize('finalize', $submission);
 
         $validated = $request->validate([
             'hr_notes' => 'nullable|string|max:1000',
         ]);
 
         try {
-            $this->submissionService->approveSubmission($submission, $validated['hr_notes'] ?? null);
-            
+            $this->submissionService->finalizeOnboarding($submission, $validated['hr_notes'] ?? null);
+
             return back()->with('success', 'Submission approved! You can now convert this to a user account.');
-            
+
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
     }
 
     /**
-     * Reject submission (request revisions)
+     * Bulk approve all uploaded documents for a submission
      */
-    public function reject(Request $request, OnboardingSubmission $submission)
+    public function bulkApproveDocuments(OnboardingSubmission $submission)
     {
-        // Check permission
-        if (!auth()->user()->roles->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->count()) {
-            abort(403);
-        }
-
-        $validated = $request->validate([
-            'rejection_reason' => 'required|string|max:1000',
-        ]);
+        // Policy authorization
+        $this->authorize('approveDocument', OnboardingSubmission::class);
 
         try {
-            $this->submissionService->rejectSubmission($submission, $validated['rejection_reason']);
-            
-            return back()->with('success', 'Submission rejected. Candidate has been notified to make revisions.');
-            
+            // Use transaction for atomic operation
+            $count = DB::transaction(function() use ($submission) {
+                // Get count first
+                $count = $submission->documents()
+                    ->where('status', OnboardingDocument::STATUS_UPLOADED)
+                    ->count();
+
+                if ($count === 0) {
+                    throw new \Exception('No documents waiting for approval.');
+                }
+
+                // Bulk update - single query instead of loop
+                $submission->documents()
+                    ->where('status', OnboardingDocument::STATUS_UPLOADED)
+                    ->update([
+                        'status' => OnboardingDocument::STATUS_APPROVED,
+                        'verified_at' => now(),
+                        'verified_by' => auth()->id(),
+                        'rejection_reason' => null,
+                    ]);
+
+                return $count;
+            });
+
+            return back()->with('success', "Approved {$count} document(s)!");
+
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
