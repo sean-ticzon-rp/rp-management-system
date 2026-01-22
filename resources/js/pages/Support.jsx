@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
+import axios from 'axios';
+import { useTimezone } from '@/hooks/use-timezone.jsx';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
@@ -27,6 +29,10 @@ export default function Support() {
     const [statusFilter, setStatusFilter] = useState('open');
     const [categoryFilter, setCategoryFilter] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const [allTickets, setAllTickets] = useState([]);
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const { timezone } = useTimezone();
 
     const getStatusBadgeColor = (status) => {
         switch (status) {
@@ -62,19 +68,39 @@ export default function Support() {
         const date = new Date(dateString);
         const now = new Date();
         const diffInMs = now - date;
+        const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
         const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
         const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
 
-        if (diffInHours < 24) {
-            if (diffInHours < 1) {
-                return 'Just now';
-            }
+        if (diffInMinutes < 1) {
+            return 'Just now';
+        } else if (diffInMinutes < 60) {
+            return `${diffInMinutes}m ago`;
+        } else if (diffInHours < 24) {
             return `${diffInHours}h ago`;
         } else if (diffInDays < 7) {
             return `${diffInDays}d ago`;
         } else {
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                timeZone: timezone
+            });
         }
+    };
+
+    const formatFullDate = (dateString) => {
+        const date = new Date(dateString);
+        return date.toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+            timeZone: timezone
+        });
     };
 
     // Dialog state
@@ -91,141 +117,21 @@ export default function Support() {
         category: 'bug',
     });
 
-    // Mock data - replace with real data later
-    const [allTickets, setAllTickets] = useState([
-        {
-            id: 1,
-            subject: 'Login page not loading on Safari',
-            category: 'bug',
-            priority: 'high',
-            status: 'open',
-            description: 'When trying to access the login page on Safari, it shows a blank screen.',
-            created_at: '2026-01-20 09:30:00',
-            updated_at: '2026-01-20 09:30:00',
-            messages: [
-                {
-                    id: 1,
-                    author: 'You',
-                    is_support: false,
-                    message: 'When trying to access the login page on Safari, it shows a blank screen.',
-                    created_at: '2026-01-20 09:30:00',
-                },
-                {
-                    id: 2,
-                    author: 'Support Team',
-                    is_support: true,
-                    message: 'Thank you for reporting this issue. We\'re looking into it and will update you shortly.',
-                    created_at: '2026-01-20 10:15:00',
-                },
-            ],
-        },
-        {
-            id: 2,
-            subject: 'Add dark mode support',
-            category: 'feature',
-            priority: 'medium',
-            status: 'in_progress',
-            description: 'It would be great to have a dark mode option for the application.',
-            created_at: '2026-01-19 14:15:00',
-            updated_at: '2026-01-21 10:00:00',
-            messages: [
-                {
-                    id: 1,
-                    author: 'You',
-                    is_support: false,
-                    message: 'It would be great to have a dark mode option for the application.',
-                    created_at: '2026-01-19 14:15:00',
-                },
-                {
-                    id: 2,
-                    author: 'Support Team',
-                    is_support: true,
-                    message: 'Great suggestion! We\'ve added this to our roadmap and have started working on it.',
-                    created_at: '2026-01-20 08:00:00',
-                },
-                {
-                    id: 3,
-                    author: 'You',
-                    is_support: false,
-                    message: 'Awesome! Looking forward to it. Will it include custom color schemes?',
-                    created_at: '2026-01-21 09:30:00',
-                },
-                {
-                    id: 4,
-                    author: 'Support Team',
-                    is_support: true,
-                    message: 'We\'re starting with a default dark theme, but custom themes are on our future roadmap!',
-                    created_at: '2026-01-21 10:00:00',
-                },
-            ],
-        },
-        {
-            id: 3,
-            subject: 'Export reports to PDF',
-            category: 'feature',
-            priority: 'low',
-            status: 'open',
-            description: 'Need ability to export monthly reports as PDF files.',
-            created_at: '2026-01-18 11:00:00',
-            updated_at: '2026-01-18 11:00:00',
-            messages: [
-                {
-                    id: 1,
-                    author: 'You',
-                    is_support: false,
-                    message: 'Need ability to export monthly reports as PDF files.',
-                    created_at: '2026-01-18 11:00:00',
-                },
-            ],
-        },
-        {
-            id: 4,
-            subject: 'Dashboard widgets not refreshing',
-            category: 'bug',
-            priority: 'medium',
-            status: 'resolved',
-            description: 'The dashboard widgets show stale data and require manual page refresh.',
-            created_at: '2026-01-15 16:45:00',
-            updated_at: '2026-01-22 08:30:00',
-            messages: [
-                {
-                    id: 1,
-                    author: 'You',
-                    is_support: false,
-                    message: 'The dashboard widgets show stale data and require manual page refresh.',
-                    created_at: '2026-01-15 16:45:00',
-                },
-                {
-                    id: 2,
-                    author: 'Support Team',
-                    is_support: true,
-                    message: 'We\'ve identified the issue. It was related to caching. Deploying a fix now.',
-                    created_at: '2026-01-16 10:00:00',
-                },
-                {
-                    id: 3,
-                    author: 'Support Team',
-                    is_support: true,
-                    message: 'The fix has been deployed. Please clear your browser cache and let us know if the issue persists.',
-                    created_at: '2026-01-16 14:30:00',
-                },
-                {
-                    id: 4,
-                    author: 'You',
-                    is_support: false,
-                    message: 'Works perfectly now! Thank you for the quick fix.',
-                    created_at: '2026-01-17 09:00:00',
-                },
-                {
-                    id: 5,
-                    author: 'Support Team',
-                    is_support: true,
-                    message: 'Glad to hear it\'s working! Marking this as resolved.',
-                    created_at: '2026-01-22 08:30:00',
-                },
-            ],
-        },
-    ]);
+    useEffect(() => {
+        fetchTickets();
+    }, []);
+
+    const fetchTickets = async () => {
+        try {
+            const response = await axios.get('/tickets');
+            setAllTickets(response.data.tickets);
+            setIsAdmin(response.data.isAdmin);
+            setIsLoading(false);
+        } catch (error) {
+            console.error('Error fetching tickets:', error);
+            setIsLoading(false);
+        }
+    };
 
     // Filter tickets based on search and filters
     const tickets = allTickets.filter(ticket => {
@@ -257,33 +163,20 @@ export default function Support() {
         });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
-        const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-        const newTicket = {
-            id: allTickets.length + 1,
-            subject: formData.subject,
-            category: formData.category,
-            priority: formData.priority,
-            status: 'open',
-            description: formData.description,
-            created_at: now,
-            updated_at: now,
-            messages: [
-                {
-                    id: 1,
-                    author: 'You',
-                    is_support: false,
-                    message: formData.description,
-                    created_at: now,
-                },
-            ],
-        };
-
-        setAllTickets([newTicket, ...allTickets]);
-        console.log('Ticket created:', newTicket);
-        handleCloseDialog();
+        try {
+            await axios.post('/tickets', formData);
+            handleCloseDialog();
+            await fetchTickets();
+        } catch (error) {
+            console.error('Error creating ticket:', error);
+            if (error.response) {
+                console.error('Validation errors:', error.response.data);
+                alert('Error creating ticket: ' + JSON.stringify(error.response.data.errors || error.response.data.message));
+            }
+        }
     };
 
     const handleInputChange = (field, value) => {
@@ -293,33 +186,48 @@ export default function Support() {
         });
     };
 
-    const handleSendMessage = (e) => {
+    const handleSendMessage = async (e) => {
         e.preventDefault();
         if (!newMessage.trim() || !selectedTicket) return;
 
-        const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-        const updatedTickets = allTickets.map((ticket) => {
-            if (ticket.id === selectedTicket.id) {
-                const newMsg = {
-                    id: ticket.messages.length + 1,
-                    author: 'You',
-                    is_support: false,
-                    message: newMessage,
-                    created_at: now,
-                };
-                return {
-                    ...ticket,
-                    messages: [...ticket.messages, newMsg],
-                    updated_at: now,
-                };
-            }
-            return ticket;
-        });
+        try {
+            const response = await axios.post(`/tickets/${selectedTicket.id}/messages`, {
+                message: newMessage,
+            });
 
-        setAllTickets(updatedTickets);
-        const updatedTicket = updatedTickets.find((t) => t.id === selectedTicket.id);
-        setSelectedTicket(updatedTicket);
-        setNewMessage('');
+            const updatedTickets = allTickets.map((ticket) =>
+                ticket.id === selectedTicket.id ? response.data.ticket : ticket
+            );
+            setAllTickets(updatedTickets);
+            setSelectedTicket(response.data.ticket);
+            setNewMessage('');
+        } catch (error) {
+            console.error('Error sending message:', error);
+            if (error.response) {
+                alert('Error sending message: ' + (error.response.data.message || 'Unknown error'));
+            }
+        }
+    };
+
+    const handleStatusChange = async (newStatus) => {
+        if (!selectedTicket || !isAdmin) return;
+
+        try {
+            const response = await axios.patch(`/tickets/${selectedTicket.id}/status`, {
+                status: newStatus,
+            });
+
+            const updatedTickets = allTickets.map((ticket) =>
+                ticket.id === selectedTicket.id ? response.data.ticket : ticket
+            );
+            setAllTickets(updatedTickets);
+            setSelectedTicket(response.data.ticket);
+        } catch (error) {
+            console.error('Error updating status:', error);
+            if (error.response) {
+                alert('Error updating status: ' + (error.response.data.message || 'Unknown error'));
+            }
+        }
     };
 
     return (
@@ -384,7 +292,14 @@ export default function Support() {
 
                 {/* Tickets List / Empty State */}
                 <div className="bg-white rounded-lg border border-gray-200 min-h-[400px]">
-                    {tickets.length === 0 ? (
+                    {isLoading ? (
+                        <div className="flex items-center justify-center h-[400px]">
+                            <div className="text-center py-12">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                                <p className="text-gray-500">Loading tickets...</p>
+                            </div>
+                        </div>
+                    ) : tickets.length === 0 ? (
                         <div className="flex items-center justify-center h-[400px]">
                             <div className="text-center py-12">
                                 <MessageSquare className="h-16 w-16 text-gray-300 mx-auto mb-4" />
@@ -437,6 +352,12 @@ export default function Support() {
                                                 </span>
                                                 <span>•</span>
                                                 <span>Ticket #{ticket.id}</span>
+                                                {isAdmin && ticket.user && (
+                                                    <>
+                                                        <span>•</span>
+                                                        <span>{ticket.user.name}</span>
+                                                    </>
+                                                )}
                                                 <span>•</span>
                                                 <span>Updated {formatDate(ticket.updated_at)}</span>
                                             </div>
@@ -464,13 +385,31 @@ export default function Support() {
                                     <h2 className="text-lg font-semibold text-gray-900">
                                         {selectedTicket.subject}
                                     </h2>
-                                    <Badge className={`${getStatusBadgeColor(selectedTicket.status)} border-0`}>
-                                        {selectedTicket.status === 'in_progress' ? 'In Progress' :
-                                         selectedTicket.status.charAt(0).toUpperCase() + selectedTicket.status.slice(1)}
-                                    </Badge>
+                                    {isAdmin ? (
+                                        <Select value={selectedTicket.status} onValueChange={handleStatusChange}>
+                                            <SelectTrigger className="w-36 h-7">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="open">Open</SelectItem>
+                                                <SelectItem value="in_progress">In Progress</SelectItem>
+                                                <SelectItem value="resolved">Resolved</SelectItem>
+                                                <SelectItem value="closed">Closed</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    ) : (
+                                        <Badge className={`${getStatusBadgeColor(selectedTicket.status)} border-0`}>
+                                            {selectedTicket.status === 'in_progress' ? 'In Progress' :
+                                             selectedTicket.status.charAt(0).toUpperCase() + selectedTicket.status.slice(1)}
+                                        </Badge>
+                                    )}
                                 </div>
                                 <p className="text-sm text-gray-600">
-                                    Ticket #{selectedTicket.id} • Created {formatDate(selectedTicket.created_at)}
+                                    Ticket #{selectedTicket.id} • Created {formatFullDate(selectedTicket.created_at)}
+                                    {isAdmin && selectedTicket.user && ` • Reported by ${selectedTicket.user.name}`}
+                                    {selectedTicket.resolved_at && (
+                                        <span className="text-green-600 font-medium"> • Resolved {formatFullDate(selectedTicket.resolved_at)}</span>
+                                    )}
                                 </p>
                             </div>
                             <Button
@@ -495,7 +434,7 @@ export default function Support() {
                                             <span className="text-xs font-medium text-gray-700">
                                                 {message.author}
                                             </span>
-                                            <span className="text-xs text-gray-500">
+                                            <span className="text-xs text-gray-500" title={formatFullDate(message.created_at)}>
                                                 {formatDate(message.created_at)}
                                             </span>
                                         </div>

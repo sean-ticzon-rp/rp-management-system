@@ -27,6 +27,7 @@ import {
     FileCheck,
     Mail,
     LifeBuoy,
+    Globe,
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -36,6 +37,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/Components/ui/dropdown-menu';
+import { useTimezone } from '@/hooks/use-timezone.jsx';
+import { cn } from '@/lib/utils';
 
 export default function AuthenticatedLayout({ header, children }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -43,6 +46,8 @@ export default function AuthenticatedLayout({ header, children }) {
     const [expandedSections, setExpandedSections] = useState({});
     const { auth } = usePage().props;
     const currentUrl = usePage().url;
+    const { timezone, setTimezone, timezones } = useTimezone();
+    const currentTimezone = timezones.find(tz => tz.id === timezone) || timezones[2];
     
     const toggleSection = (sectionName) => {
         setExpandedSections(prev => ({
@@ -272,6 +277,45 @@ export default function AuthenticatedLayout({ header, children }) {
                                 <Bell className="h-6 w-6" />
                                 <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-500"></span>
                             </button>
+
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button className="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-lg" title={`${currentTimezone.name} (${currentTimezone.offset})`}>
+                                        <img
+                                            src={currentTimezone.flag}
+                                            alt={currentTimezone.name}
+                                            className="h-5 w-5 rounded-sm object-cover"
+                                        />
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuLabel className="flex items-center gap-2">
+                                        <Globe className="h-4 w-4" />
+                                        Select Timezone
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    {timezones.map((tz) => (
+                                        <DropdownMenuItem
+                                            key={tz.id}
+                                            onClick={() => setTimezone(tz.id)}
+                                            className={cn(
+                                                "flex items-center justify-between cursor-pointer",
+                                                timezone === tz.id && "bg-accent"
+                                            )}
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <img
+                                                    src={tz.flag}
+                                                    alt={tz.name}
+                                                    className="h-4 w-4 rounded-sm object-cover"
+                                                />
+                                                <span>{tz.name}</span>
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">{tz.offset}</span>
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
 
                             <DropdownMenu>
                                 <DropdownMenuTrigger className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100">
