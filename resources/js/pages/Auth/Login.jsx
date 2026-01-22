@@ -11,8 +11,8 @@ import { Mail, Lock, AlertCircle } from 'lucide-react';
 
 export default function Login({ status, canResetPassword, userCount = 0 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
-        email: 'hr1@example.com',
-        password: 'password',
+        email: '',
+        password: '',
         remember: false,
     });
 
