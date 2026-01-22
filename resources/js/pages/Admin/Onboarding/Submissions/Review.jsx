@@ -29,14 +29,17 @@ import {
     User,
     Mail,
     Phone,
-    MapPin,
     CreditCard,
     AlertTriangle,
     UserCheck,
-    Clock,
     Briefcase,
     Building2,
 } from 'lucide-react';
+import { StatusBadge } from '@/components/onboarding/shared/StatusBadge';
+import { DocumentCard } from '@/components/onboarding/shared/DocumentCard';
+import { ADMIN_ONBOARDING_ROUTES } from '@/lib/constants/onboarding/routes';
+import { groupDocumentsByType } from '@/lib/utils/documentHelpers';
+import { generateWorkEmail, DEFAULT_TEMP_PASSWORD } from '@/lib/utils/emailHelpers';
 
 export default function Review({ submission, checklist }) {
     const [showApproveDialog, setShowApproveDialog] = useState(false);
@@ -58,7 +61,7 @@ export default function Review({ submission, checklist }) {
     });
 
     const approveDocument = (document) => {
-        router.post(route('onboarding.submissions.approve-document', document.id), {}, {
+        router.post(route(ADMIN_ONBOARDING_ROUTES.APPROVE_DOCUMENT, document.id), {}, {
             preserveScroll: true,
         });
     };
@@ -70,7 +73,7 @@ export default function Review({ submission, checklist }) {
 
     const rejectDocument = () => {
         if (selectedDocument) {
-            docRejectForm.post(route('onboarding.submissions.reject-document', selectedDocument.id), {
+            docRejectForm.post(route(ADMIN_ONBOARDING_ROUTES.REJECT_DOCUMENT, selectedDocument.id), {
                 preserveScroll: true,
                 onSuccess: () => {
                     setShowDocRejectDialog(false);
@@ -82,7 +85,7 @@ export default function Review({ submission, checklist }) {
     };
 
     const handleApproveSubmission = () => {
-        approveForm.post(route('onboarding.submissions.approve', submission.id), {
+        approveForm.post(route(ADMIN_ONBOARDING_ROUTES.APPROVE, submission.id), {
             onSuccess: () => {
                 setShowApproveDialog(false);
                 approveForm.reset();
@@ -91,7 +94,7 @@ export default function Review({ submission, checklist }) {
     };
 
     const handleRejectSubmission = () => {
-        rejectForm.post(route('onboarding.submissions.reject', submission.id), {
+        rejectForm.post(route(ADMIN_ONBOARDING_ROUTES.REJECT, submission.id), {
             onSuccess: () => {
                 setShowRejectDialog(false);
                 rejectForm.reset();
@@ -100,35 +103,11 @@ export default function Review({ submission, checklist }) {
     };
 
     const handleConvertToUser = () => {
-        router.post(route('onboarding.invites.convert-to-user', submission.invite.id), {
+        router.post(route(ADMIN_ONBOARDING_ROUTES.CONVERT_TO_USER, submission.invite.id), {
             onSuccess: () => {
                 setShowConvertDialog(false);
             },
         });
-    };
-
-    const getStatusBadge = (status) => {
-        const badges = {
-            pending: { color: 'bg-yellow-100 text-yellow-700 border-yellow-200', icon: Clock },
-            approved: { color: 'bg-green-100 text-green-700 border-green-200', icon: CheckCircle2 },
-            rejected: { color: 'bg-red-100 text-red-700 border-red-200', icon: XCircle },
-        };
-        const badge = badges[status] || badges.pending;
-        const Icon = badge.icon;
-        return (
-            <Badge className={`${badge.color} border`}>
-                <Icon className="h-3 w-3 mr-1" />
-                {status}
-            </Badge>
-        );
-    };
-
-    // Generate work email preview
-    const generateWorkEmail = () => {
-        const personal = submission.personal_info || {};
-        const firstName = (personal.first_name || '').toLowerCase();
-        const lastName = (personal.last_name || '').toLowerCase();
-        return `${firstName}.${lastName}@rocketpartners.ph`;
     };
 
     return (
@@ -139,7 +118,7 @@ export default function Review({ submission, checklist }) {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href={route('onboarding.submissions.index')}>
+                        <Link href={route(ADMIN_ONBOARDING_ROUTES.INDEX)}>
                             <Button variant="outline" size="sm">
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back to Submissions
@@ -166,15 +145,15 @@ export default function Review({ submission, checklist }) {
                     <div className="flex gap-3">
                         {submission.status === 'submitted' && (
                             <>
-                                <Button 
-                                    variant="outline" 
+                                <Button
+                                    variant="outline"
                                     className="border-red-200 text-red-600 hover:bg-red-50"
                                     onClick={() => setShowRejectDialog(true)}
                                 >
                                     <XCircle className="h-4 w-4 mr-2" />
                                     Request Revisions
                                 </Button>
-                                <Button 
+                                <Button
                                     className="bg-green-600 hover:bg-green-700"
                                     onClick={() => setShowApproveDialog(true)}
                                 >
@@ -183,9 +162,9 @@ export default function Review({ submission, checklist }) {
                                 </Button>
                             </>
                         )}
-                        
+
                         {submission.status === 'approved' && !submission.invite.converted_user_id && (
-                            <Button 
+                            <Button
                                 className="bg-blue-600 hover:bg-blue-700"
                                 onClick={() => setShowConvertDialog(true)}
                             >
@@ -207,7 +186,8 @@ export default function Review({ submission, checklist }) {
                     <CardContent>
                         <Progress value={submission.completion_percentage} className="h-3" />
                         <div className="grid grid-cols-4 gap-4 mt-4">
-                            {checklist.map((item, index) => (
+                            {/* Change from checklist.map to Object.values */}
+                            {Object.values(checklist || {}).map((item, index) => (
                                 <div key={index} className="flex items-center gap-2">
                                     {item.completed ? (
                                         <CheckCircle2 className="h-5 w-5 text-green-600" />
@@ -215,8 +195,8 @@ export default function Review({ submission, checklist }) {
                                         <XCircle className="h-5 w-5 text-gray-300" />
                                     )}
                                     <span className={`text-sm ${item.completed ? 'text-gray-900' : 'text-gray-400'}`}>
-                                        {item.section}
-                                    </span>
+                        {item.section}
+                    </span>
                                 </div>
                             ))}
                         </div>
@@ -347,90 +327,178 @@ export default function Review({ submission, checklist }) {
 
                     {/* Right Column - Documents & Actions */}
                     <div className="space-y-6">
-                        {/* Documents */}
+                        {/* Documents - Enhanced with Preview */}
                         <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <FileText className="h-5 w-5" />
-                                    Uploaded Documents
+                                <CardTitle className="flex items-center justify-between">
+            <span className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Uploaded Documents ({submission.documents?.length || 0})
+            </span>
+                                    {submission.status === 'submitted' && submission.documents?.length > 0 && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                                const pendingDocs = submission.documents.filter(d => d.status === 'pending');
+                                                if (pendingDocs.length > 0 && confirm(`Approve all ${pendingDocs.length} pending documents?`)) {
+                                                    router.post(route(ADMIN_ONBOARDING_ROUTES.BULK_APPROVE_DOCUMENTS, submission.id));
+                                                }
+                                            }}
+                                            className="border-green-200 text-green-600 hover:bg-green-50"
+                                        >
+                                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                                            Approve All Pending
+                                        </Button>
+                                    )}
                                 </CardTitle>
-                                <CardDescription>Review NBI & PNP Clearance</CardDescription>
+                                <CardDescription>
+                                    Review and approve required clearances and documents
+                                </CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-3">
+                            <CardContent className="space-y-4">
                                 {submission.documents && submission.documents.length > 0 ? (
-                                    submission.documents.map((doc) => (
-                                        <div key={doc.id} className="border rounded-lg p-4 space-y-3">
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <FileText className="h-4 w-4 text-blue-600" />
-                                                        <p className="font-medium text-gray-900">{doc.document_type_label}</p>
+                                    // Group documents by type using helper
+                                    Object.entries(
+                                        groupDocumentsByType(submission.documents)
+                                    ).map(([docType, docs]) => (
+                                        <div key={docType} className="space-y-2">
+                                            {/* Document Type Header */}
+                                            <div className="flex items-center justify-between p-2 bg-gray-100 rounded-lg">
+                                                <div className="flex items-center gap-2">
+                                                    <FileText className="h-4 w-4 text-gray-600" />
+                                                    <span className="font-semibold text-sm text-gray-900">
+                                {docs[0].document_type_label}
+                            </span>
+                                                    <Badge variant="secondary" className="text-xs">
+                                                        {docs.length} file{docs.length !== 1 ? 's' : ''}
+                                                    </Badge>
+                                                </div>
+                                                {/* Show overall status for this doc type */}
+                                                {docs.every(d => d.status === 'approved') && (
+                                                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                                )}
+                                            </div>
+
+                                            {/* Individual files */}
+                                            <div className="space-y-2 pl-4">
+                                                {docs.map((doc) => (
+                                                    <div key={doc.id} className="border rounded-lg p-4 space-y-3 bg-white hover:shadow-md transition-shadow">
+                                                        <div className="flex items-start justify-between">
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center gap-2 mb-2">
+                                                                    <div className={`p-1.5 rounded ${
+                                                                        doc.status === 'approved' ? 'bg-green-100' :
+                                                                            doc.status === 'rejected' ? 'bg-red-100' :
+                                                                                'bg-yellow-100'
+                                                                    }`}>
+                                                                        <FileText className={`h-4 w-4 ${
+                                                                            doc.status === 'approved' ? 'text-green-600' :
+                                                                                doc.status === 'rejected' ? 'text-red-600' :
+                                                                                    'text-yellow-600'
+                                                                        }`} />
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <p className="font-medium text-sm text-gray-900 truncate">
+                                                                            {doc.filename}
+                                                                        </p>
+                                                                        <p className="text-xs text-gray-500">
+                                                                            {doc.file_size} • Uploaded {new Date(doc.created_at).toLocaleDateString()}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+
+                                                                {doc.description && (
+                                                                    <div className="bg-gray-50 rounded p-2 mb-2">
+                                                                        <p className="text-xs text-gray-600">
+                                                                            <strong>Note:</strong> {doc.description}
+                                                                        </p>
+                                                                    </div>
+                                                                )}
+
+                                                                {doc.rejection_reason && (
+                                                                    <div className="bg-red-50 border border-red-200 rounded p-2">
+                                                                        <p className="text-xs text-red-800">
+                                                                            <strong>Rejected:</strong> {doc.rejection_reason}
+                                                                        </p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            {getStatusBadge(doc.status)}
+                                                        </div>
+
+                                                        {/* Action Buttons */}
+                                                        <div className="flex gap-2">
+                                                            <a
+                                                                href={doc.view_url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="flex-1"
+                                                            >
+                                                                <Button variant="outline" size="sm" className="w-full">
+                                                                    <Eye className="h-4 w-4 mr-2" />
+                                                                    View in New Tab
+                                                                </Button>
+                                                            </a>
+                                                            <a
+                                                                href={doc.download_url}
+                                                                className="flex-1"
+                                                            >
+                                                                <Button variant="outline" size="sm" className="w-full">
+                                                                    <Download className="h-4 w-4 mr-2" />
+                                                                    Download
+                                                                </Button>
+                                                            </a>
+                                                        </div>
+
+                                                        {/* Approve/Reject for pending docs */}
+                                                        {doc.status === 'pending' && (
+                                                            <div className="flex gap-2 pt-3 border-t">
+                                                                <Button
+                                                                    size="sm"
+                                                                    className="flex-1 bg-green-600 hover:bg-green-700"
+                                                                    onClick={() => approveDocument(doc)}
+                                                                >
+                                                                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                                                                    Approve
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
+                                                                    onClick={() => openRejectDocDialog(doc)}
+                                                                >
+                                                                    <XCircle className="h-4 w-4 mr-2" />
+                                                                    Reject
+                                                                </Button>
+                                                            </div>
+                                                        )}
+
+
+
+                                                        {/* Show re-approval option for rejected docs */}
+                                                        {doc.status === 'rejected' && (
+                                                            <div className="pt-3 border-t">
+                                                                <Button
+                                                                    size="sm"
+                                                                    className="w-full bg-green-600 hover:bg-green-700"
+                                                                    onClick={() => approveDocument(doc)}
+                                                                >
+                                                                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                                                                    Approve This Document
+                                                                </Button>
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    <p className="text-sm text-gray-500">{doc.filename}</p>
-                                                    <p className="text-xs text-gray-400 mt-1">{doc.file_size}</p>
-                                                </div>
-                                                {getStatusBadge(doc.status)}
+                                                ))}
                                             </div>
-
-                                            {doc.rejection_reason && (
-                                                <div className="bg-red-50 border border-red-200 rounded-md p-3">
-                                                    <p className="text-sm text-red-800">
-                                                        <strong>Rejection Reason:</strong> {doc.rejection_reason}
-                                                    </p>
-                                                </div>
-                                            )}
-
-                                            <div className="flex gap-2">
-                                                <a 
-                                                    href={doc.download_url} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
-                                                    className="flex-1"
-                                                >
-                                                    <Button variant="outline" size="sm" className="w-full">
-                                                        <Eye className="h-4 w-4 mr-2" />
-                                                        View
-                                                    </Button>
-                                                </a>
-                                                <a 
-                                                    href={doc.download_url} 
-                                                    download
-                                                    className="flex-1"
-                                                >
-                                                    <Button variant="outline" size="sm" className="w-full">
-                                                        <Download className="h-4 w-4 mr-2" />
-                                                        Download
-                                                    </Button>
-                                                </a>
-                                            </div>
-
-                                            {doc.status === 'pending' && (
-                                                <div className="flex gap-2 pt-2 border-t">
-                                                    <Button 
-                                                        size="sm" 
-                                                        className="flex-1 bg-green-600 hover:bg-green-700"
-                                                        onClick={() => approveDocument(doc)}
-                                                    >
-                                                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                                                        Approve
-                                                    </Button>
-                                                    <Button 
-                                                        size="sm" 
-                                                        variant="outline"
-                                                        className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
-                                                        onClick={() => openRejectDocDialog(doc)}
-                                                    >
-                                                        <XCircle className="h-4 w-4 mr-2" />
-                                                        Reject
-                                                    </Button>
-                                                </div>
-                                            )}
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="text-center py-8 text-gray-500">
-                                        <FileText className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                                        <p>No documents uploaded yet</p>
+                                    <div className="text-center py-12 text-gray-500">
+                                        <FileText className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+                                        <p className="font-medium">No documents uploaded yet</p>
+                                        <p className="text-sm mt-1">Candidate hasn't uploaded any documents</p>
                                     </div>
                                 )}
                             </CardContent>
@@ -445,10 +513,10 @@ export default function Review({ submission, checklist }) {
                                 <div>
                                     <p className="text-sm text-gray-500">Status</p>
                                     <div className="mt-1">
-                                        {getStatusBadge(submission.status)}
+                                        <StatusBadge status={submission.status} variant="submission" />
                                     </div>
                                 </div>
-                                
+
                                 {submission.submitted_at && (
                                     <div>
                                         <p className="text-sm text-gray-500">Submitted Date</p>
@@ -488,7 +556,7 @@ export default function Review({ submission, checklist }) {
                                 <CardContent>
                                     <div className="flex items-center gap-2">
                                         <Mail className="h-4 w-4 text-blue-600" />
-                                        <code className="text-sm font-mono text-blue-900">{generateWorkEmail()}</code>
+                                        <code className="text-sm font-mono text-blue-900">{generateWorkEmail(submission.personal_info)}</code>
                                     </div>
                                     <p className="text-xs text-blue-700 mt-2">
                                         This will be their login username after conversion
@@ -513,7 +581,7 @@ export default function Review({ submission, checklist }) {
                             They will be notified and you can then convert this to a user account.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    
+
                     <div className="space-y-2 py-4">
                         <Label>HR Notes (Optional)</Label>
                         <Textarea
@@ -549,7 +617,7 @@ export default function Review({ submission, checklist }) {
                             The candidate will be notified to make corrections and resubmit.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    
+
                     <div className="space-y-2 py-4">
                         <Label>Reason for Rejection *</Label>
                         <Textarea
@@ -587,7 +655,7 @@ export default function Review({ submission, checklist }) {
                             The candidate will need to reupload a valid document.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    
+
                     <div className="space-y-2 py-4">
                         <Label>Rejection Reason *</Label>
                         <Textarea
@@ -630,7 +698,7 @@ export default function Review({ submission, checklist }) {
                             This will create a user account with the following details:
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    
+
                     <div className="space-y-3 py-4 bg-gray-50 rounded-lg p-4">
                         <div>
                             <p className="text-sm text-gray-500">Full Name</p>
@@ -640,7 +708,7 @@ export default function Review({ submission, checklist }) {
                         </div>
                         <div>
                             <p className="text-sm text-gray-500">Work Email (Login Username)</p>
-                            <code className="text-sm font-mono text-blue-600">{generateWorkEmail()}</code>
+                            <code className="text-sm font-mono text-blue-600">{generateWorkEmail(submission.personal_info)}</code>
                         </div>
                         <div>
                             <p className="text-sm text-gray-500">Position</p>
@@ -652,7 +720,7 @@ export default function Review({ submission, checklist }) {
                         </div>
                         <div>
                             <p className="text-sm text-gray-500">Temporary Password</p>
-                            <code className="text-sm font-mono text-orange-600">ChangeMe123!</code>
+                            <code className="text-sm font-mono text-orange-600">{DEFAULT_TEMP_PASSWORD}</code>
                         </div>
                     </div>
 
