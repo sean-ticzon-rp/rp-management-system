@@ -38,6 +38,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                     id="email"
                                     type="email"
                                     name="email"
+                                    defaultValue={import.meta.env.DEV ? import.meta.env.VITE_DEV_LOGIN_EMAIL : undefined}
                                     required
                                     autoFocus
                                     tabIndex={1}
@@ -64,6 +65,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                     id="password"
                                     type="password"
                                     name="password"
+                                    defaultValue={import.meta.env.DEV ? import.meta.env.VITE_DEV_LOGIN_PASSWORD : undefined}
                                     required
                                     tabIndex={2}
                                     autoComplete="current-password"
@@ -101,6 +103,18 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                 Sign up
                             </TextLink>
                         </div>
+
+                        {import.meta.env.DEV && (import.meta.env.VITE_DEV_LOGIN_EMAIL || import.meta.env.VITE_DEV_LOGIN_PASSWORD) && (
+                            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <div className="flex items-center gap-2 text-yellow-800">
+                                    <span className="text-lg">🔧</span>
+                                    <p className="text-sm font-medium">Development Mode</p>
+                                </div>
+                                <p className="text-xs text-yellow-700 mt-1">
+                                    Login credentials auto-filled from .env.local
+                                </p>
+                            </div>
+                        )}
                     </>
                 )}
             </Form>

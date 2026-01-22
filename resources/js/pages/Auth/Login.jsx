@@ -11,8 +11,8 @@ import { Mail, Lock, AlertCircle } from 'lucide-react';
 
 export default function Login({ status, canResetPassword, userCount = 0 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
-        email: '',
-        password: '',
+        email: import.meta.env.DEV ? (import.meta.env.VITE_DEV_LOGIN_EMAIL || '') : '',
+        password: import.meta.env.DEV ? (import.meta.env.VITE_DEV_LOGIN_PASSWORD || '') : '',
         remember: false,
     });
 
@@ -205,6 +205,18 @@ export default function Login({ status, canResetPassword, userCount = 0 }) {
                                         )}
                                     </Button>
                                 </form>
+
+                                {import.meta.env.DEV && (data.email || data.password) && (
+                                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg animate-fade-in">
+                                        <div className="flex items-center gap-2 text-yellow-800">
+                                            <span className="text-lg">🔧</span>
+                                            <p className="text-sm font-medium">Development Mode</p>
+                                        </div>
+                                        <p className="text-xs text-yellow-700 mt-1">
+                                            Login credentials auto-filled from .env.local
+                                        </p>
+                                    </div>
+                                )}
 
                                 <div className="mt-6 text-center animate-fade-in animation-delay-800">
                                     <p className="text-sm text-gray-600">
