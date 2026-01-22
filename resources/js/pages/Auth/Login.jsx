@@ -11,8 +11,8 @@ import { Mail, Lock, AlertCircle } from 'lucide-react';
 
 export default function Login({ status, canResetPassword, userCount = 0 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
-        email: '',
-        password: '',
+        email: 'hr1@example.com',
+        password: 'password',
         remember: false,
     });
 
@@ -30,7 +30,7 @@ export default function Login({ status, canResetPassword, userCount = 0 }) {
     return (
         <>
             <Head title="Log in" />
-            
+
             <div className="min-h-screen flex overflow-hidden">
                 {/* Left Side - Branding */}
                 <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 items-center justify-center p-12 relative overflow-hidden">
@@ -44,17 +44,17 @@ export default function Login({ status, canResetPassword, userCount = 0 }) {
                     <div className="text-center relative z-10 animate-fade-in-up">
                         {/* Logo - Bigger size */}
                         <div className="inline-flex items-center justify-center bg-white/10 backdrop-blur-sm rounded-3xl p-10 mb-8 animate-scale-in hover:scale-105 transition-transform duration-300">
-                            <img 
-                                src="/images/logo.png" 
-                                alt="Company Logo" 
+                            <img
+                                src="/images/logo.png"
+                                alt="Company Logo"
                                 className="h-32 w-auto object-contain"
                             />
                         </div>
-                    
+
                         <p className="text-xl text-blue-100 max-w-md animate-fade-in-up animation-delay-400">
                             Managing your business operations with ease and efficiency
                         </p>
-                        
+
                         {/* Stats - Now showing actual user count */}
                         <div className="mt-12 flex items-center justify-center gap-8 text-blue-100 animate-fade-in-up animation-delay-600">
                             <div className="text-center hover:scale-110 transition-transform duration-300">
@@ -76,9 +76,9 @@ export default function Login({ status, canResetPassword, userCount = 0 }) {
                         {/* Mobile Logo - Bigger */}
                         <div className="lg:hidden text-center mb-8">
                             <div className="inline-flex items-center justify-center bg-white rounded-2xl p-6 mb-4 animate-scale-in shadow-lg">
-                                <img 
-                                    src="/images/logo.png" 
-                                    alt="Company Logo" 
+                                <img
+                                    src="/images/logo.png"
+                                    alt="Company Logo"
                                     className="h-16 w-auto object-contain"
                                 />
                             </div>
@@ -89,9 +89,9 @@ export default function Login({ status, canResetPassword, userCount = 0 }) {
                                 {/* Logo in Card Header */}
                                 <div className="flex justify-center">
                                     <div className="inline-flex items-center justify-center bg-blue-50 rounded-xl p-3">
-                                        <img 
-                                            src="/images/icon.png" 
-                                            alt="Company Logo" 
+                                        <img
+                                            src="/images/icon.png"
+                                            alt="Company Logo"
                                             className="h-20 w-auto object-contain"
                                         />
                                     </div>
@@ -103,7 +103,7 @@ export default function Login({ status, canResetPassword, userCount = 0 }) {
                                     </CardDescription>
                                 </div>
                             </CardHeader>
-                            
+
                             <CardContent>
                                 {status && (
                                     <Alert className="mb-6 animate-slide-down bg-green-50 border-green-200">
@@ -164,7 +164,7 @@ export default function Login({ status, canResetPassword, userCount = 0 }) {
 
                                     <div className="flex items-center justify-between animate-fade-in animation-delay-600">
                                         <div className="flex items-center space-x-2">
-                                            <Checkbox 
+                                            <Checkbox
                                                 id="remember"
                                                 checked={data.remember}
                                                 onCheckedChange={(checked) => setData('remember', checked)}
@@ -187,9 +187,9 @@ export default function Login({ status, canResetPassword, userCount = 0 }) {
                                         )}
                                     </div>
 
-                                    <Button 
-                                        type="submit" 
-                                        className="w-full animate-fade-in animation-delay-700" 
+                                    <Button
+                                        type="submit"
+                                        className="w-full animate-fade-in animation-delay-700"
                                         disabled={processing}
                                     >
                                         {processing ? (
@@ -209,8 +209,8 @@ export default function Login({ status, canResetPassword, userCount = 0 }) {
                                 <div className="mt-6 text-center animate-fade-in animation-delay-800">
                                     <p className="text-sm text-gray-600">
                                         Don't have an account?{' '}
-                                        <Link 
-                                            href={route('register')} 
+                                        <Link
+                                            href={route('register')}
                                             className="text-blue-600 hover:text-blue-700 font-medium hover:underline transition-colors"
                                         >
                                             Sign up

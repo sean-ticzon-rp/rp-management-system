@@ -37,7 +37,7 @@ export default function Import({ auth }) {
         e.preventDefault();
         e.stopPropagation();
         setDragActive(false);
-        
+
         if (e.dataTransfer.files && e.dataTransfer.files[0]) {
             setData('file', e.dataTransfer.files[0]);
         }
@@ -163,8 +163,8 @@ export default function Import({ auth }) {
                             {!data.file ? (
                                 <div
                                     className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
-                                        dragActive 
-                                            ? 'border-blue-500 bg-blue-50' 
+                                        dragActive
+                                            ? 'border-blue-500 bg-blue-50'
                                             : 'border-gray-300 hover:border-gray-400'
                                     }`}
                                     onDragEnter={handleDrag}
@@ -227,7 +227,7 @@ export default function Import({ auth }) {
                                     {progress && (
                                         <div className="mt-4">
                                             <div className="w-full bg-gray-200 rounded-full h-2">
-                                                <div 
+                                                <div
                                                     className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                                                     style={{ width: `${progress.percentage}%` }}
                                                 />
