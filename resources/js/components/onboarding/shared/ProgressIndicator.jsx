@@ -52,7 +52,7 @@ export const ProgressIndicator = React.memo(({ currentStep, totalSteps = 4 }) =>
                                 <div className="flex flex-col items-center flex-1">
                                     <div className={`flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all ${
                                         isCompleted ? 'bg-green-600 border-green-600' :
-                                            isActive ? `${BRAND_CLASSES.bgPrimary} ${BRAND_CLASSES.borderPrimary}` :
+                                            isActive ? 'bg-green-500 border-green-500' :
                                                 'bg-gray-100 border-gray-300'
                                     }`}>
                                         {isCompleted ? (
@@ -62,7 +62,7 @@ export const ProgressIndicator = React.memo(({ currentStep, totalSteps = 4 }) =>
                                         )}
                                     </div>
                                     <p className={`text-sm mt-2 font-medium ${
-                                        isActive ? `${BRAND_CLASSES.textPrimary}` :
+                                        isActive ? 'text-green-600' :
                                             isCompleted ? 'text-green-600' :
                                                 'text-gray-500'
                                     }`}>
@@ -78,7 +78,7 @@ export const ProgressIndicator = React.memo(({ currentStep, totalSteps = 4 }) =>
                         );
                     })}
                 </div>
-                <Progress value={(currentStep / totalSteps) * 100} className="h-2" />
+                <Progress value={(currentStep / totalSteps) * 100} className="h-2 [&>[data-slot=progress-indicator]]:bg-green-600" />
             </CardContent>
         </Card>
     );

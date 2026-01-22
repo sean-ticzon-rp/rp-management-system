@@ -48,8 +48,8 @@ export default function Form({ invite, submission, requiredDocuments }) {
                     {/* Header with Logo */}
                     <div className="text-center animate-fade-in">
                         <div className="flex flex-col items-center justify-center mb-6">
-                            {/* Logo with Black Background */}
-                            <div className="bg-black px-8 py-4 rounded-xl shadow-xl mb-4">
+                            {/* Logo */}
+                            <div className="bg-white border-2 border-gray-100 px-8 py-4 rounded-xl shadow-sm mb-4 hover:shadow-md transition-shadow">
                                 <img
                                     src="https://i.postimg.cc/RV82nPB5/image.png"
                                     alt="Rocket Partners"

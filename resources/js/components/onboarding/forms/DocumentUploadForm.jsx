@@ -142,6 +142,11 @@ export const DocumentUploadForm = ({
                                                     {doc.required && <span className="text-red-600 ml-1">*</span>}
                                                 </span>
                                             </div>
+                                            {doc.accepted_formats && doc.max_size && (
+                                                <p className="text-xs text-gray-500 mt-1 ml-6">
+                                                    {doc.accepted_formats.map(f => f.toUpperCase()).join(', ')} • Max {doc.max_size >= 1024 ? `${doc.max_size / 1024}MB` : `${doc.max_size}KB`}
+                                                </p>
+                                            )}
                                             {documentsForType.length > 0 && (
                                                 <div className="mt-2 ml-6">
                                                     <Badge variant="secondary" className="text-xs">

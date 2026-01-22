@@ -9,6 +9,40 @@ import { DEFAULT_COUNTRY } from '@/lib/constants/onboarding/selectOptions';
 import { GUEST_ONBOARDING_ROUTES } from '@/lib/constants/onboarding/routes';
 
 /**
+ * Determines the initial step based on submission completion
+ * @param {Object} submission - Existing submission data
+ * @returns {number} Initial step number (1-4)
+ */
+function determineInitialStep(submission) {
+    if (!submission) return 1;
+
+    // If emergency contact is filled, go to step 4 (documents)
+    if (submission.emergency_contact?.name && submission.emergency_contact?.phone) {
+        return 4;
+    }
+
+    // If government IDs are filled, go to step 3 (emergency contact)
+    if (submission.government_ids && (
+        submission.government_ids.sss_number ||
+        submission.government_ids.tin_number ||
+        submission.government_ids.hdmf_number ||
+        submission.government_ids.philhealth_number
+    )) {
+        return 3;
+    }
+
+    // If personal info is filled, go to step 2 (government IDs)
+    if (submission.personal_info?.first_name &&
+        submission.personal_info?.last_name &&
+        submission.personal_info?.birthday) {
+        return 2;
+    }
+
+    // Default to step 1 (personal info)
+    return 1;
+}
+
+/**
  * Manages multi-step onboarding form state
  *
  * @param {Object} submission - Existing submission data
@@ -16,7 +50,7 @@ import { GUEST_ONBOARDING_ROUTES } from '@/lib/constants/onboarding/routes';
  * @returns {Object} Form state and handlers
  */
 export function useOnboardingForm(submission, inviteToken) {
-    const [currentStep, setCurrentStep] = useState(1);
+    const [currentStep, setCurrentStep] = useState(() => determineInitialStep(submission));
 
     // Personal Info Form (Step 1)
     const personalForm = useForm({
