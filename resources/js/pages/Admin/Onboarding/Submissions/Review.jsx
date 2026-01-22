@@ -424,7 +424,7 @@ export default function Review({ submission, checklist }) {
                                                                     </div>
                                                                 )}
                                                             </div>
-                                                            {getStatusBadge(doc.status)}
+                                                            <StatusBadge status={doc.status} variant="document" />
                                                         </div>
 
                                                         {/* Action Buttons */}
