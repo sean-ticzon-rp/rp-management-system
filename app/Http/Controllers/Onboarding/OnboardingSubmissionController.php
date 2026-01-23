@@ -141,6 +141,59 @@ class OnboardingSubmissionController extends Controller
     }
 
     /**
+     * Reject/request revisions for a submission
+     */
+    public function reject(Request $request, OnboardingSubmission $submission)
+    {
+        // Policy authorization
+        $this->authorize('finalize', $submission);
+
+        $validated = $request->validate([
+            'rejection_reason' => 'required|string|max:1000',
+        ]);
+
+        try {
+            // Update submission status back to draft and add rejection note
+            $submission->update([
+                'status' => OnboardingSubmission::STATUS_DRAFT,
+                'hr_notes' => $validated['rejection_reason'],
+                'reviewed_by' => auth()->id(),
+                'reviewed_at' => now(),
+            ]);
+
+            // Optionally send notification email to candidate
+            // Notify::send($submission->invite, new OnboardingRevisionRequested($submission));
+
+            return back()->with('success', 'Revision request sent to candidate.');
+
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Reject a document
+     */
+    public function rejectDocument(Request $request, OnboardingDocument $document)
+    {
+        // Policy authorization
+        $this->authorize('approveDocument', OnboardingSubmission::class);
+
+        $validated = $request->validate([
+            'rejection_reason' => 'required|string|max:500',
+        ]);
+
+        try {
+            $this->documentService->rejectDocument($document, $validated['rejection_reason']);
+
+            return back()->with('success', 'Document rejected. Candidate will be notified.');
+
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
+    }
+
+    /**
      * Bulk approve all uploaded documents for a submission
      */
     public function bulkApproveDocuments(OnboardingSubmission $submission)
