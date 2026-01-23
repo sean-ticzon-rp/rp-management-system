@@ -49,11 +49,11 @@ export default function Form({ invite, submission, requiredDocuments }) {
                     <div className="text-center animate-fade-in">
                         <div className="flex flex-col items-center justify-center mb-6">
                             {/* Logo */}
-                            <div className="bg-white border-2 border-gray-100 px-8 py-4 rounded-xl shadow-sm mb-4 hover:shadow-md transition-shadow">
+                            <div className="inline-flex items-center justify-center bg-gradient-to-br from-[#2596be] to-[#1e7a9e] px-4 py-2 rounded-xl shadow-md mb-4 hover:shadow-lg transition-shadow">
                                 <img
-                                    src="https://i.postimg.cc/RV82nPB5/image.png"
+                                    src="/images/logo.png"
                                     alt="Rocket Partners"
-                                    className="h-12 w-auto"
+                                    className="h-10 w-auto object-contain"
                                 />
                             </div>
 

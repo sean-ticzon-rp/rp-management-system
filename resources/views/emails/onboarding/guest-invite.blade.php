@@ -24,7 +24,7 @@
                                 <tr>
                                     <td align="center" style="padding-bottom: 28px;">
                                         <div style="background-color: #000000; display: inline-block; padding: 20px 50px; border-radius: 12px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);">
-                                            <img src="https://i.postimg.cc/RV82nPB5/image.png" alt="Rocket Partners" style="height: 50px; width: auto; display: block;">
+                                            <img src="{{ config('app.url') }}/images/logo.png" alt="Rocket Partners" style="height: 50px; width: auto; display: block;">
                                         </div>
                                     </td>
                                 </tr>
@@ -290,7 +290,7 @@
                                 <tr>
                                     <td align="center" style="padding-bottom: 20px;">
                                         <div style="background-color: #000000; display: inline-block; padding: 12px 32px; border-radius: 8px;">
-                                            <img src="https://i.postimg.cc/RV82nPB5/image.png" alt="Rocket Partners" style="height: 32px; width: auto; display: block;">
+                                            <img src="{{ config('app.url') }}/images/logo.png" alt="Rocket Partners" style="height: 32px; width: auto; display: block;">
                                         </div>
                                     </td>
                                 </tr>
