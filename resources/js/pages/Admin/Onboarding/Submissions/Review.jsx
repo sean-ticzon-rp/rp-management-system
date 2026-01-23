@@ -143,7 +143,7 @@ export default function Review({ submission, checklist }) {
 
                     {/* Action Buttons */}
                     <div className="flex gap-3">
-                        {submission.status === 'submitted' && (
+                        {(submission.status === 'draft') && (
                             <>
                                 <Button
                                     variant="outline"
@@ -330,27 +330,9 @@ export default function Review({ submission, checklist }) {
                         {/* Documents - Enhanced with Preview */}
                         <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center justify-between">
-            <span className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Uploaded Documents ({submission.documents?.length || 0})
-            </span>
-                                    {submission.status === 'submitted' && submission.documents?.length > 0 && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => {
-                                                const pendingDocs = submission.documents.filter(d => d.status === 'pending');
-                                                if (pendingDocs.length > 0 && confirm(`Approve all ${pendingDocs.length} pending documents?`)) {
-                                                    router.post(route(ADMIN_ONBOARDING_ROUTES.BULK_APPROVE_DOCUMENTS, submission.id));
-                                                }
-                                            }}
-                                            className="border-green-200 text-green-600 hover:bg-green-50"
-                                        >
-                                            <CheckCircle2 className="h-4 w-4 mr-2" />
-                                            Approve All Pending
-                                        </Button>
-                                    )}
+                                <CardTitle className="flex items-center gap-2">
+                                    <FileText className="h-5 w-5" />
+                                    Uploaded Documents ({submission.documents?.length || 0})
                                 </CardTitle>
                                 <CardDescription>
                                     Review and approve required clearances and documents
@@ -451,8 +433,8 @@ export default function Review({ submission, checklist }) {
                                                             </a>
                                                         </div>
 
-                                                        {/* Approve/Reject for pending docs */}
-                                                        {doc.status === 'pending' && (
+                                                        {/* Approve/Reject for uploaded docs */}
+                                                        {doc.status === 'uploaded' && (
                                                             <div className="flex gap-2 pt-3 border-t">
                                                                 <Button
                                                                     size="sm"
@@ -486,6 +468,21 @@ export default function Review({ submission, checklist }) {
                                                                 >
                                                                     <CheckCircle2 className="h-4 w-4 mr-2" />
                                                                     Approve This Document
+                                                                </Button>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Show reject option for approved docs */}
+                                                        {doc.status === 'approved' && (
+                                                            <div className="pt-3 border-t">
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="w-full border-red-200 text-red-600 hover:bg-red-50"
+                                                                    onClick={() => openRejectDocDialog(doc)}
+                                                                >
+                                                                    <XCircle className="h-4 w-4 mr-2" />
+                                                                    Revoke Approval
                                                                 </Button>
                                                             </div>
                                                         )}
