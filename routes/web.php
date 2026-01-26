@@ -15,6 +15,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TicketController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserImportController;
 use App\Http\Controllers\Onboarding\OnboardingInviteController;
@@ -85,6 +86,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/profile', [SettingsController::class, 'updateProfile'])->name('update-profile');
         Route::put('/password', [SettingsController::class, 'updatePassword'])->name('update-password');
         Route::delete('/account', [SettingsController::class, 'destroy'])->name('destroy');
+    });
+
+    // ============================================
+    // 🆘 SUPPORT
+    // ============================================
+    Route::get('/support', function () {
+        return Inertia::render('Support');
+    })->name('support');
+
+    Route::prefix('tickets')->name('tickets.')->group(function () {
+        Route::get('/', [TicketController::class, 'index'])->name('index');
+        Route::post('/', [TicketController::class, 'store'])->name('store');
+        Route::post('/{ticket}/messages', [TicketController::class, 'addMessage'])->name('add-message');
+        Route::patch('/{ticket}/status', [TicketController::class, 'updateStatus'])->name('update-status');
     });
 
     // ============================================

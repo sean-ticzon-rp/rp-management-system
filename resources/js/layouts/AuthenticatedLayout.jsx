@@ -28,6 +28,8 @@ import {
     FileCheck,
     Mail,
     Wallet,
+    LifeBuoy,
+    Globe,
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -37,6 +39,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/Components/ui/dropdown-menu';
+import { useTimezone } from '@/hooks/use-timezone.jsx';
+import { cn } from '@/lib/utils';
 
 export default function AuthenticatedLayout({ header, children }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -45,6 +49,8 @@ export default function AuthenticatedLayout({ header, children }) {
     const { auth } = usePage().props;
     const currentUrl = usePage().url;
     const { can } = usePermission();
+    const { timezone, setTimezone, timezones } = useTimezone();
+    const currentTimezone = timezones.find(tz => tz.id === timezone) || timezones[2];
     
     const toggleSection = (sectionName) => {
         setExpandedSections(prev => ({
@@ -203,11 +209,12 @@ export default function AuthenticatedLayout({ header, children }) {
         }
 
         // ============================================
-        // SETTINGS
+        // SUPPORT & SETTINGS
         // ============================================
         nav.push({
             type: 'items',
             items: [
+                { name: 'Support', href: '/support', icon: LifeBuoy },
                 { name: 'Settings', href: '/settings', icon: Settings },
             ]
         });
@@ -282,6 +289,45 @@ export default function AuthenticatedLayout({ header, children }) {
                             </button>
 
                             <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button className="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-lg" title={`${currentTimezone.name} (${currentTimezone.offset})`}>
+                                        <img
+                                            src={currentTimezone.flag}
+                                            alt={currentTimezone.name}
+                                            className="h-5 w-5 rounded-sm object-cover"
+                                        />
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuLabel className="flex items-center gap-2">
+                                        <Globe className="h-4 w-4" />
+                                        Select Timezone
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    {timezones.map((tz) => (
+                                        <DropdownMenuItem
+                                            key={tz.id}
+                                            onClick={() => setTimezone(tz.id)}
+                                            className={cn(
+                                                "flex items-center justify-between cursor-pointer",
+                                                timezone === tz.id && "bg-accent"
+                                            )}
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <img
+                                                    src={tz.flag}
+                                                    alt={tz.name}
+                                                    className="h-4 w-4 rounded-sm object-cover"
+                                                />
+                                                <span>{tz.name}</span>
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">{tz.offset}</span>
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            <DropdownMenu>
                                 <DropdownMenuTrigger className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100">
                                     <div className="flex items-center justify-center w-8 h-8 bg-blue-600 rounded-full">
                                         <span className="text-sm font-medium text-white">
@@ -297,6 +343,12 @@ export default function AuthenticatedLayout({ header, children }) {
                                 <DropdownMenuContent align="end" className="w-56">
                                     <DropdownMenuLabel>My Account</DropdownMenuLabel>
                                     <DropdownMenuSeparator />
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/support" className="cursor-pointer">
+                                            <LifeBuoy className="mr-2 h-4 w-4" />
+                                            Support
+                                        </Link>
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem asChild>
                                         <Link href={route('settings.index')} className="cursor-pointer">
                                             <Settings className="mr-2 h-4 w-4" />
