@@ -216,18 +216,26 @@ export const DocumentUploadForm = ({
                                                                 {doc.description}
                                                             </p>
                                                         )}
+                                                        {doc.status === 'approved' && (
+                                                            <p className="text-xs text-green-600 mt-1">
+                                                                ✓ Approved by HR - cannot be deleted
+                                                            </p>
+                                                        )}
                                                     </div>
                                                     <StatusBadge status={doc.status} variant="document" className="flex-shrink-0" />
                                                 </div>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => onDeleteDocument(doc.id)}
-                                                    className="text-red-600 hover:bg-red-50 ml-2 flex-shrink-0"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
+                                                {/* Only show delete button for non-approved documents */}
+                                                {doc.status !== 'approved' && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => onDeleteDocument(doc.id)}
+                                                        className="text-red-600 hover:bg-red-50 ml-2 flex-shrink-0"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                )}
                                             </div>
                                         ))}
                                     </CardContent>
@@ -362,18 +370,26 @@ export const DocumentUploadForm = ({
                                                                     {document.description}
                                                                 </p>
                                                             )}
+                                                            {document.status === 'approved' && (
+                                                                <p className="text-xs text-green-600 mt-1">
+                                                                    ✓ Approved by HR - cannot be deleted
+                                                                </p>
+                                                            )}
                                                         </div>
                                                         <StatusBadge status={document.status} variant="document" className="flex-shrink-0" />
                                                     </div>
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => onDeleteDocument(document.id)}
-                                                        className="text-red-600 hover:bg-red-50 ml-2 flex-shrink-0"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
+                                                    {/* Only show delete button for non-approved documents */}
+                                                    {document.status !== 'approved' && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => onDeleteDocument(document.id)}
+                                                            className="text-red-600 hover:bg-red-50 ml-2 flex-shrink-0"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
