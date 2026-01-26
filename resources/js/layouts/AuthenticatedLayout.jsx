@@ -3,13 +3,14 @@ import { useState } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Badge } from '@/Components/ui/badge';
-import { 
-    LayoutDashboard, 
-    Users, 
-    Package, 
-    FolderKanban, 
-    Settings, 
-    Bell, 
+import { usePermission } from '@/hooks/usePermission';
+import {
+    LayoutDashboard,
+    Users,
+    Package,
+    FolderKanban,
+    Settings,
+    Bell,
     Search,
     Menu,
     X,
@@ -26,6 +27,7 @@ import {
     UserPlus,
     FileCheck,
     Mail,
+    Wallet,
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -42,6 +44,7 @@ export default function AuthenticatedLayout({ header, children }) {
     const [expandedSections, setExpandedSections] = useState({});
     const { auth } = usePage().props;
     const currentUrl = usePage().url;
+    const { can } = usePermission();
     
     const toggleSection = (sectionName) => {
         setExpandedSections(prev => ({
@@ -60,11 +63,12 @@ export default function AuthenticatedLayout({ header, children }) {
         // ============================================
         // EVERYONE - Personal Dashboard
         // ============================================
-        nav.push({ 
+        nav.push({
             type: 'items',
             items: [
                 { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-                { name: 'My Leaves', href: '/my-leaves', icon: Calendar },
+                { name: 'Calendar', href: '/calendar', icon: Calendar },
+                { name: 'My Leaves', href: '/my-leaves', icon: ClipboardList },
                 { name: 'My Assets', href: '/employees/assets', icon: Laptop },
             ]
         });
@@ -72,17 +76,26 @@ export default function AuthenticatedLayout({ header, children }) {
         // ============================================
         // USER MANAGEMENT
         // ============================================
-        if (auth.user?.can_manage_users) {
-            nav.push({
-                type: 'accordion',
-                name: 'User Management',
-                icon: Users,
-                items: [
-                    { name: 'All Users', href: '/users', icon: Users },
-                    { name: 'Pending Approvals', href: '/users/pending-approvals', icon: UserCheck, badge: 'new' },
-                ]
-            });
-        } else if (auth.user?.can_approve_users) {
+        if (can('users.view')) {
+            const userItems = [];
+
+            if (can('users.view')) {
+                userItems.push({ name: 'All Users', href: '/users', icon: Users });
+            }
+
+            if (can('users.approve')) {
+                userItems.push({ name: 'Pending Approvals', href: '/users/pending-approvals', icon: UserCheck, badge: 'new' });
+            }
+
+            if (userItems.length > 0) {
+                nav.push({
+                    type: 'accordion',
+                    name: 'User Management',
+                    icon: Users,
+                    items: userItems
+                });
+            }
+        } else if (can('users.approve')) {
             nav.push({
                 type: 'items',
                 items: [
@@ -92,13 +105,9 @@ export default function AuthenticatedLayout({ header, children }) {
         }
 
         // ============================================
-        // ONBOARDING MANAGEMENT (HR/Admin only)
+        // ONBOARDING MANAGEMENT
         // ============================================
-        const isHROrAdmin = auth.user?.roles?.some(r => 
-            ['super-admin', 'admin', 'hr-manager'].includes(r.slug)
-        );
-
-        if (isHROrAdmin) {
+        if (can('onboarding.view') || can('onboarding.manage')) {
             nav.push({
                 type: 'accordion',
                 name: 'Onboarding',
@@ -113,42 +122,42 @@ export default function AuthenticatedLayout({ header, children }) {
         // ============================================
         // LEAVE MANAGEMENT
         // ============================================
-        if (auth.user?.can_approve_leaves) {
+        if (can('leaves.approve') || can('leaves.view-all') || can('leaves.manage')) {
             const leaveItems = [];
-            
-            const isSeniorOrAbove = auth.user.roles?.some(r => 
-                ['senior-engineer', 'lead-engineer', 'project-manager'].includes(r.slug)
-            );
-            
-            const isHROrAdmin = auth.user.roles?.some(r => 
-                ['super-admin', 'admin', 'hr-manager'].includes(r.slug)
-            );
-            
-            if (isSeniorOrAbove) {
-                leaveItems.push({ 
-                    name: 'Pending Approvals', 
-                    href: '/leaves/pending-approvals', 
-                    icon: CheckSquare, 
-                    badge: 'pending' 
+
+            if (can('leaves.approve') && !can('leaves.manage')) {
+                leaveItems.push({
+                    name: 'Pending Approvals',
+                    href: '/leaves/pending-approvals',
+                    icon: CheckSquare,
+                    badge: 'pending'
                 });
             }
-            
-            if (isHROrAdmin) {
-                leaveItems.push({ 
-                    name: 'All Requests', 
-                    href: '/leaves', 
-                    icon: ClipboardList 
+
+            if (can('leaves.view-all') || can('leaves.manage')) {
+                leaveItems.push({
+                    name: 'All Requests',
+                    href: '/leaves',
+                    icon: ClipboardList
                 });
-                leaveItems.push({ 
-                    name: 'Pending HR Approval', 
-                    href: '/leaves?status=pending_hr', 
-                    icon: CheckSquare, 
-                    badge: 'pending' 
+                leaveItems.push({
+                    name: 'Pending HR Approval',
+                    href: '/leaves?status=pending_hr',
+                    icon: CheckSquare,
+                    badge: 'pending'
                 });
-                leaveItems.push({ 
-                    name: 'Leave Types', 
-                    href: '/leave-types', 
-                    icon: Layers 
+            }
+
+            if (can('leaves.manage')) {
+                leaveItems.push({
+                    name: 'Leave Types',
+                    href: '/leave-types',
+                    icon: Layers
+                });
+                leaveItems.push({
+                    name: 'Balance Management',
+                    href: '/leave-balances',
+                    icon: Wallet
                 });
             }
 
@@ -165,7 +174,7 @@ export default function AuthenticatedLayout({ header, children }) {
         // ============================================
         // INVENTORY MANAGEMENT
         // ============================================
-        if (auth.user?.can_manage_inventory) {
+        if (can('assets.view') || can('assets.create') || can('assets.edit')) {
             nav.push({
                 type: 'accordion',
                 name: 'Inventory',
@@ -180,7 +189,7 @@ export default function AuthenticatedLayout({ header, children }) {
         // ============================================
         // PROJECT MANAGEMENT
         // ============================================
-        if (auth.user?.can_manage_projects) {
+        if (can('projects.view') || can('tasks.view')) {
             nav.push({
                 type: 'accordion',
                 name: 'Projects',
@@ -211,9 +220,10 @@ export default function AuthenticatedLayout({ header, children }) {
     const isActive = (href) => {
         const cleanHref = href.split('?')[0];
         const cleanUrl = currentUrl.split('?')[0];
-        
+
         if (cleanUrl === cleanHref) return true;
-        
+
+        if (cleanHref === '/calendar' && cleanUrl.startsWith('/calendar')) return true;
         if (cleanHref === '/users' && cleanUrl.startsWith('/users/')) return true;
         if (cleanHref === '/leaves' && cleanUrl.startsWith('/leaves/')) return true;
         if (cleanHref === '/inventory' && cleanUrl.startsWith('/inventory/')) return true;
@@ -222,7 +232,7 @@ export default function AuthenticatedLayout({ header, children }) {
         if (cleanHref === '/tasks' && cleanUrl.startsWith('/tasks/')) return true;
         if (cleanHref === '/onboarding/invites' && cleanUrl.startsWith('/onboarding/')) return true;
         if (cleanHref === '/onboarding/submissions' && cleanUrl.startsWith('/onboarding/')) return true;
-        
+
         return false;
     };
 
@@ -435,15 +445,15 @@ export default function AuthenticatedLayout({ header, children }) {
                                     <p className="text-xs text-gray-500 truncate">{auth.user.position || auth.user.email}</p>
                                 </div>
                             </div>
-                            {(auth.user.can_approve_users || auth.user.can_approve_leaves) && (
+                            {(can('users.approve') || can('leaves.approve')) && (
                                 <div className="flex flex-wrap gap-1">
-                                    {auth.user.can_approve_users && (
+                                    {can('users.approve') && (
                                         <Badge className="bg-green-100 text-green-700 text-xs border-green-200 border">
                                             <UserCheck className="h-3 w-3 mr-1" />
                                             Approver
                                         </Badge>
                                     )}
-                                    {auth.user.can_approve_leaves && (
+                                    {can('leaves.approve') && (
                                         <Badge className="bg-blue-100 text-blue-700 text-xs border-blue-200 border">
                                             <Calendar className="h-3 w-3 mr-1" />
                                             Manager

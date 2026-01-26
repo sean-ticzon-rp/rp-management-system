@@ -32,10 +32,13 @@ import {
     XCircle,
     AlertCircle,
     Tag,
+    ShieldCheck,
 } from 'lucide-react';
+import { usePermission } from '@/hooks/usePermission';
 
 export default function Show({ auth, user }) {
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const { can } = usePermission();
 
     const handleDelete = () => {
         setDeleteModalOpen(true);
@@ -149,6 +152,17 @@ export default function Show({ auth, user }) {
                                 Edit
                             </Link>
                         </Button>
+
+                        {/* 🔐 MANAGE PERMISSIONS BUTTON */}
+                        {can('users.assign-permissions') && (
+                            <Button asChild variant="outline">
+                                <Link href={route('users.permissions.edit', user.id)}>
+                                    <ShieldCheck className="h-4 w-4 mr-2" />
+                                    Manage Permissions
+                                </Link>
+                            </Button>
+                        )}
+
                         {canDelete && (
                             <Button variant="destructive" onClick={handleDelete}>
                                 <Trash2 className="h-4 w-4 mr-2" />

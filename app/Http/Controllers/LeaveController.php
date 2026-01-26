@@ -8,6 +8,8 @@ use App\Models\User;
 use App\Models\LeaveBalance;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use App\Mail\Leave\LeaveRequestSubmittedMail;
+use Illuminate\Support\Facades\Mail;
 
 class LeaveController extends Controller
 {
@@ -16,7 +18,7 @@ class LeaveController extends Controller
      */
     public function index(Request $request)
     {
-        $query = LeaveRequest::with(['user', 'leaveType', 'manager']);
+        $query = LeaveRequest::with(['user', 'leaveType']);
 
         // Search
         if ($request->has('search') && $request->search) {
@@ -85,7 +87,6 @@ class LeaveController extends Controller
         $leave->load([
             'user',
             'leaveType',
-            'manager',
             'managerApprover',
             'hrApprover'
         ]);
@@ -127,13 +128,7 @@ class LeaveController extends Controller
             ->get()
             ->keyBy('leave_type_id');
 
-        // Get all active users as potential managers
-        $managers = User::where('employment_status', 'active')
-            ->where('id', '!=', $currentUser->id)
-            ->orderBy('name')
-            ->get(['id', 'name', 'position', 'department']);
-
-        // ✅ NEW: Get all employees (for HR/Admin to file on behalf of)
+        // ✅ Get all employees (for HR/Admin to file on behalf of)
         $allUsers = [];
         if ($isHROrAdmin) {
             $allUsers = User::where('employment_status', 'active')
@@ -141,15 +136,14 @@ class LeaveController extends Controller
                     $query->where('year', now()->year)->with('leaveType');
                 }])
                 ->orderBy('name')
-                ->get(['id', 'name', 'position', 'department', 'manager_id', 'emergency_contact_name', 'emergency_contact_phone']);
+                ->get(['id', 'name', 'position', 'department', 'emergency_contact_name', 'emergency_contact_phone']);
         }
 
         return Inertia::render('Admin/Leaves/Apply', [
             'leaveTypes' => $leaveTypes,
             'leaveBalances' => $leaveBalances,
-            'user' => $currentUser->load('manager'),
-            'managers' => $managers,
-            'allUsers' => $allUsers, // ✅ NEW: For proxy filing
+            'user' => $currentUser,
+            'allUsers' => $allUsers,
         ]);
     }
 
@@ -179,21 +173,19 @@ class LeaveController extends Controller
         }
 
         $validated = $request->validate([
-            'user_id' => 'nullable|exists:users,id', // ✅ NEW: Allow HR to file for others
+            'user_id' => 'nullable|exists:users,id', // ✅ Allow HR to file for others
             'leave_type_id' => 'required|exists:leave_types,id',
             'start_date' => 'required|date|after_or_equal:today',
             'end_date' => 'required|date|after_or_equal:start_date',
-            'duration' => 'required|in:full_day,half_day_am,half_day_pm,custom_hours',
-            'custom_start_time' => 'nullable|required_if:duration,custom_hours|date_format:H:i',
-            'custom_end_time' => 'nullable|required_if:duration,custom_hours|date_format:H:i|after:custom_start_time',
             'reason' => 'required|string|max:1000',
-            'attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'emergency_contact_name' => 'nullable|required_if:use_default_emergency_contact,false|string|max:255',
-            'emergency_contact_phone' => 'nullable|required_if:use_default_emergency_contact,false|string|max:20',
+            'emergency_contact_name' => 'nullable|string|max:255',
+            'emergency_contact_phone' => 'nullable|string|max:20',
             'use_default_emergency_contact' => 'boolean',
             'availability' => 'nullable|in:reachable,offline,emergency_only',
-            'manager_id' => 'required|exists:users,id',
         ]);
+
+        // All leaves are full day
+        $validated['duration'] = 'full_day';
 
         // Calculate total days
         $totalDays = $this->calculateTotalDays(
@@ -202,6 +194,12 @@ class LeaveController extends Controller
             $validated['duration']
         );
 
+        // Get target user
+        $targetUser = User::find($targetUserId);
+
+        // ✅ GET LEAVE TYPE TO CHECK APPROVAL REQUIREMENTS
+        $leaveType = LeaveType::findOrFail($validated['leave_type_id']);
+
         // ✅ Check balance for the TARGET user (not current user)
         $balance = LeaveBalance::where('user_id', $targetUserId)
             ->where('leave_type_id', $validated['leave_type_id'])
@@ -209,65 +207,113 @@ class LeaveController extends Controller
             ->first();
 
         if (!$balance || !$balance->hasSufficientBalance($totalDays)) {
-            $targetUser = User::find($targetUserId);
-            return back()->withInput()->with('error', 
+            return back()->withInput()->with('error',
                 'Insufficient leave balance. ' . ($targetUser->id === $currentUser->id ? 'You have' : $targetUser->name . ' has') . ' ' .
-                ($balance ? $balance->remaining_days : 0) . 
+                ($balance ? $balance->remaining_days : 0) .
                 ' days remaining but requested ' . $totalDays . ' days.'
             );
         }
 
-        // Handle file upload
-        if ($request->hasFile('attachment')) {
-            $validated['attachment'] = $request->file('attachment')->store('leave-attachments', 'private');
-        }
-
         // Set default emergency contact if requested
-        $targetUser = User::find($targetUserId);
         if ($validated['use_default_emergency_contact']) {
             $validated['emergency_contact_name'] = $targetUser->emergency_contact_name;
             $validated['emergency_contact_phone'] = $targetUser->emergency_contact_phone;
         }
 
-        // Create leave request
-        LeaveRequest::create([
+        // ✅ DYNAMIC APPROVAL FLOW BASED ON LEAVE TYPE CONFIGURATION
+        $initialStatus = 'pending_manager'; // Default
+        $successMessage = 'Leave request submitted successfully! Waiting for approval.';
+
+        if (!$leaveType->requires_manager_approval && !$leaveType->requires_hr_approval) {
+            // ✅ NO APPROVAL NEEDED - AUTO APPROVE
+            $initialStatus = 'approved';
+            $successMessage = 'Leave request auto-approved! Balance has been updated.';
+
+            // Deduct balance immediately
+            $balance->deductDays($totalDays);
+
+            // Set approval data
+            $validated['manager_approved_by'] = $targetUserId;
+            $validated['manager_approved_at'] = now();
+            $validated['manager_comments'] = 'Auto-approved (no manager approval required)';
+            $validated['hr_approved_by'] = $targetUserId;
+            $validated['hr_approved_at'] = now();
+            $validated['hr_comments'] = 'Auto-approved (no HR approval required)';
+
+        } elseif (!$leaveType->requires_manager_approval && $leaveType->requires_hr_approval) {
+            // ✅ SKIP MANAGER - GO STRAIGHT TO HR
+            $initialStatus = 'pending_hr';
+            $successMessage = 'Leave request submitted! Waiting for HR approval (manager approval not required).';
+
+            // Mark manager as auto-approved
+            $validated['manager_approved_by'] = $targetUserId;
+            $validated['manager_approved_at'] = now();
+            $validated['manager_comments'] = 'Skipped (no manager approval required for this leave type)';
+
+        } elseif ($leaveType->requires_manager_approval && !$leaveType->requires_hr_approval) {
+            // ✅ MANAGER ONLY - NO HR NEEDED
+            $initialStatus = 'pending_manager';
+            $successMessage = 'Leave request submitted! Waiting for manager approval (HR approval not required).';
+
+        } else {
+            // ✅ STANDARD FLOW - BOTH APPROVALS REQUIRED
+            $initialStatus = 'pending_manager';
+            $successMessage = 'Leave request submitted successfully! Waiting for manager approval.';
+        }
+
+        // Create leave request with open queue system (manager_id = null)
+        $leaveRequest = LeaveRequest::create([
             ...$validated,
-            'user_id' => $targetUserId, // ✅ Use target user ID
+            'user_id' => $targetUserId,
             'total_days' => $totalDays,
-            'status' => 'pending_manager',
+            'status' => $initialStatus,
+            'manager_id' => null, // ✅ Open queue system
         ]);
 
-        // ✅ Different success messages
-        $successMessage = $targetUserId === $currentUser->id
-            ? 'Leave request submitted successfully! Your manager will review it.'
-            : "Leave request for {$targetUser->name} submitted successfully!";
+        // ✅ SEND EMAIL NOTIFICATION TO HR AND ADMIN
+        $this->notifyHRAndAdmin($leaveRequest);
+
+        // ✅ Different success messages for proxy filing
+        if ($targetUserId !== $currentUser->id) {
+            $successMessage = "Leave request for {$targetUser->name} created successfully! " . $successMessage;
+        }
 
         return redirect()->route('leaves.index')->with('success', $successMessage);
     }
 
     /**
-     * Calculate total leave days based on duration type
+     * Calculate total leave days (always full days)
      */
     private function calculateTotalDays($startDate, $endDate, $duration)
     {
         $start = \Carbon\Carbon::parse($startDate);
         $end = \Carbon\Carbon::parse($endDate);
+        return $start->diffInDays($end) + 1;
+    }
 
-        // Get number of days between dates (inclusive)
-        $daysBetween = $start->diffInDays($end) + 1;
+    /**
+     * Send email notification to HR and Admin users
+     */
+    private function notifyHRAndAdmin(LeaveRequest $leaveRequest)
+    {
+        // Get all HR and Admin users
+        $hrAndAdminUsers = User::whereHas('roles', function ($query) {
+            $query->whereIn('slug', ['super-admin', 'admin', 'hr-manager']);
+        })
+        ->where('employment_status', 'active')
+        ->get();
 
-        // Calculate based on duration type
-        switch ($duration) {
-            case 'half_day_am':
-            case 'half_day_pm':
-                return 0.5;
-            
-            case 'custom_hours':
-                return 0.5;
-            
-            case 'full_day':
-            default:
-                return $daysBetween;
+        // Load relationships for the email
+        $leaveRequest->load(['user', 'leaveType']);
+
+        // Send email to each HR/Admin user
+        foreach ($hrAndAdminUsers as $recipient) {
+            // Use work_email if available, otherwise fall back to primary email
+            $emailAddress = $recipient->work_email ?? $recipient->email;
+
+            if ($emailAddress) {
+                Mail::to($emailAddress)->send(new LeaveRequestSubmittedMail($leaveRequest));
+            }
         }
     }
 }
