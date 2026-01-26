@@ -237,8 +237,8 @@ export default function AuthenticatedLayout({ header, children }) {
         if (cleanHref === '/individual-assets' && cleanUrl.startsWith('/individual-assets/')) return true;
         if (cleanHref === '/projects' && cleanUrl.startsWith('/projects/')) return true;
         if (cleanHref === '/tasks' && cleanUrl.startsWith('/tasks/')) return true;
-        if (cleanHref === '/onboarding/invites' && cleanUrl.startsWith('/onboarding/')) return true;
-        if (cleanHref === '/onboarding/submissions' && cleanUrl.startsWith('/onboarding/')) return true;
+        if (cleanHref === '/onboarding/invites' && cleanUrl.startsWith('/onboarding/invites')) return true;
+        if (cleanHref === '/onboarding/submissions' && cleanUrl.startsWith('/onboarding/submissions')) return true;
 
         return false;
     };
