@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Button } from '@/Components/ui/button';
-import { FileText, Trash2, Eye, Download, CheckCircle2, XCircle } from 'lucide-react';
+import { FileText, Trash2, Eye, Download, Lock, Unlock } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { getDocumentStatusConfig } from '@/lib/constants/onboarding/statuses';
 
@@ -35,6 +35,7 @@ export const DocumentCard = React.memo(({
     const statusConfig = getDocumentStatusConfig(document.status);
     const isPending = document.status === 'pending' || document.status === 'uploaded';
     const isRejected = document.status === 'rejected';
+    const isApproved = document.status === 'approved';
 
     return (
         <div className={`border rounded-lg p-4 space-y-3 bg-white hover:shadow-md transition-shadow ${className}`}>
@@ -130,7 +131,7 @@ export const DocumentCard = React.memo(({
                                 className="flex-1 bg-green-600 hover:bg-green-700"
                                 onClick={() => onApprove(document)}
                             >
-                                <CheckCircle2 className="h-4 w-4 mr-2" />
+                                <Lock className="h-4 w-4 mr-2" />
                                 Approve
                             </Button>
                             <Button
@@ -139,7 +140,7 @@ export const DocumentCard = React.memo(({
                                 className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
                                 onClick={() => onReject(document)}
                             >
-                                <XCircle className="h-4 w-4 mr-2" />
+                                <Unlock className="h-4 w-4 mr-2" />
                                 Reject
                             </Button>
                         </div>
@@ -153,8 +154,23 @@ export const DocumentCard = React.memo(({
                                 className="w-full bg-green-600 hover:bg-green-700"
                                 onClick={() => onApprove(document)}
                             >
-                                <CheckCircle2 className="h-4 w-4 mr-2" />
+                                <Lock className="h-4 w-4 mr-2" />
                                 Approve This Document
+                            </Button>
+                        </div>
+                    )}
+
+                    {/* Revoke approval for approved docs */}
+                    {showAdminActions && isApproved && onReject && (
+                        <div className="pt-3 border-t">
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full border-red-200 text-red-600 hover:bg-red-50"
+                                onClick={() => onReject(document)}
+                            >
+                                <Unlock className="h-4 w-4 mr-2" />
+                                Revoke Approval
                             </Button>
                         </div>
                     )}
