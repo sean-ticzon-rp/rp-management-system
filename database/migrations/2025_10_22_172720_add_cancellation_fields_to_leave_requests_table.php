@@ -19,17 +19,20 @@ return new class extends Migration
             $table->text('cancellation_hr_comments')->nullable()->after('cancellation_approved_at');
         });
 
-        // Update status enum to include 'pending_cancellation'
-        DB::statement("ALTER TABLE leave_requests MODIFY COLUMN status ENUM(
-            'pending_manager',
-            'pending_hr',
-            'approved',
-            'rejected_by_manager',
-            'rejected_by_hr',
-            'appealed',
-            'cancelled',
-            'pending_cancellation'
-        ) DEFAULT 'pending_manager'");
+        // Update status enum to include 'pending_cancellation' (MySQL only)
+        // SQLite doesn't support ENUM and stores it as TEXT anyway
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE leave_requests MODIFY COLUMN status ENUM(
+                'pending_manager',
+                'pending_hr',
+                'approved',
+                'rejected_by_manager',
+                'rejected_by_hr',
+                'appealed',
+                'cancelled',
+                'pending_cancellation'
+            ) DEFAULT 'pending_manager'");
+        }
     }
 
     public function down(): void
@@ -47,15 +50,17 @@ return new class extends Migration
             ]);
         });
 
-        // Restore original enum
-        DB::statement("ALTER TABLE leave_requests MODIFY COLUMN status ENUM(
-            'pending_manager',
-            'pending_hr',
-            'approved',
-            'rejected_by_manager',
-            'rejected_by_hr',
-            'appealed',
-            'cancelled'
-        ) DEFAULT 'pending_manager'");
+        // Restore original enum (MySQL only)
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE leave_requests MODIFY COLUMN status ENUM(
+                'pending_manager',
+                'pending_hr',
+                'approved',
+                'rejected_by_manager',
+                'rejected_by_hr',
+                'appealed',
+                'cancelled'
+            ) DEFAULT 'pending_manager'");
+        }
     }
 };
