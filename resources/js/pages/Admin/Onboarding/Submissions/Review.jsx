@@ -8,6 +8,7 @@ import { Badge } from '@/Components/ui/badge';
 import { Progress } from '@/Components/ui/progress';
 import { Textarea } from '@/Components/ui/textarea';
 import { Label } from '@/Components/ui/label';
+import { Alert, AlertDescription } from '@/Components/ui/alert';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -48,9 +49,7 @@ export default function Review({ submission, checklist }) {
     const [selectedDocument, setSelectedDocument] = useState(null);
     const [showDocRejectDialog, setShowDocRejectDialog] = useState(false);
 
-    const approveForm = useForm({
-        hr_notes: '',
-    });
+    const approveForm = useForm({});
 
     const rejectForm = useForm({
         rejection_reason: '',
@@ -59,6 +58,11 @@ export default function Review({ submission, checklist }) {
     const docRejectForm = useForm({
         rejection_reason: '',
     });
+
+    // Check if any documents are rejected (prevents approve all)
+    const hasRejectedDocuments = submission.documents?.some(doc => doc.status === 'rejected') || false;
+    const rejectedCount = submission.documents?.filter(doc => doc.status === 'rejected').length || 0;
+    const uploadedCount = submission.documents?.filter(doc => doc.status === 'uploaded').length || 0;
 
     const approveDocument = (document) => {
         router.post(route(ADMIN_ONBOARDING_ROUTES.APPROVE_DOCUMENT, document.id), {}, {
@@ -86,6 +90,7 @@ export default function Review({ submission, checklist }) {
 
     const handleApproveSubmission = () => {
         approveForm.post(route(ADMIN_ONBOARDING_ROUTES.APPROVE, submission.id), {
+            preserveScroll: true,
             onSuccess: () => {
                 setShowApproveDialog(false);
                 approveForm.reset();
@@ -95,6 +100,7 @@ export default function Review({ submission, checklist }) {
 
     const handleRejectSubmission = () => {
         rejectForm.post(route(ADMIN_ONBOARDING_ROUTES.REJECT, submission.id), {
+            preserveScroll: true,
             onSuccess: () => {
                 setShowRejectDialog(false);
                 rejectForm.reset();
@@ -153,13 +159,21 @@ export default function Review({ submission, checklist }) {
                                     <XCircle className="h-4 w-4 mr-2" />
                                     Request Revisions
                                 </Button>
-                                <Button
-                                    className="bg-green-600 hover:bg-green-700"
-                                    onClick={() => setShowApproveDialog(true)}
-                                >
-                                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                                    Approve All
-                                </Button>
+                                <div className="relative">
+                                    <Button
+                                        className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        onClick={() => setShowApproveDialog(true)}
+                                        disabled={hasRejectedDocuments || uploadedCount === 0}
+                                        title={hasRejectedDocuments
+                                            ? `Cannot approve: ${rejectedCount} document(s) rejected and need to be reuploaded`
+                                            : uploadedCount === 0
+                                            ? 'No documents waiting for approval'
+                                            : 'Approve all uploaded documents'}
+                                    >
+                                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                                        Approve All
+                                    </Button>
+                                </div>
                             </>
                         )}
 
@@ -339,6 +353,17 @@ export default function Review({ submission, checklist }) {
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
+                                {/* Alert when rejected documents block Approve All */}
+                                {hasRejectedDocuments && (
+                                    <Alert className="border-red-200 bg-red-50">
+                                        <AlertTriangle className="h-4 w-4 text-red-600" />
+                                        <AlertDescription className="text-red-800 text-sm">
+                                            <strong>Action Required:</strong> {rejectedCount} document(s) {rejectedCount === 1 ? 'is' : 'are'} rejected.
+                                            The candidate must reupload {rejectedCount === 1 ? 'this document' : 'these documents'} before you can use "Approve All".
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+
                                 {submission.documents && submission.documents.length > 0 ? (
                                     // Group documents by type using helper
                                     Object.entries(
@@ -565,28 +590,27 @@ export default function Review({ submission, checklist }) {
                 </div>
             </div>
 
-            {/* Approve Submission Dialog */}
+            {/* Approve All Documents Dialog */}
             <AlertDialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle className="flex items-center gap-2">
                             <CheckCircle2 className="h-5 w-5 text-green-600" />
-                            Approve Onboarding Submission
+                            Approve All Documents
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will approve <strong>{submission.invite.first_name} {submission.invite.last_name}'s</strong> onboarding submission.
-                            They will be notified and you can then convert this to a user account.
+                            This will approve <strong>all uploaded documents</strong> for <strong>{submission.invite.first_name} {submission.invite.last_name}</strong>.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
 
-                    <div className="space-y-2 py-4">
-                        <Label>HR Notes (Optional)</Label>
-                        <Textarea
-                            value={approveForm.data.hr_notes}
-                            onChange={(e) => approveForm.setData('hr_notes', e.target.value)}
-                            placeholder="Internal notes about this approval..."
-                            rows={3}
-                        />
+                    <div className="py-4">
+                        <Alert className="border-yellow-200 bg-yellow-50">
+                            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                            <AlertDescription className="text-yellow-800 text-sm">
+                                <strong>Warning:</strong> This will mark all uploaded documents as approved.
+                                Make sure you have reviewed each document before proceeding.
+                            </AlertDescription>
+                        </Alert>
                     </div>
 
                     <AlertDialogFooter>
@@ -596,31 +620,40 @@ export default function Review({ submission, checklist }) {
                             disabled={approveForm.processing}
                             className="bg-green-600 hover:bg-green-700"
                         >
-                            Approve Submission
+                            Approve All Documents
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* Reject Submission Dialog */}
+            {/* Reject All Documents Dialog */}
             <AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle className="flex items-center gap-2">
-                            <AlertTriangle className="h-5 w-5 text-red-600" />
-                            Request Revisions
+                            <XCircle className="h-5 w-5 text-red-600" />
+                            Reject All Documents
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            The candidate will be notified to make corrections and resubmit.
+                            This will reject <strong>all documents</strong> for <strong>{submission.invite.first_name} {submission.invite.last_name}</strong>.
+                            The candidate will need to reupload valid documents.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
 
                     <div className="space-y-2 py-4">
+                        <Alert className="border-red-200 bg-red-50 mb-4">
+                            <AlertTriangle className="h-4 w-4 text-red-600" />
+                            <AlertDescription className="text-red-800 text-sm">
+                                <strong>Warning:</strong> All uploaded and approved documents will be marked as rejected.
+                                The candidate will be notified to make corrections.
+                            </AlertDescription>
+                        </Alert>
+
                         <Label>Reason for Rejection *</Label>
                         <Textarea
                             value={rejectForm.data.rejection_reason}
                             onChange={(e) => rejectForm.setData('rejection_reason', e.target.value)}
-                            placeholder="Explain what needs to be corrected..."
+                            placeholder="Explain what needs to be corrected in the documents..."
                             rows={4}
                             required
                         />
@@ -633,7 +666,7 @@ export default function Review({ submission, checklist }) {
                             disabled={rejectForm.processing || !rejectForm.data.rejection_reason}
                             className="bg-red-600 hover:bg-red-700"
                         >
-                            Request Revisions
+                            Reject All Documents
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
