@@ -20,6 +20,7 @@ import {
     Send,
     Loader2,
     Info,
+    Trash2,
 } from 'lucide-react';
 import { StatusBadge } from '@/components/onboarding/shared/StatusBadge';
 import { BRAND_CLASSES } from '@/lib/constants/theme';
@@ -92,6 +93,26 @@ export const DocumentUploadForm = ({
     const uploadedRequiredCount = countUploadedRequiredTypes(requiredDocuments, submission?.documents);
     const requiredCount = countRequiredDocumentTypes(requiredDocuments);
     const canSubmit = uploadedRequiredCount >= requiredCount;
+
+    // Get accepted file types for selected document type
+    const getAcceptedFileTypes = () => {
+        if (!selectedDocType || !requiredDocuments[selectedDocType]) {
+            return '.pdf,.jpg,.jpeg,.png,.doc,.docx';
+        }
+        const formats = requiredDocuments[selectedDocType].accepted_formats || [];
+        return formats.map(ext => `.${ext}`).join(',');
+    };
+
+    // Get formatted file type display text
+    const getFileTypeDisplayText = () => {
+        if (!selectedDocType || !requiredDocuments[selectedDocType]) {
+            return 'PDF, JPG, JPEG, PNG, DOC, DOCX (Max 10MB)';
+        }
+        const config = requiredDocuments[selectedDocType];
+        const formats = (config.accepted_formats || []).map(ext => ext.toUpperCase()).join(', ');
+        const maxSizeMB = Math.round((config.max_size || 10240) / 1024);
+        return `${formats} (Max ${maxSizeMB}MB)`;
+    };
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -205,7 +226,7 @@ export const DocumentUploadForm = ({
                                                     onClick={() => onDeleteDocument(doc.id)}
                                                     className="text-red-600 hover:bg-red-50 ml-2 flex-shrink-0"
                                                 >
-                                                    <FileText className="h-4 w-4" />
+                                                    <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
                                         ))}
@@ -233,7 +254,7 @@ export const DocumentUploadForm = ({
                                             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-[#2596be] transition-colors">
                                                 <Input
                                                     type="file"
-                                                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                                    accept={getAcceptedFileTypes()}
                                                     onChange={handleFileChange}
                                                     className="hidden"
                                                     id="file-upload"
@@ -244,7 +265,7 @@ export const DocumentUploadForm = ({
                                                         Click to upload or drag and drop
                                                     </p>
                                                     <p className="text-xs text-gray-500 mt-1">
-                                                        PDF, JPG, PNG, DOC, DOCX • Max 10MB
+                                                        {getFileTypeDisplayText()}
                                                     </p>
                                                     {documentForm.data.file && (
                                                         <p className={`text-sm ${BRAND_CLASSES.textPrimary} font-medium mt-2`}>
@@ -351,7 +372,7 @@ export const DocumentUploadForm = ({
                                                         onClick={() => onDeleteDocument(document.id)}
                                                         className="text-red-600 hover:bg-red-50 ml-2 flex-shrink-0"
                                                     >
-                                                        <FileText className="h-4 w-4" />
+                                                        <Trash2 className="h-4 w-4" />
                                                     </Button>
                                                 </div>
                                             ))}
