@@ -74,4 +74,12 @@ class Role extends Model
     {
         $this->permissions()->sync($permissionIds);
     }
+
+    /**
+     * Get array of permission slugs for this role
+     */
+    public function getPermissionSlugs(): array
+    {
+        return $this->permissions()->pluck('slug')->toArray();
+    }
 }

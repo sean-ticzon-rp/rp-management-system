@@ -76,7 +76,7 @@ export default function Form({ invite, submission, requiredDocuments }) {
 
     const documentForm = useForm({
         document_type: '',
-        file: null,
+        files: [], // Changed from 'file' to 'files' array
         description: '',
     });
 

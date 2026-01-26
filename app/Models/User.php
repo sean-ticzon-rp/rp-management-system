@@ -111,27 +111,65 @@ class User extends Authenticatable implements MustVerifyEmail
     public function permissions()
     {
         return $this->belongsToMany(Permission::class, 'permission_user')
-                    ->withPivot(['granted', 'granted_by', 'granted_at', 'reason'])
+                    ->withPivot(['type', 'granted_by', 'granted_at', 'reason', 'expires_at'])
                     ->withTimestamps();
     }
 
     /**
+     * Permission overrides for this user (using UserPermissionOverride model)
+     */
+    public function permissionOverrides()
+    {
+        return $this->hasMany(UserPermissionOverride::class);
+    }
+
+    /**
+     * Granted permission overrides only
+     */
+    public function grantedOverrides()
+    {
+        return $this->hasMany(UserPermissionOverride::class)->grants();
+    }
+
+    /**
+     * Revoked permission overrides only
+     */
+    public function revokedOverrides()
+    {
+        return $this->hasMany(UserPermissionOverride::class)->revokes();
+    }
+
+    /**
      * Check if user has a specific permission
-     * Checks: 1) Direct user permission override, 2) Role permissions
+     * Priority: 1) User REVOKE override → deny, 2) User GRANT override → allow, 3) Role permission → allow, 4) Deny
      */
     public function hasPermission($permissionSlug): bool
     {
-        // Check if user has direct permission assignment (override)
+        // Check if user has direct permission override
         $userPermission = $this->permissions()
             ->where('slug', $permissionSlug)
             ->first();
 
         if ($userPermission) {
-            // If user has direct assignment, use that (granted true/false)
-            return $userPermission->pivot->granted;
+            $pivot = $userPermission->pivot;
+
+            // Check if override has expired
+            if ($pivot->expires_at && now()->greaterThan($pivot->expires_at)) {
+                // Expired override - fall through to role permissions
+            } else {
+                // 1. If explicitly REVOKED for this user → deny (highest priority)
+                if ($pivot->type === 'revoke') {
+                    return false;
+                }
+
+                // 2. If explicitly GRANTED to this user → allow
+                if ($pivot->type === 'grant') {
+                    return true;
+                }
+            }
         }
 
-        // Otherwise, check role permissions
+        // 3. Check role permissions
         return $this->roles()
             ->whereHas('permissions', function ($query) use ($permissionSlug) {
                 $query->where('slug', $permissionSlug);
@@ -225,18 +263,19 @@ class User extends Authenticatable implements MustVerifyEmail
 
     /**
      * Grant a permission directly to this user
+     * @deprecated Use PermissionService::grantToUser() instead
      */
     public function grantPermission($permissionSlug, $grantedBy = null, $reason = null)
     {
         $permission = Permission::where('slug', $permissionSlug)->first();
-        
+
         if (!$permission) {
             return false;
         }
 
         $this->permissions()->syncWithoutDetaching([
             $permission->id => [
-                'granted' => true,
+                'type' => 'grant',
                 'granted_by' => $grantedBy ?? auth()->id(),
                 'granted_at' => now(),
                 'reason' => $reason,
@@ -248,18 +287,19 @@ class User extends Authenticatable implements MustVerifyEmail
 
     /**
      * Revoke a permission directly from this user
+     * @deprecated Use PermissionService::revokeFromUser() instead
      */
     public function revokePermission($permissionSlug, $revokedBy = null, $reason = null)
     {
         $permission = Permission::where('slug', $permissionSlug)->first();
-        
+
         if (!$permission) {
             return false;
         }
 
         $this->permissions()->syncWithoutDetaching([
             $permission->id => [
-                'granted' => false,
+                'type' => 'revoke',
                 'granted_by' => $revokedBy ?? auth()->id(),
                 'granted_at' => now(),
                 'reason' => $reason,
@@ -283,6 +323,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     /**
      * Get all user permissions (from roles + direct assignments)
+     * @deprecated Use getEffectivePermissions() instead
      */
     public function getAllPermissions()
     {
@@ -296,6 +337,190 @@ class User extends Authenticatable implements MustVerifyEmail
         $userPermissions = $this->permissions;
 
         return $rolePermissions->merge($userPermissions)->unique('id');
+    }
+
+    /**
+     * Check if user has any of the given permissions
+     */
+    public function hasAnyPermission(array $slugs): bool
+    {
+        foreach ($slugs as $slug) {
+            if ($this->hasPermission($slug)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if user has all of the given permissions
+     */
+    public function hasAllPermissions(array $slugs): bool
+    {
+        foreach ($slugs as $slug) {
+            if (!$this->hasPermission($slug)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Get effective permissions (after applying role permissions + overrides)
+     */
+    public function getEffectivePermissions()
+    {
+        // Get all permissions from roles
+        $rolePermissions = $this->roles()
+            ->with('permissions')
+            ->get()
+            ->pluck('permissions')
+            ->flatten()
+            ->unique('id')
+            ->keyBy('id');
+
+        // Get user overrides
+        $overrides = $this->permissionOverrides()->active()->with('permission')->get();
+
+        // Apply overrides
+        foreach ($overrides as $override) {
+            if ($override->type === 'grant') {
+                // Add granted permission
+                $rolePermissions[$override->permission_id] = $override->permission;
+            } elseif ($override->type === 'revoke') {
+                // Remove revoked permission
+                unset($rolePermissions[$override->permission_id]);
+            }
+        }
+
+        return $rolePermissions->values();
+    }
+
+    /**
+     * Get array of effective permission slugs (cached for performance)
+     */
+    public function getEffectivePermissionSlugs(): array
+    {
+        return \Cache::remember(
+            "user:{$this->id}:permissions",
+            now()->addHours(1),
+            fn() => $this->getEffectivePermissions()->pluck('slug')->toArray()
+        );
+    }
+
+    /**
+     * Get permissions from roles only (no overrides)
+     */
+    public function getRolePermissions()
+    {
+        return $this->roles()
+            ->with('permissions')
+            ->get()
+            ->pluck('permissions')
+            ->flatten()
+            ->unique('id');
+    }
+
+    /**
+     * Get permission overrides only
+     */
+    public function getPermissionOverrides()
+    {
+        return $this->permissionOverrides()->active()->with('permission')->get();
+    }
+
+    /**
+     * Get permissions grouped by group for UI display
+     */
+    public function getPermissionsGroupedForUI(): array
+    {
+        $allPermissions = Permission::active()->orderBy('group')->orderBy('name')->get();
+        $rolePermissions = $this->getRolePermissions()->pluck('id')->toArray();
+        $overrides = $this->permissionOverrides()->active()->get()->keyBy('permission_id');
+
+        $grouped = [];
+
+        foreach ($allPermissions as $permission) {
+            $group = $permission->group ?? $permission->category ?? 'general';
+
+            if (!isset($grouped[$group])) {
+                $grouped[$group] = [];
+            }
+
+            $override = $overrides->get($permission->id);
+
+            $grouped[$group][] = [
+                'id' => $permission->id,
+                'name' => $permission->name,
+                'slug' => $permission->slug,
+                'description' => $permission->description,
+                'from_role' => in_array($permission->id, $rolePermissions),
+                'override' => $override ? $override->type : null,
+                'effective' => $this->hasPermission($permission->slug),
+                'override_info' => $override ? [
+                    'granted_by' => $override->grantedBy,
+                    'reason' => $override->reason,
+                    'expires_at' => $override->expires_at,
+                    'created_at' => $override->created_at,
+                ] : null,
+            ];
+        }
+
+        return $grouped;
+    }
+
+    /**
+     * Check if user has an override for this permission
+     * Returns: 'grant', 'revoke', or null
+     */
+    public function hasPermissionOverride(string $slug): ?string
+    {
+        $permission = Permission::where('slug', $slug)->first();
+        if (!$permission) {
+            return null;
+        }
+
+        $override = $this->permissionOverrides()->active()
+            ->where('permission_id', $permission->id)
+            ->first();
+
+        return $override ? $override->type : null;
+    }
+
+    /**
+     * Check if permission comes from user's role
+     */
+    public function isPermissionFromRole(string $slug): bool
+    {
+        return $this->roles()
+            ->whereHas('permissions', function ($query) use ($slug) {
+                $query->where('slug', $slug);
+            })
+            ->exists();
+    }
+
+    /**
+     * Check if permission is granted directly to user (override)
+     */
+    public function isPermissionGrantedDirectly(string $slug): bool
+    {
+        return $this->hasPermissionOverride($slug) === 'grant';
+    }
+
+    /**
+     * Check if permission is revoked for user (override)
+     */
+    public function isPermissionRevoked(string $slug): bool
+    {
+        return $this->hasPermissionOverride($slug) === 'revoke';
+    }
+
+    /**
+     * Clear permission cache for this user
+     */
+    public function clearPermissionCache(): void
+    {
+        \Cache::forget("user:{$this->id}:permissions");
     }
 
     // ============================================

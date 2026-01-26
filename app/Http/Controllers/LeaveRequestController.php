@@ -8,6 +8,8 @@ use App\Models\LeaveBalance;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use App\Mail\Leave\LeaveRequestSubmittedMail;
+use Illuminate\Support\Facades\Mail;
 
 class LeaveRequestController extends Controller
 {
@@ -59,7 +61,7 @@ class LeaveRequestController extends Controller
     public function create()
     {
         $user = auth()->user();
-        
+
         $leaveTypes = LeaveType::active()
             ->ordered()
             ->get()
@@ -93,16 +95,15 @@ class LeaveRequestController extends Controller
             'leave_type_id' => 'required|exists:leave_types,id',
             'start_date' => 'required|date|after_or_equal:today',
             'end_date' => 'required|date|after_or_equal:start_date',
-            'duration' => 'required|in:full_day,half_day_am,half_day_pm,custom_hours',
-            'custom_start_time' => 'nullable|required_if:duration,custom_hours|date_format:H:i',
-            'custom_end_time' => 'nullable|required_if:duration,custom_hours|date_format:H:i|after:custom_start_time',
             'reason' => 'required|string|max:1000',
-            'attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
             'emergency_contact_name' => 'nullable|string|max:255',
             'emergency_contact_phone' => 'nullable|string|max:20',
             'use_default_emergency_contact' => 'boolean',
             'availability' => 'nullable|in:reachable,offline,emergency_only',
         ]);
+
+        // All leaves are full day
+        $validated['duration'] = 'full_day';
 
         // ✅ GET LEAVE TYPE TO CHECK APPROVAL REQUIREMENTS
         $leaveType = LeaveType::findOrFail($validated['leave_type_id']);
@@ -126,11 +127,6 @@ class LeaveRequestController extends Controller
                 ($balance ? $balance->remaining_days : 0) . 
                 ' days remaining but requested ' . $totalDays . ' days.'
             );
-        }
-
-        // Handle file upload
-        if ($request->hasFile('attachment')) {
-            $validated['attachment'] = $request->file('attachment')->store('leave-attachments', 'private');
         }
 
         // Set default emergency contact if requested
@@ -181,13 +177,16 @@ class LeaveRequestController extends Controller
         }
 
         // Create leave request
-        LeaveRequest::create([
+        $leaveRequest = LeaveRequest::create([
             ...$validated,
             'user_id' => $user->id,
             'total_days' => $totalDays,
             'status' => $initialStatus,
             'manager_id' => null, // Open queue system
         ]);
+
+        // ✅ SEND EMAIL NOTIFICATION TO HR AND ADMIN
+        $this->notifyHRAndAdmin($leaveRequest);
 
         return redirect()->route('my-leaves.index')->with('success', $successMessage);
     }
@@ -271,16 +270,15 @@ class LeaveRequestController extends Controller
             'leave_type_id' => 'required|exists:leave_types,id',
             'start_date' => 'required|date|after_or_equal:today',
             'end_date' => 'required|date|after_or_equal:start_date',
-            'duration' => 'required|in:full_day,half_day_am,half_day_pm,custom_hours',
-            'custom_start_time' => 'nullable|required_if:duration,custom_hours|date_format:H:i',
-            'custom_end_time' => 'nullable|required_if:duration,custom_hours|date_format:H:i|after:custom_start_time',
             'reason' => 'required|string|max:1000',
-            'attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
             'emergency_contact_name' => 'nullable|string|max:255',
             'emergency_contact_phone' => 'nullable|string|max:20',
             'use_default_emergency_contact' => 'boolean',
             'availability' => 'nullable|in:reachable,offline,emergency_only',
         ]);
+
+        // All leaves are full day
+        $validated['duration'] = 'full_day';
 
         $totalDays = $this->calculateTotalDays(
             $validated['start_date'],
@@ -303,13 +301,6 @@ class LeaveRequestController extends Controller
             }
         }
 
-        if ($request->hasFile('attachment')) {
-            if ($leave->attachment) {
-                \Storage::disk('private')->delete($leave->attachment);
-            }
-            $validated['attachment'] = $request->file('attachment')->store('leave-attachments', 'private');
-        }
-
         if ($validated['use_default_emergency_contact']) {
             $validated['emergency_contact_name'] = $user->emergency_contact_name;
             $validated['emergency_contact_phone'] = $user->emergency_contact_phone;
@@ -320,10 +311,7 @@ class LeaveRequestController extends Controller
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'],
             'duration' => $validated['duration'],
-            'custom_start_time' => $validated['custom_start_time'] ?? null,
-            'custom_end_time' => $validated['custom_end_time'] ?? null,
             'reason' => $validated['reason'],
-            'attachment' => $validated['attachment'] ?? $leave->attachment,
             'emergency_contact_name' => $validated['emergency_contact_name'],
             'emergency_contact_phone' => $validated['emergency_contact_phone'],
             'availability' => $validated['availability'],
@@ -383,26 +371,38 @@ class LeaveRequestController extends Controller
     }
 
     /**
-     * Calculate total leave days based on duration type
+     * Calculate total leave days (always full days)
      */
     private function calculateTotalDays($startDate, $endDate, $duration)
     {
         $start = \Carbon\Carbon::parse($startDate);
         $end = \Carbon\Carbon::parse($endDate);
+        return $start->diffInDays($end) + 1;
+    }
 
-        $daysBetween = $start->diffInDays($end) + 1;
+    /**
+     * Send email notification to HR and Admin users
+     */
+    private function notifyHRAndAdmin(LeaveRequest $leaveRequest)
+    {
+        // Get all HR and Admin users
+        $hrAndAdminUsers = User::whereHas('roles', function ($query) {
+            $query->whereIn('slug', ['super-admin', 'admin', 'hr-manager']);
+        })
+        ->where('employment_status', 'active')
+        ->get();
 
-        switch ($duration) {
-            case 'half_day_am':
-            case 'half_day_pm':
-                return 0.5;
-            
-            case 'custom_hours':
-                return 0.5;
-            
-            case 'full_day':
-            default:
-                return $daysBetween;
+        // Load relationships for the email
+        $leaveRequest->load(['user', 'leaveType']);
+
+        // Send email to each HR/Admin user
+        foreach ($hrAndAdminUsers as $recipient) {
+            // Use work_email if available, otherwise fall back to primary email
+            $emailAddress = $recipient->work_email ?? $recipient->email;
+
+            if ($emailAddress) {
+                Mail::to($emailAddress)->send(new LeaveRequestSubmittedMail($leaveRequest));
+            }
         }
     }
 }

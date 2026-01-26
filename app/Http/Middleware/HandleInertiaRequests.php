@@ -36,7 +36,9 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $user ? [
                     ...$user->load('roles')->toArray(),
-                    // ✅ Add permissions to auth.user
+                    // ✅ New permission system - array of slugs
+                    'permissions' => $user->getEffectivePermissionSlugs(),
+                    // ✅ Legacy permission flags (for backward compatibility)
                     'can_approve_users' => $user->canApproveUsers(),
                     'can_approve_leaves' => $user->canApproveLeaves(),
                     'can_manage_inventory' => $user->canManageInventory(),

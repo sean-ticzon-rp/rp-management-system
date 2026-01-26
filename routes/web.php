@@ -1,21 +1,23 @@
 <?php
 
+use App\Http\Controllers\AssetController;
+use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EmployeeAssetController;
+use App\Http\Controllers\EmployeeDashboardController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\LeaveApprovalController;
+use App\Http\Controllers\LeaveBalanceController;
+use App\Http\Controllers\LeaveController;
+use App\Http\Controllers\LeaveRequestController;
+use App\Http\Controllers\LeaveTypeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\SettingsController;
-use App\Http\Controllers\UserImportController;
-use App\Http\Controllers\AssetController;
 use App\Http\Controllers\TaskController;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\LeaveController;
-use App\Http\Controllers\LeaveRequestController;
-use App\Http\Controllers\LeaveApprovalController;
-use App\Http\Controllers\LeaveTypeController;
-use App\Http\Controllers\EmployeeDashboardController;
-use App\Http\Controllers\EmployeeAssetController;
 use App\Http\Controllers\TicketController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\UserImportController;
 use App\Http\Controllers\Onboarding\OnboardingInviteController;
 use App\Http\Controllers\Onboarding\GuestOnboardingController;
 use App\Http\Controllers\Onboarding\OnboardingSubmissionController;
@@ -108,6 +110,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // ============================================
+    // 📅 CALENDAR MODULE
+    // ============================================
+    Route::prefix('calendar')->name('calendar.')->group(function () {
+        // Main calendar page (accessible to all authenticated users)
+        Route::get('/', [CalendarController::class, 'index'])->name('index');
+
+        // Export calendar data (requires team view permission)
+        Route::get('/export', [CalendarController::class, 'export'])->name('export');
+
+        // Save user calendar settings
+        Route::put('/settings', [CalendarController::class, 'saveSettings'])->name('settings.update');
+    });
+
+    // ============================================
     // 📋 EMPLOYEE LEAVE ROUTES (Self-Service)
     // ============================================
     Route::prefix('my-leaves')->name('my-leaves.')->group(function () {
@@ -193,6 +209,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // ============================================
+    // 💰 LEAVE BALANCE MANAGEMENT (HR/Admin only)
+    // ============================================
+    Route::prefix('leave-balances')->name('leave-balances.')->group(function () {
+        Route::get('/', [LeaveBalanceController::class, 'index'])->name('index');
+        Route::post('/reset', [LeaveBalanceController::class, 'reset'])->name('reset');
+        Route::get('/preview', [LeaveBalanceController::class, 'preview'])->name('preview');
+    });
+
+    // ============================================
     // 🎓 ONBOARDING MANAGEMENT (HR/Admin only)
     // ============================================
     Route::prefix('onboarding')->name('onboarding.')->group(function () {
@@ -234,6 +259,30 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/{task}/status', [TaskController::class, 'updateStatus'])->name('updateStatus');
         Route::delete('/{task}', [TaskController::class, 'destroy'])->name('destroy');
     });
+
+    // ============================================
+    // 🔐 PERMISSION MANAGEMENT
+    // ============================================
+
+    // User permission overrides management
+    Route::prefix('users/{user}/permissions')->name('users.permissions.')->group(function () {
+        Route::get('/', [App\Http\Controllers\UserPermissionController::class, 'edit'])->name('edit');
+        Route::put('/', [App\Http\Controllers\UserPermissionController::class, 'update'])->name('update');
+        Route::post('/reset', [App\Http\Controllers\UserPermissionController::class, 'reset'])->name('reset');
+        Route::post('/{permission}/grant', [App\Http\Controllers\UserPermissionController::class, 'grant'])->name('grant');
+        Route::post('/{permission}/revoke', [App\Http\Controllers\UserPermissionController::class, 'revoke'])->name('revoke');
+        Route::delete('/{permission}', [App\Http\Controllers\UserPermissionController::class, 'removeOverride'])->name('remove-override');
+    });
+
+    // Role built-in permissions management
+    Route::prefix('roles/{role}/permissions')->name('roles.permissions.')->group(function () {
+        Route::get('/', [App\Http\Controllers\RolePermissionController::class, 'edit'])->name('edit');
+        Route::put('/', [App\Http\Controllers\RolePermissionController::class, 'update'])->name('update');
+        Route::get('/preview', [App\Http\Controllers\RolePermissionController::class, 'preview'])->name('preview');
+    });
+
+    // Permission reference list
+    Route::get('/permissions', [App\Http\Controllers\PermissionController::class, 'index'])->name('permissions.index');
 });
 
 require __DIR__.'/auth.php';
