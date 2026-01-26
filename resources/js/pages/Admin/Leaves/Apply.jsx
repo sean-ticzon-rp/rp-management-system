@@ -19,19 +19,16 @@ import {
     Loader2,
     AlertCircle,
     Clock,
-    Upload,
     User,
     Phone,
     CheckCircle2,
     XCircle,
     Info,
-    FileText,
-    UserCheck,
     Users,
     Shield,
 } from 'lucide-react';
 
-export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user, managers = [], allUsers = [] }) {
+export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user, allUsers = [] }) {
     const { flash } = usePage().props;
     
     // ✅ Check if user is HR/Admin/Super Admin
@@ -45,25 +42,19 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
     const [employeeBalances, setEmployeeBalances] = useState({});
 
     const { data, setData, post, processing, errors } = useForm({
-        user_id: user?.id || '', // ✅ NEW: Target user (for proxy filing)
+        user_id: user?.id || '', // ✅ Target user (for proxy filing)
         leave_type_id: '',
         start_date: '',
         end_date: '',
-        duration: 'full_day',
-        custom_start_time: '',
-        custom_end_time: '',
         reason: '',
-        attachment: null,
         emergency_contact_name: user?.emergency_contact_name || '',
         emergency_contact_phone: user?.emergency_contact_phone || '',
         use_default_emergency_contact: true,
         availability: 'reachable',
-        manager_id: user?.manager_id?.toString() || '',
     });
 
     const [selectedLeaveType, setSelectedLeaveType] = useState(null);
     const [calculatedDays, setCalculatedDays] = useState(0);
-    const [filePreview, setFilePreview] = useState(null);
 
     // ✅ Handle employee selection (for HR/Admin filing for others)
     const handleEmployeeChange = (employeeId) => {
@@ -83,11 +74,10 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
             setEmployeeBalances(balancesMap);
         }
         
-        // Reset manager selection when employee changes
+        // Update form data with employee info
         setData({
             ...data,
             user_id: employeeId,
-            manager_id: employee?.manager_id?.toString() || '',
             emergency_contact_name: employee?.emergency_contact_name || '',
             emergency_contact_phone: employee?.emergency_contact_phone || '',
         });
@@ -101,7 +91,6 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
         setData({
             ...data,
             user_id: user.id,
-            manager_id: user?.manager_id?.toString() || '',
             emergency_contact_name: user?.emergency_contact_name || '',
             emergency_contact_phone: user?.emergency_contact_phone || '',
         });
@@ -115,42 +104,20 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
         }
     }, [data.leave_type_id, leaveTypes]);
 
-    // Calculate days whenever dates or duration changes
+    // Calculate days whenever dates change
     useEffect(() => {
         if (data.start_date && data.end_date) {
             calculateDays();
         } else {
             setCalculatedDays(0);
         }
-    }, [data.start_date, data.end_date, data.duration]);
+    }, [data.start_date, data.end_date]);
 
     const calculateDays = () => {
         const start = new Date(data.start_date);
         const end = new Date(data.end_date);
         const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
-
-        let total = 0;
-        switch (data.duration) {
-            case 'half_day_am':
-            case 'half_day_pm':
-            case 'custom_hours':
-                total = 0.5;
-                break;
-            case 'full_day':
-            default:
-                total = daysDiff;
-                break;
-        }
-
-        setCalculatedDays(total);
-    };
-
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            setData('attachment', file);
-            setFilePreview(file.name);
-        }
+        setCalculatedDays(daysDiff);
     };
 
     const handleSubmit = (e) => {
@@ -162,13 +129,9 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
     const activeBalances = filingForOther ? employeeBalances : leaveBalances;
     const selectedBalance = data.leave_type_id ? activeBalances[data.leave_type_id] : null;
 
-    const hasSufficientBalance = selectedBalance 
-        ? selectedBalance.remaining_days >= calculatedDays 
+    const hasSufficientBalance = selectedBalance
+        ? selectedBalance.remaining_days >= calculatedDays
         : true;
-
-    const requiresMedicalCert = selectedLeaveType?.requires_medical_cert && 
-        (selectedLeaveType.medical_cert_days_threshold === null || 
-         calculatedDays > selectedLeaveType.medical_cert_days_threshold);
 
     return (
         <AuthenticatedLayout
@@ -371,44 +334,6 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <Label htmlFor="duration">Duration *</Label>
-                                        <Select value={data.duration} onValueChange={(value) => setData('duration', value)}>
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="full_day">Full Day(s)</SelectItem>
-                                                <SelectItem value="half_day_am">Half Day - Morning (8 AM - 12 PM)</SelectItem>
-                                                <SelectItem value="half_day_pm">Half Day - Afternoon (1 PM - 5 PM)</SelectItem>
-                                                <SelectItem value="custom_hours">Custom Hours</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    {data.duration === 'custom_hours' && (
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="custom_start_time">Start Time</Label>
-                                                <Input
-                                                    id="custom_start_time"
-                                                    type="time"
-                                                    value={data.custom_start_time}
-                                                    onChange={(e) => setData('custom_start_time', e.target.value)}
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="custom_end_time">End Time</Label>
-                                                <Input
-                                                    id="custom_end_time"
-                                                    type="time"
-                                                    value={data.custom_end_time}
-                                                    onChange={(e) => setData('custom_end_time', e.target.value)}
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-
                                     {/* Days Calculation Display */}
                                     {calculatedDays > 0 && (
                                         <Alert className="bg-blue-50 border-blue-200">
@@ -434,63 +359,6 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                                 </CardContent>
                             </Card>
 
-                            {/* Manager Selection */}
-                            <Card className="animate-fade-in animation-delay-50">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <UserCheck className="h-5 w-5" />
-                                        Select Manager for Approval
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Choose the manager who will review this leave request
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="manager_id">Manager *</Label>
-                                        <Select 
-                                            value={data.manager_id.toString()} 
-                                            onValueChange={(value) => setData('manager_id', value)}
-                                        >
-                                            <SelectTrigger className={errors.manager_id ? 'border-red-500' : ''}>
-                                                <SelectValue placeholder="Select manager" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {Array.isArray(managers) && managers.length > 0 ? (
-                                                    managers.map((manager) => (
-                                                        <SelectItem key={manager.id} value={manager.id.toString()}>
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="flex items-center justify-center w-6 h-6 bg-blue-600 rounded-full">
-                                                                    <span className="text-xs font-medium text-white">
-                                                                        {manager.name.charAt(0).toUpperCase()}
-                                                                    </span>
-                                                                </div>
-                                                                <div>
-                                                                    <span className="font-medium">{manager.name}</span>
-                                                                    {manager.position && (
-                                                                        <span className="text-xs text-gray-500 ml-2">
-                                                                            - {manager.position}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </SelectItem>
-                                                    ))
-                                                ) : (
-                                                    <SelectItem value="none" disabled>No managers available</SelectItem>
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                        {errors.manager_id && (
-                                            <p className="text-sm text-red-500 flex items-center gap-1">
-                                                <AlertCircle className="h-4 w-4" />
-                                                {errors.manager_id}
-                                            </p>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-
                             {/* Reason & Attachment */}
                             <Card className="animate-fade-in animation-delay-100">
                                 <CardHeader>
@@ -510,43 +378,6 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                                         />
                                         {errors.reason && (
                                             <p className="text-sm text-red-500">{errors.reason}</p>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="attachment">
-                                            Medical Certificate / Supporting Document
-                                            {requiresMedicalCert && <span className="text-red-600 ml-1">*</span>}
-                                        </Label>
-                                        <div className="flex items-center gap-3">
-                                            <input
-                                                type="file"
-                                                id="attachment"
-                                                className="hidden"
-                                                accept=".pdf,.jpg,.jpeg,.png"
-                                                onChange={handleFileChange}
-                                            />
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                onClick={() => document.getElementById('attachment').click()}
-                                            >
-                                                <Upload className="h-4 w-4 mr-2" />
-                                                Choose File
-                                            </Button>
-                                            {filePreview && (
-                                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                                    <FileText className="h-4 w-4" />
-                                                    {filePreview}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <p className="text-xs text-gray-500">
-                                            PDF, JPG, PNG up to 5MB
-                                            {requiresMedicalCert && ' · Medical certificate required for this leave'}
-                                        </p>
-                                        {errors.attachment && (
-                                            <p className="text-sm text-red-500">{errors.attachment}</p>
                                         )}
                                     </div>
 

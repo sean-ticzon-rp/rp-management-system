@@ -47,6 +47,8 @@ class DatabaseSeeder extends Seeder
             LeaveTypeSeeder::class,
             TestUsersSeeder::class,
             LeaveRequestSeeder::class,
+            CalendarEventTypeSeeder::class,
+            CalendarTestDataSeeder::class,
         ]);
     }
 }
