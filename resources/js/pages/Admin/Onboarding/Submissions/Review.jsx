@@ -35,6 +35,8 @@ import {
     UserCheck,
     Briefcase,
     Building2,
+    Lock,
+    Unlock,
 } from 'lucide-react';
 import { StatusBadge } from '@/components/onboarding/shared/StatusBadge';
 import { DocumentCard } from '@/components/onboarding/shared/DocumentCard';
@@ -156,7 +158,7 @@ export default function Review({ submission, checklist }) {
                                     className="border-red-200 text-red-600 hover:bg-red-50"
                                     onClick={() => setShowRejectDialog(true)}
                                 >
-                                    <XCircle className="h-4 w-4 mr-2" />
+                                    <Unlock className="h-4 w-4 mr-2" />
                                     Request Revisions
                                 </Button>
                                 <div className="relative">
@@ -170,7 +172,7 @@ export default function Review({ submission, checklist }) {
                                             ? 'No documents waiting for approval'
                                             : 'Approve all uploaded documents'}
                                     >
-                                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                                        <Lock className="h-4 w-4 mr-2" />
                                         Approve All
                                     </Button>
                                 </div>
@@ -390,128 +392,14 @@ export default function Review({ submission, checklist }) {
                                             {/* Individual files */}
                                             <div className="space-y-2 pl-4">
                                                 {docs.map((doc) => (
-                                                    <div key={doc.id} className="border rounded-lg p-4 space-y-3 bg-white hover:shadow-md transition-shadow">
-                                                        <div className="flex items-start justify-between">
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="flex items-center gap-2 mb-2">
-                                                                    <div className={`p-1.5 rounded ${
-                                                                        doc.status === 'approved' ? 'bg-green-100' :
-                                                                            doc.status === 'rejected' ? 'bg-red-100' :
-                                                                                'bg-yellow-100'
-                                                                    }`}>
-                                                                        <FileText className={`h-4 w-4 ${
-                                                                            doc.status === 'approved' ? 'text-green-600' :
-                                                                                doc.status === 'rejected' ? 'text-red-600' :
-                                                                                    'text-yellow-600'
-                                                                        }`} />
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <p className="font-medium text-sm text-gray-900 truncate">
-                                                                            {doc.filename}
-                                                                        </p>
-                                                                        <p className="text-xs text-gray-500">
-                                                                            {doc.file_size} • Uploaded {new Date(doc.created_at).toLocaleDateString()}
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
-
-                                                                {doc.description && (
-                                                                    <div className="bg-gray-50 rounded p-2 mb-2">
-                                                                        <p className="text-xs text-gray-600">
-                                                                            <strong>Note:</strong> {doc.description}
-                                                                        </p>
-                                                                    </div>
-                                                                )}
-
-                                                                {doc.rejection_reason && (
-                                                                    <div className="bg-red-50 border border-red-200 rounded p-2">
-                                                                        <p className="text-xs text-red-800">
-                                                                            <strong>Rejected:</strong> {doc.rejection_reason}
-                                                                        </p>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <StatusBadge status={doc.status} variant="document" />
-                                                        </div>
-
-                                                        {/* Action Buttons */}
-                                                        <div className="flex gap-2">
-                                                            <a
-                                                                href={doc.view_url}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="flex-1"
-                                                            >
-                                                                <Button variant="outline" size="sm" className="w-full">
-                                                                    <Eye className="h-4 w-4 mr-2" />
-                                                                    View in New Tab
-                                                                </Button>
-                                                            </a>
-                                                            <a
-                                                                href={doc.download_url}
-                                                                className="flex-1"
-                                                            >
-                                                                <Button variant="outline" size="sm" className="w-full">
-                                                                    <Download className="h-4 w-4 mr-2" />
-                                                                    Download
-                                                                </Button>
-                                                            </a>
-                                                        </div>
-
-                                                        {/* Approve/Reject for uploaded docs */}
-                                                        {doc.status === 'uploaded' && (
-                                                            <div className="flex gap-2 pt-3 border-t">
-                                                                <Button
-                                                                    size="sm"
-                                                                    className="flex-1 bg-green-600 hover:bg-green-700"
-                                                                    onClick={() => approveDocument(doc)}
-                                                                >
-                                                                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                                                                    Approve
-                                                                </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
-                                                                    onClick={() => openRejectDocDialog(doc)}
-                                                                >
-                                                                    <XCircle className="h-4 w-4 mr-2" />
-                                                                    Reject
-                                                                </Button>
-                                                            </div>
-                                                        )}
-
-
-
-                                                        {/* Show re-approval option for rejected docs */}
-                                                        {doc.status === 'rejected' && (
-                                                            <div className="pt-3 border-t">
-                                                                <Button
-                                                                    size="sm"
-                                                                    className="w-full bg-green-600 hover:bg-green-700"
-                                                                    onClick={() => approveDocument(doc)}
-                                                                >
-                                                                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                                                                    Approve This Document
-                                                                </Button>
-                                                            </div>
-                                                        )}
-
-                                                        {/* Show reject option for approved docs */}
-                                                        {doc.status === 'approved' && (
-                                                            <div className="pt-3 border-t">
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    className="w-full border-red-200 text-red-600 hover:bg-red-50"
-                                                                    onClick={() => openRejectDocDialog(doc)}
-                                                                >
-                                                                    <XCircle className="h-4 w-4 mr-2" />
-                                                                    Revoke Approval
-                                                                </Button>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                    <DocumentCard
+                                                        key={doc.id}
+                                                        document={doc}
+                                                        showActions={true}
+                                                        showAdminActions={true}
+                                                        onApprove={approveDocument}
+                                                        onReject={openRejectDocDialog}
+                                                    />
                                                 ))}
                                             </div>
                                         </div>
