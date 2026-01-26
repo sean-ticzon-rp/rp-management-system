@@ -119,21 +119,58 @@ class OnboardingSubmissionController extends Controller
     }
 
     /**
-     * Approve entire submission
+     * Bulk approve all uploaded documents
+     * Note: This does NOT finalize the submission
+     * Cannot approve if any documents are rejected (they need to be reuploaded first)
      */
     public function approve(Request $request, OnboardingSubmission $submission)
     {
         // Policy authorization
-        $this->authorize('finalize', $submission);
-
-        $validated = $request->validate([
-            'hr_notes' => 'nullable|string|max:1000',
-        ]);
+        $this->authorize('approveDocument', OnboardingSubmission::class);
 
         try {
-            $this->submissionService->finalizeOnboarding($submission, $validated['hr_notes'] ?? null);
+            $count = DB::transaction(function() use ($submission) {
+                $totalDocs = $submission->documents()->count();
+                $uploadedCount = $submission->documents()
+                    ->where('status', OnboardingDocument::STATUS_UPLOADED)
+                    ->count();
+                $approvedCount = $submission->documents()
+                    ->where('status', OnboardingDocument::STATUS_APPROVED)
+                    ->count();
+                $rejectedCount = $submission->documents()
+                    ->where('status', OnboardingDocument::STATUS_REJECTED)
+                    ->count();
 
-            return back()->with('success', 'Submission approved! You can now convert this to a user account.');
+                // Validation
+                if ($totalDocs === 0) {
+                    throw new \Exception('No documents have been uploaded yet.');
+                }
+
+                if ($rejectedCount > 0) {
+                    throw new \Exception("Cannot approve all documents. {$rejectedCount} document(s) are rejected and need to be reuploaded first.");
+                }
+
+                if ($uploadedCount === 0) {
+                    if ($approvedCount === $totalDocs) {
+                        throw new \Exception('All documents are already approved.');
+                    }
+                    throw new \Exception('No documents waiting for approval.');
+                }
+
+                // Bulk approve all uploaded documents
+                $submission->documents()
+                    ->where('status', OnboardingDocument::STATUS_UPLOADED)
+                    ->update([
+                        'status' => OnboardingDocument::STATUS_APPROVED,
+                        'verified_at' => now(),
+                        'verified_by' => auth()->id(),
+                        'rejection_reason' => null,
+                    ]);
+
+                return $uploadedCount;
+            });
+
+            return back()->with('success', "Successfully approved {$count} document(s).");
 
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
@@ -141,30 +178,59 @@ class OnboardingSubmissionController extends Controller
     }
 
     /**
-     * Reject/request revisions for a submission
+     * Bulk reject all documents and request revisions
+     * This rejects all uploaded/approved documents so candidate can reupload
      */
     public function reject(Request $request, OnboardingSubmission $submission)
     {
         // Policy authorization
-        $this->authorize('finalize', $submission);
+        $this->authorize('approveDocument', OnboardingSubmission::class);
 
         $validated = $request->validate([
             'rejection_reason' => 'required|string|max:1000',
         ]);
 
         try {
-            // Update submission status back to draft and add rejection note
-            $submission->update([
-                'status' => OnboardingSubmission::STATUS_DRAFT,
-                'hr_notes' => $validated['rejection_reason'],
-                'reviewed_by' => auth()->id(),
-                'reviewed_at' => now(),
-            ]);
+            $count = DB::transaction(function() use ($submission, $validated) {
+                // Count documents that can be rejected (uploaded or approved)
+                $count = $submission->documents()
+                    ->whereIn('status', [
+                        OnboardingDocument::STATUS_UPLOADED,
+                        OnboardingDocument::STATUS_APPROVED
+                    ])
+                    ->count();
 
-            // Optionally send notification email to candidate
-            // Notify::send($submission->invite, new OnboardingRevisionRequested($submission));
+                if ($count === 0) {
+                    throw new \Exception('No documents to reject. All documents may already be rejected.');
+                }
 
-            return back()->with('success', 'Revision request sent to candidate.');
+                // Bulk reject all uploaded/approved documents
+                $submission->documents()
+                    ->whereIn('status', [
+                        OnboardingDocument::STATUS_UPLOADED,
+                        OnboardingDocument::STATUS_APPROVED
+                    ])
+                    ->update([
+                        'status' => OnboardingDocument::STATUS_REJECTED,
+                        'rejection_reason' => $validated['rejection_reason'],
+                        'verified_at' => now(),
+                        'verified_by' => auth()->id(),
+                    ]);
+
+                // Add HR notes to submission for tracking
+                $submission->update([
+                    'hr_notes' => "Revisions requested: " . $validated['rejection_reason'],
+                    'reviewed_by' => auth()->id(),
+                    'reviewed_at' => now(),
+                ]);
+
+                return $count;
+            });
+
+            // TODO: Send notification email to candidate
+            // Notify::send($submission->invite, new DocumentsRejected($submission));
+
+            return back()->with('success', "Rejected {$count} document(s). Candidate will be notified to reupload.");
 
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
@@ -187,46 +253,6 @@ class OnboardingSubmissionController extends Controller
             $this->documentService->rejectDocument($document, $validated['rejection_reason']);
 
             return back()->with('success', 'Document rejected. Candidate will be notified.');
-
-        } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
-        }
-    }
-
-    /**
-     * Bulk approve all uploaded documents for a submission
-     */
-    public function bulkApproveDocuments(OnboardingSubmission $submission)
-    {
-        // Policy authorization
-        $this->authorize('approveDocument', OnboardingSubmission::class);
-
-        try {
-            // Use transaction for atomic operation
-            $count = DB::transaction(function() use ($submission) {
-                // Get count first
-                $count = $submission->documents()
-                    ->where('status', OnboardingDocument::STATUS_UPLOADED)
-                    ->count();
-
-                if ($count === 0) {
-                    throw new \Exception('No documents waiting for approval.');
-                }
-
-                // Bulk update - single query instead of loop
-                $submission->documents()
-                    ->where('status', OnboardingDocument::STATUS_UPLOADED)
-                    ->update([
-                        'status' => OnboardingDocument::STATUS_APPROVED,
-                        'verified_at' => now(),
-                        'verified_by' => auth()->id(),
-                        'rejection_reason' => null,
-                    ]);
-
-                return $count;
-            });
-
-            return back()->with('success', "Approved {$count} document(s)!");
 
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
