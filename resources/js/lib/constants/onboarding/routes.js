@@ -43,7 +43,6 @@ export const ADMIN_ONBOARDING_ROUTES = {
     // Document approval/rejection
     APPROVE_DOCUMENT: 'onboarding.submissions.approve-document',
     REJECT_DOCUMENT: 'onboarding.submissions.reject-document',
-    BULK_APPROVE_DOCUMENTS: 'onboarding.submissions.bulk-approve-documents',
 
     // User conversion
     CONVERT_TO_USER: 'onboarding.invites.convert-to-user',

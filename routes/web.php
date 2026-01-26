@@ -206,7 +206,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/{submission}/reject', [OnboardingSubmissionController::class, 'reject'])->name('reject');
             Route::post('/documents/{document}/approve', [OnboardingSubmissionController::class, 'approveDocument'])->name('approve-document');
             Route::post('/documents/{document}/reject', [OnboardingSubmissionController::class, 'rejectDocument'])->name('reject-document');
-            Route::post('/{submission}/bulk-approve-documents', [OnboardingSubmissionController::class, 'bulkApproveDocuments'])->name('bulk-approve-documents');
             Route::get('/documents/{document}/view', [OnboardingDocumentDownloadController::class, 'view'])->name('view-document');
             Route::get('/documents/{document}/download', [OnboardingDocumentDownloadController::class, 'download'])->name('download-document');
         });
