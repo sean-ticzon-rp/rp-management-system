@@ -69,7 +69,48 @@
 
 ## Test Accounts
 
-After running `php artisan migrate:fresh --seed`, check the terminal output for the complete user summary with all test account emails and roles. All passwords are: `password`
+After running `php artisan migrate:fresh --seed`, you can log in with any of these test accounts:
+
+### Super Admin (1 user)
+| Name | Email | Role | Employee ID |
+|------|-------|------|-------------|
+| Super Admin | superadmin@example.com | super-admin | SA-001 |
+
+### Admins (2 users)
+| Name | Email | Role | Employee ID |
+|------|-------|------|-------------|
+| Admin One | admin1@example.com | admin | ADM-001 |
+| Admin Two | admin2@example.com | admin | ADM-002 |
+
+### HR Managers (2 users)
+| Name | Email | Role | Employee ID |
+|------|-------|------|-------------|
+| HR Manager One | hr1@example.com | hr-manager | HR-001 |
+| HR Manager Two | hr2@example.com | hr-manager | HR-002 |
+
+### Project Managers (2 users)
+| Name | Email | Role | Employee ID |
+|------|-------|------|-------------|
+| Project Manager One | pm1@example.com | project-manager | PM-001 |
+| Project Manager Two | pm2@example.com | project-manager | PM-002 |
+
+### Lead Engineers (3 users)
+| Name | Email | Role | Employee ID |
+|------|-------|------|-------------|
+| Lead Engineer One | lead1@example.com | lead-engineer | LEAD-001 |
+| Lead Engineer Two | lead2@example.com | lead-engineer | LEAD-002 |
+| Lead Engineer Three | lead3@example.com | lead-engineer | LEAD-003 |
+
+### Senior Engineers (3 users)
+| Name | Email | Role | Employee ID |
+|------|-------|------|-------------|
+| Senior Engineer One | senior1@example.com | senior-engineer | SEN-001 |
+| Senior Engineer Two | senior2@example.com | senior-engineer | SEN-002 |
+| Senior Engineer Three | senior3@example.com | senior-engineer | SEN-003 |
+
+**Password for all accounts:** `password`
+
+**Total Users:** 14 (13 can approve leave requests)
 
 ## Leave Balance System
 

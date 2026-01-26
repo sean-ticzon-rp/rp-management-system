@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
     DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -28,18 +31,18 @@ import {
 } from '@/components/ui/tooltip';
 import { UserMenuContent } from '@/components/user-menu-content';
 import { useInitials } from '@/hooks/use-initials';
+import { useTimezone } from '@/hooks/use-timezone.jsx';
 import { cn } from '@/lib/utils';
-import { dashboard } from '@/routes';
 import { type BreadcrumbItem, type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, Menu, Search } from 'lucide-react';
+import { BookOpen, Folder, LayoutGrid, Menu, Search, Globe } from 'lucide-react';
 import AppLogo from './app-logo';
 import AppLogoIcon from './app-logo-icon';
 
 const mainNavItems: NavItem[] = [
     {
         title: 'Dashboard',
-        href: dashboard(),
+        href: '/dashboard',
         icon: LayoutGrid,
     },
 ];
@@ -68,6 +71,10 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
     const page = usePage<SharedData>();
     const { auth } = page.props;
     const getInitials = useInitials();
+    const { timezone, setTimezone, timezones } = useTimezone();
+
+    const currentTimezone = timezones.find(tz => tz.id === timezone) || timezones[2];
+
     return (
         <>
             <div className="border-b border-sidebar-border/80">
@@ -145,7 +152,7 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                     </div>
 
                     <Link
-                        href={dashboard()}
+                        href="/dashboard"
                         prefetch
                         className="flex items-center space-x-2"
                     >
@@ -238,6 +245,49 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                                 ))}
                             </div>
                         </div>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-9 w-9"
+                                    title={`${currentTimezone.name} (${currentTimezone.offset})`}
+                                >
+                                    <img
+                                        src={currentTimezone.flag}
+                                        alt={currentTimezone.name}
+                                        className="h-5 w-5 rounded-sm object-cover"
+                                    />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuLabel className="flex items-center gap-2">
+                                    <Globe className="h-4 w-4" />
+                                    Select Timezone
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                {timezones.map((tz) => (
+                                    <DropdownMenuItem
+                                        key={tz.id}
+                                        onClick={() => setTimezone(tz.id)}
+                                        className={cn(
+                                            "flex items-center justify-between cursor-pointer",
+                                            timezone === tz.id && "bg-accent"
+                                        )}
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <img
+                                                src={tz.flag}
+                                                alt={tz.name}
+                                                className="h-4 w-4 rounded-sm object-cover"
+                                            />
+                                            <span>{tz.name}</span>
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">{tz.offset}</span>
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button
