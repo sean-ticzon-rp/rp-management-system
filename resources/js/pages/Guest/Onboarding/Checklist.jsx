@@ -14,6 +14,11 @@ import {
 } from 'lucide-react';
 
 export default function Checklist({ invite, submission, checklist }) {
+    // Check if any documents are pending approval
+    const hasUnapprovedDocuments = submission?.documents?.some(doc =>
+        doc.status === 'uploaded' || doc.status === 'rejected'
+    );
+
     const getStatusColor = (status) => {
         switch (status) {
             case 'complete':
@@ -81,6 +86,17 @@ export default function Checklist({ invite, submission, checklist }) {
                             You'll receive an email notification once your onboarding has been approved.
                         </AlertDescription>
                     </Alert>
+
+                    {/* Document Review Pending Alert */}
+                    {hasUnapprovedDocuments && (
+                        <Alert className="border-yellow-300 bg-yellow-50">
+                            <Clock className="h-4 w-4 text-yellow-600" />
+                            <AlertDescription className="text-yellow-800">
+                                <strong>Document Review In Progress:</strong> Please wait for our reviewer to review and approve your documents.
+                                You'll be notified once all documents have been reviewed.
+                            </AlertDescription>
+                        </Alert>
+                    )}
 
                     {/* Completion Progress */}
                     <Card>
