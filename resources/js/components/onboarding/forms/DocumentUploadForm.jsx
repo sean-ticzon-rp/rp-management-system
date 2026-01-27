@@ -40,6 +40,7 @@ import {
  * @param {Object} props.requiredDocuments - Required document types configuration
  * @param {Object} props.documentForm - Inertia form instance for document uploads
  * @param {string} props.inviteToken - Invite token for API calls
+ * @param {Object} props.submissionStatus - Validation status (can_submit, blocker, missing_documents)
  * @param {Function} props.onBack - Handler for going back to previous step
  * @param {Function} props.onDeleteDocument - Handler for deleting a document
  * @param {Function} props.onFinalSubmit - Handler for final submission
@@ -50,6 +51,7 @@ export const DocumentUploadForm = ({
     requiredDocuments,
     documentForm,
     inviteToken,
+    submissionStatus,
     onBack,
     onDeleteDocument,
     onFinalSubmit,
@@ -92,7 +94,11 @@ export const DocumentUploadForm = ({
 
     const uploadedRequiredCount = countUploadedRequiredTypes(requiredDocuments, submission?.documents);
     const requiredCount = countRequiredDocumentTypes(requiredDocuments);
-    const canSubmit = uploadedRequiredCount >= requiredCount;
+
+    // Use submissionStatus if available, otherwise fall back to simple count check
+    const canSubmit = submissionStatus ? submissionStatus.can_submit : (uploadedRequiredCount >= requiredCount);
+    const blockerMessage = submissionStatus?.blocker || null;
+    const missingDocuments = submissionStatus?.missing_documents || [];
 
     // Get accepted file types for selected document type
     const getAcceptedFileTypes = () => {
@@ -423,19 +429,19 @@ export const DocumentUploadForm = ({
                     </div>
 
                     {/* Missing Required Document Types Alert */}
-                    {!canSubmit && (
+                    {!canSubmit && blockerMessage && (
                         <Alert className="mb-4 border-orange-300 bg-orange-50">
                             <Info className="h-4 w-4 text-orange-600" />
                             <AlertDescription className="text-orange-800">
-                                <strong>Missing required documents:</strong>
-                                <ul className="list-disc list-inside mt-2">
-                                    {Object.entries(requiredDocuments || {})
-                                        .filter(([key, doc]) => doc.required && !hasDocumentType(submission?.documents, key))
-                                        .map(([key, doc]) => (
-                                            <li key={key}>{doc.label}</li>
-                                        ))
-                                    }
-                                </ul>
+                                <strong>Cannot submit yet:</strong>
+                                <p className="mt-1">{blockerMessage}</p>
+                                {missingDocuments.length > 0 && (
+                                    <ul className="list-disc list-inside mt-2">
+                                        {missingDocuments.map((doc, index) => (
+                                            <li key={index}>{doc}</li>
+                                        ))}
+                                    </ul>
+                                )}
                             </AlertDescription>
                         </Alert>
                     )}
@@ -448,7 +454,8 @@ export const DocumentUploadForm = ({
                         <Button
                             onClick={onFinalSubmit}
                             disabled={!canSubmit}
-                            className="bg-green-600 hover:bg-green-700"
+                            title={!canSubmit && blockerMessage ? blockerMessage : 'Submit your onboarding form to HR for review'}
+                            className={`bg-green-600 hover:bg-green-700 ${!canSubmit ? 'cursor-not-allowed opacity-50' : ''}`}
                         >
                             <Send className="h-4 w-4 mr-2" />
                             Submit to HR
