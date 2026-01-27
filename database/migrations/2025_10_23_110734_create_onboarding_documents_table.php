@@ -26,7 +26,6 @@ return new class extends Migration
                 'birth_certificate',
                 'nbi_clearance',
                 'pnp_clearance',
-                // 'police_clearance',
                 'medical_certificate',
                 'diploma',
                 'transcript',
@@ -42,11 +41,10 @@ return new class extends Migration
 
             // Verification Status
             $table->enum('status', [
-                'pending',      // Uploaded, waiting for HR review
-                'approved',     // HR verified document
-                'rejected',     // HR rejected (needs reupload)
-                'expired',      // Document expired (e.g., old medical cert)
-            ])->default('pending');
+                'uploaded',    // Candidate uploaded (replaces 'draft')
+                'approved',    // HR verified
+                'rejected',    // HR rejected - needs reupload
+            ])->default('uploaded');
 
             $table->text('rejection_reason')->nullable(); // Why rejected
             $table->timestamp('verified_at')->nullable();

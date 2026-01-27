@@ -33,6 +33,10 @@ class OnboardingInvite extends Model
         'approved_at' => 'datetime',
     ];
 
+    protected $appends = [
+        'full_name',
+    ];
+
     // ============================================
     // RELATIONSHIPS
     // ============================================

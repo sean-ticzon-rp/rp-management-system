@@ -51,7 +51,7 @@ export default function AuthenticatedLayout({ header, children }) {
     const { can } = usePermission();
     const { timezone, setTimezone, timezones } = useTimezone();
     const currentTimezone = timezones.find(tz => tz.id === timezone) || timezones[2];
-    
+
     const toggleSection = (sectionName) => {
         setExpandedSections(prev => ({
             ...prev,
@@ -237,8 +237,8 @@ export default function AuthenticatedLayout({ header, children }) {
         if (cleanHref === '/individual-assets' && cleanUrl.startsWith('/individual-assets/')) return true;
         if (cleanHref === '/projects' && cleanUrl.startsWith('/projects/')) return true;
         if (cleanHref === '/tasks' && cleanUrl.startsWith('/tasks/')) return true;
-        if (cleanHref === '/onboarding/invites' && cleanUrl.startsWith('/onboarding/')) return true;
-        if (cleanHref === '/onboarding/submissions' && cleanUrl.startsWith('/onboarding/')) return true;
+        if (cleanHref === '/onboarding/invites' && cleanUrl.startsWith('/onboarding/invites')) return true;
+        if (cleanHref === '/onboarding/submissions' && cleanUrl.startsWith('/onboarding/submissions')) return true;
 
         return false;
     };

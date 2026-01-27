@@ -18,7 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
-            \App\Http\Middleware\CheckAccountStatus::class, // ✅ ADD THIS
+            \App\Http\Middleware\CheckAccountStatus::class,
 
         ]);
 
@@ -38,6 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Register middleware aliases
         $middleware->alias([
             'permission' => \App\Http\Middleware\CheckPermission::class,
+            'validate.onboarding.invite' => \App\Http\Middleware\ValidateOnboardingInvite::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

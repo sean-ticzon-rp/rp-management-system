@@ -8,6 +8,7 @@ import { Badge } from '@/Components/ui/badge';
 import { Progress } from '@/Components/ui/progress';
 import { Textarea } from '@/Components/ui/textarea';
 import { Label } from '@/Components/ui/label';
+import { Alert, AlertDescription } from '@/Components/ui/alert';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -29,14 +30,19 @@ import {
     User,
     Mail,
     Phone,
-    MapPin,
     CreditCard,
     AlertTriangle,
     UserCheck,
-    Clock,
     Briefcase,
     Building2,
+    Lock,
+    Unlock,
 } from 'lucide-react';
+import { StatusBadge } from '@/components/onboarding/shared/StatusBadge';
+import { DocumentCard } from '@/components/onboarding/shared/DocumentCard';
+import { ADMIN_ONBOARDING_ROUTES } from '@/lib/constants/onboarding/routes';
+import { groupDocumentsByType } from '@/lib/utils/documentHelpers';
+import { generateWorkEmail, DEFAULT_TEMP_PASSWORD } from '@/lib/utils/emailHelpers';
 
 export default function Review({ submission, checklist }) {
     const [showApproveDialog, setShowApproveDialog] = useState(false);
@@ -45,9 +51,7 @@ export default function Review({ submission, checklist }) {
     const [selectedDocument, setSelectedDocument] = useState(null);
     const [showDocRejectDialog, setShowDocRejectDialog] = useState(false);
 
-    const approveForm = useForm({
-        hr_notes: '',
-    });
+    const approveForm = useForm({});
 
     const rejectForm = useForm({
         rejection_reason: '',
@@ -57,8 +61,13 @@ export default function Review({ submission, checklist }) {
         rejection_reason: '',
     });
 
+    // Check if any documents are rejected (prevents approve all)
+    const hasRejectedDocuments = submission.documents?.some(doc => doc.status === 'rejected') || false;
+    const rejectedCount = submission.documents?.filter(doc => doc.status === 'rejected').length || 0;
+    const uploadedCount = submission.documents?.filter(doc => doc.status === 'uploaded').length || 0;
+
     const approveDocument = (document) => {
-        router.post(route('onboarding.submissions.approve-document', document.id), {}, {
+        router.post(route(ADMIN_ONBOARDING_ROUTES.APPROVE_DOCUMENT, document.id), {}, {
             preserveScroll: true,
         });
     };
@@ -70,7 +79,7 @@ export default function Review({ submission, checklist }) {
 
     const rejectDocument = () => {
         if (selectedDocument) {
-            docRejectForm.post(route('onboarding.submissions.reject-document', selectedDocument.id), {
+            docRejectForm.post(route(ADMIN_ONBOARDING_ROUTES.REJECT_DOCUMENT, selectedDocument.id), {
                 preserveScroll: true,
                 onSuccess: () => {
                     setShowDocRejectDialog(false);
@@ -82,7 +91,8 @@ export default function Review({ submission, checklist }) {
     };
 
     const handleApproveSubmission = () => {
-        approveForm.post(route('onboarding.submissions.approve', submission.id), {
+        approveForm.post(route(ADMIN_ONBOARDING_ROUTES.APPROVE, submission.id), {
+            preserveScroll: true,
             onSuccess: () => {
                 setShowApproveDialog(false);
                 approveForm.reset();
@@ -91,7 +101,8 @@ export default function Review({ submission, checklist }) {
     };
 
     const handleRejectSubmission = () => {
-        rejectForm.post(route('onboarding.submissions.reject', submission.id), {
+        rejectForm.post(route(ADMIN_ONBOARDING_ROUTES.REJECT, submission.id), {
+            preserveScroll: true,
             onSuccess: () => {
                 setShowRejectDialog(false);
                 rejectForm.reset();
@@ -100,35 +111,11 @@ export default function Review({ submission, checklist }) {
     };
 
     const handleConvertToUser = () => {
-        router.post(route('onboarding.invites.convert-to-user', submission.invite.id), {
+        router.post(route(ADMIN_ONBOARDING_ROUTES.CONVERT_TO_USER, submission.invite.id), {
             onSuccess: () => {
                 setShowConvertDialog(false);
             },
         });
-    };
-
-    const getStatusBadge = (status) => {
-        const badges = {
-            pending: { color: 'bg-yellow-100 text-yellow-700 border-yellow-200', icon: Clock },
-            approved: { color: 'bg-green-100 text-green-700 border-green-200', icon: CheckCircle2 },
-            rejected: { color: 'bg-red-100 text-red-700 border-red-200', icon: XCircle },
-        };
-        const badge = badges[status] || badges.pending;
-        const Icon = badge.icon;
-        return (
-            <Badge className={`${badge.color} border`}>
-                <Icon className="h-3 w-3 mr-1" />
-                {status}
-            </Badge>
-        );
-    };
-
-    // Generate work email preview
-    const generateWorkEmail = () => {
-        const personal = submission.personal_info || {};
-        const firstName = (personal.first_name || '').toLowerCase();
-        const lastName = (personal.last_name || '').toLowerCase();
-        return `${firstName}.${lastName}@rocketpartners.ph`;
     };
 
     return (
@@ -139,7 +126,7 @@ export default function Review({ submission, checklist }) {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href={route('onboarding.submissions.index')}>
+                        <Link href={route(ADMIN_ONBOARDING_ROUTES.INDEX)}>
                             <Button variant="outline" size="sm">
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back to Submissions
@@ -164,28 +151,36 @@ export default function Review({ submission, checklist }) {
 
                     {/* Action Buttons */}
                     <div className="flex gap-3">
-                        {submission.status === 'submitted' && (
+                        {(submission.status === 'draft') && (
                             <>
-                                <Button 
-                                    variant="outline" 
+                                <Button
+                                    variant="outline"
                                     className="border-red-200 text-red-600 hover:bg-red-50"
                                     onClick={() => setShowRejectDialog(true)}
                                 >
-                                    <XCircle className="h-4 w-4 mr-2" />
+                                    <Unlock className="h-4 w-4 mr-2" />
                                     Request Revisions
                                 </Button>
-                                <Button 
-                                    className="bg-green-600 hover:bg-green-700"
-                                    onClick={() => setShowApproveDialog(true)}
-                                >
-                                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                                    Approve All
-                                </Button>
+                                <div className="relative">
+                                    <Button
+                                        className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        onClick={() => setShowApproveDialog(true)}
+                                        disabled={hasRejectedDocuments || uploadedCount === 0}
+                                        title={hasRejectedDocuments
+                                            ? `Cannot approve: ${rejectedCount} document(s) rejected and need to be reuploaded`
+                                            : uploadedCount === 0
+                                            ? 'No documents waiting for approval'
+                                            : 'Approve all uploaded documents'}
+                                    >
+                                        <Lock className="h-4 w-4 mr-2" />
+                                        Approve All
+                                    </Button>
+                                </div>
                             </>
                         )}
-                        
+
                         {submission.status === 'approved' && !submission.invite.converted_user_id && (
-                            <Button 
+                            <Button
                                 className="bg-blue-600 hover:bg-blue-700"
                                 onClick={() => setShowConvertDialog(true)}
                             >
@@ -207,7 +202,8 @@ export default function Review({ submission, checklist }) {
                     <CardContent>
                         <Progress value={submission.completion_percentage} className="h-3" />
                         <div className="grid grid-cols-4 gap-4 mt-4">
-                            {checklist.map((item, index) => (
+                            {/* Change from checklist.map to Object.values */}
+                            {Object.values(checklist || {}).map((item, index) => (
                                 <div key={index} className="flex items-center gap-2">
                                     {item.completed ? (
                                         <CheckCircle2 className="h-5 w-5 text-green-600" />
@@ -215,8 +211,8 @@ export default function Review({ submission, checklist }) {
                                         <XCircle className="h-5 w-5 text-gray-300" />
                                     )}
                                     <span className={`text-sm ${item.completed ? 'text-gray-900' : 'text-gray-400'}`}>
-                                        {item.section}
-                                    </span>
+                        {item.section}
+                    </span>
                                 </div>
                             ))}
                         </div>
@@ -347,90 +343,72 @@ export default function Review({ submission, checklist }) {
 
                     {/* Right Column - Documents & Actions */}
                     <div className="space-y-6">
-                        {/* Documents */}
+                        {/* Documents - Enhanced with Preview */}
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <FileText className="h-5 w-5" />
-                                    Uploaded Documents
+                                    Uploaded Documents ({submission.documents?.length || 0})
                                 </CardTitle>
-                                <CardDescription>Review NBI & PNP Clearance</CardDescription>
+                                <CardDescription>
+                                    Review and approve required clearances and documents
+                                </CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-3">
+                            <CardContent className="space-y-4">
+                                {/* Alert when rejected documents block Approve All */}
+                                {hasRejectedDocuments && (
+                                    <Alert className="border-red-200 bg-red-50">
+                                        <AlertTriangle className="h-4 w-4 text-red-600" />
+                                        <AlertDescription className="text-red-800 text-sm">
+                                            <strong>Action Required:</strong> {rejectedCount} document(s) {rejectedCount === 1 ? 'is' : 'are'} rejected.
+                                            The candidate must reupload {rejectedCount === 1 ? 'this document' : 'these documents'} before you can use "Approve All".
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+
                                 {submission.documents && submission.documents.length > 0 ? (
-                                    submission.documents.map((doc) => (
-                                        <div key={doc.id} className="border rounded-lg p-4 space-y-3">
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <FileText className="h-4 w-4 text-blue-600" />
-                                                        <p className="font-medium text-gray-900">{doc.document_type_label}</p>
-                                                    </div>
-                                                    <p className="text-sm text-gray-500">{doc.filename}</p>
-                                                    <p className="text-xs text-gray-400 mt-1">{doc.file_size}</p>
+                                    // Group documents by type using helper
+                                    Object.entries(
+                                        groupDocumentsByType(submission.documents)
+                                    ).map(([docType, docs]) => (
+                                        <div key={docType} className="space-y-2">
+                                            {/* Document Type Header */}
+                                            <div className="flex items-center justify-between p-2 bg-gray-100 rounded-lg">
+                                                <div className="flex items-center gap-2">
+                                                    <FileText className="h-4 w-4 text-gray-600" />
+                                                    <span className="font-semibold text-sm text-gray-900">
+                                {docs[0].document_type_label}
+                            </span>
+                                                    <Badge variant="secondary" className="text-xs">
+                                                        {docs.length} file{docs.length !== 1 ? 's' : ''}
+                                                    </Badge>
                                                 </div>
-                                                {getStatusBadge(doc.status)}
+                                                {/* Show overall status for this doc type */}
+                                                {docs.every(d => d.status === 'approved') && (
+                                                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                                )}
                                             </div>
 
-                                            {doc.rejection_reason && (
-                                                <div className="bg-red-50 border border-red-200 rounded-md p-3">
-                                                    <p className="text-sm text-red-800">
-                                                        <strong>Rejection Reason:</strong> {doc.rejection_reason}
-                                                    </p>
-                                                </div>
-                                            )}
-
-                                            <div className="flex gap-2">
-                                                <a 
-                                                    href={doc.download_url} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
-                                                    className="flex-1"
-                                                >
-                                                    <Button variant="outline" size="sm" className="w-full">
-                                                        <Eye className="h-4 w-4 mr-2" />
-                                                        View
-                                                    </Button>
-                                                </a>
-                                                <a 
-                                                    href={doc.download_url} 
-                                                    download
-                                                    className="flex-1"
-                                                >
-                                                    <Button variant="outline" size="sm" className="w-full">
-                                                        <Download className="h-4 w-4 mr-2" />
-                                                        Download
-                                                    </Button>
-                                                </a>
+                                            {/* Individual files */}
+                                            <div className="space-y-2 pl-4">
+                                                {docs.map((doc) => (
+                                                    <DocumentCard
+                                                        key={doc.id}
+                                                        document={doc}
+                                                        showActions={true}
+                                                        showAdminActions={true}
+                                                        onApprove={approveDocument}
+                                                        onReject={openRejectDocDialog}
+                                                    />
+                                                ))}
                                             </div>
-
-                                            {doc.status === 'pending' && (
-                                                <div className="flex gap-2 pt-2 border-t">
-                                                    <Button 
-                                                        size="sm" 
-                                                        className="flex-1 bg-green-600 hover:bg-green-700"
-                                                        onClick={() => approveDocument(doc)}
-                                                    >
-                                                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                                                        Approve
-                                                    </Button>
-                                                    <Button 
-                                                        size="sm" 
-                                                        variant="outline"
-                                                        className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
-                                                        onClick={() => openRejectDocDialog(doc)}
-                                                    >
-                                                        <XCircle className="h-4 w-4 mr-2" />
-                                                        Reject
-                                                    </Button>
-                                                </div>
-                                            )}
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="text-center py-8 text-gray-500">
-                                        <FileText className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                                        <p>No documents uploaded yet</p>
+                                    <div className="text-center py-12 text-gray-500">
+                                        <FileText className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+                                        <p className="font-medium">No documents uploaded yet</p>
+                                        <p className="text-sm mt-1">Candidate hasn't uploaded any documents</p>
                                     </div>
                                 )}
                             </CardContent>
@@ -445,10 +423,10 @@ export default function Review({ submission, checklist }) {
                                 <div>
                                     <p className="text-sm text-gray-500">Status</p>
                                     <div className="mt-1">
-                                        {getStatusBadge(submission.status)}
+                                        <StatusBadge status={submission.status} variant="submission" />
                                     </div>
                                 </div>
-                                
+
                                 {submission.submitted_at && (
                                     <div>
                                         <p className="text-sm text-gray-500">Submitted Date</p>
@@ -488,7 +466,7 @@ export default function Review({ submission, checklist }) {
                                 <CardContent>
                                     <div className="flex items-center gap-2">
                                         <Mail className="h-4 w-4 text-blue-600" />
-                                        <code className="text-sm font-mono text-blue-900">{generateWorkEmail()}</code>
+                                        <code className="text-sm font-mono text-blue-900">{generateWorkEmail(submission.personal_info)}</code>
                                     </div>
                                     <p className="text-xs text-blue-700 mt-2">
                                         This will be their login username after conversion
@@ -500,28 +478,27 @@ export default function Review({ submission, checklist }) {
                 </div>
             </div>
 
-            {/* Approve Submission Dialog */}
+            {/* Approve All Documents Dialog */}
             <AlertDialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle className="flex items-center gap-2">
                             <CheckCircle2 className="h-5 w-5 text-green-600" />
-                            Approve Onboarding Submission
+                            Approve All Documents
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will approve <strong>{submission.invite.first_name} {submission.invite.last_name}'s</strong> onboarding submission.
-                            They will be notified and you can then convert this to a user account.
+                            This will approve <strong>all uploaded documents</strong> for <strong>{submission.invite.first_name} {submission.invite.last_name}</strong>.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    
-                    <div className="space-y-2 py-4">
-                        <Label>HR Notes (Optional)</Label>
-                        <Textarea
-                            value={approveForm.data.hr_notes}
-                            onChange={(e) => approveForm.setData('hr_notes', e.target.value)}
-                            placeholder="Internal notes about this approval..."
-                            rows={3}
-                        />
+
+                    <div className="py-4">
+                        <Alert className="border-yellow-200 bg-yellow-50">
+                            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                            <AlertDescription className="text-yellow-800 text-sm">
+                                <strong>Warning:</strong> This will mark all uploaded documents as approved.
+                                Make sure you have reviewed each document before proceeding.
+                            </AlertDescription>
+                        </Alert>
                     </div>
 
                     <AlertDialogFooter>
@@ -531,31 +508,40 @@ export default function Review({ submission, checklist }) {
                             disabled={approveForm.processing}
                             className="bg-green-600 hover:bg-green-700"
                         >
-                            Approve Submission
+                            Approve All Documents
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* Reject Submission Dialog */}
+            {/* Reject All Documents Dialog */}
             <AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle className="flex items-center gap-2">
-                            <AlertTriangle className="h-5 w-5 text-red-600" />
-                            Request Revisions
+                            <XCircle className="h-5 w-5 text-red-600" />
+                            Reject All Documents
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            The candidate will be notified to make corrections and resubmit.
+                            This will reject <strong>all documents</strong> for <strong>{submission.invite.first_name} {submission.invite.last_name}</strong>.
+                            The candidate will need to reupload valid documents.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    
+
                     <div className="space-y-2 py-4">
+                        <Alert className="border-red-200 bg-red-50 mb-4">
+                            <AlertTriangle className="h-4 w-4 text-red-600" />
+                            <AlertDescription className="text-red-800 text-sm">
+                                <strong>Warning:</strong> All uploaded and approved documents will be marked as rejected.
+                                The candidate will be notified to make corrections.
+                            </AlertDescription>
+                        </Alert>
+
                         <Label>Reason for Rejection *</Label>
                         <Textarea
                             value={rejectForm.data.rejection_reason}
                             onChange={(e) => rejectForm.setData('rejection_reason', e.target.value)}
-                            placeholder="Explain what needs to be corrected..."
+                            placeholder="Explain what needs to be corrected in the documents..."
                             rows={4}
                             required
                         />
@@ -568,7 +554,7 @@ export default function Review({ submission, checklist }) {
                             disabled={rejectForm.processing || !rejectForm.data.rejection_reason}
                             className="bg-red-600 hover:bg-red-700"
                         >
-                            Request Revisions
+                            Reject All Documents
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -587,7 +573,7 @@ export default function Review({ submission, checklist }) {
                             The candidate will need to reupload a valid document.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    
+
                     <div className="space-y-2 py-4">
                         <Label>Rejection Reason *</Label>
                         <Textarea
@@ -630,7 +616,7 @@ export default function Review({ submission, checklist }) {
                             This will create a user account with the following details:
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    
+
                     <div className="space-y-3 py-4 bg-gray-50 rounded-lg p-4">
                         <div>
                             <p className="text-sm text-gray-500">Full Name</p>
@@ -640,7 +626,7 @@ export default function Review({ submission, checklist }) {
                         </div>
                         <div>
                             <p className="text-sm text-gray-500">Work Email (Login Username)</p>
-                            <code className="text-sm font-mono text-blue-600">{generateWorkEmail()}</code>
+                            <code className="text-sm font-mono text-blue-600">{generateWorkEmail(submission.personal_info)}</code>
                         </div>
                         <div>
                             <p className="text-sm text-gray-500">Position</p>
@@ -652,7 +638,7 @@ export default function Review({ submission, checklist }) {
                         </div>
                         <div>
                             <p className="text-sm text-gray-500">Temporary Password</p>
-                            <code className="text-sm font-mono text-orange-600">ChangeMe123!</code>
+                            <code className="text-sm font-mono text-orange-600">{DEFAULT_TEMP_PASSWORD}</code>
                         </div>
                     </div>
 

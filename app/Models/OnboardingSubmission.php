@@ -4,10 +4,22 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class OnboardingSubmission extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
+
+    // ============================================
+    // CONSTANTS
+    // ============================================
+
+    const STATUS_DRAFT = 'draft';
+    const STATUS_APPROVED = 'approved';
+
+    // ============================================
+    // MODEL CONFIGURATION
+    // ============================================
 
     protected $fillable = [
         'invite_id',
@@ -22,6 +34,7 @@ class OnboardingSubmission extends Model
         'reviewed_at',
         'reviewed_by',
         'hr_notes',
+        'revision_notes',
     ];
 
     protected $casts = [
@@ -34,59 +47,28 @@ class OnboardingSubmission extends Model
         'reviewed_at' => 'datetime',
     ];
 
+    protected $attributes = [
+        'status' => self::STATUS_DRAFT,
+        'completion_percentage' => 0,
+    ];
+
     // ============================================
     // RELATIONSHIPS
     // ============================================
 
-    /**
-     * The invite this submission belongs to
-     */
     public function invite()
     {
         return $this->belongsTo(OnboardingInvite::class, 'invite_id');
     }
 
-    /**
-     * HR user who reviewed the submission
-     */
     public function reviewer()
     {
         return $this->belongsTo(User::class, 'reviewed_by');
     }
 
-    /**
-     * Uploaded documents
-     */
     public function documents()
     {
         return $this->hasMany(OnboardingDocument::class, 'submission_id');
-    }
-
-    /**
-     * Pending documents (waiting for HR review)
-     */
-    public function pendingDocuments()
-    {
-        return $this->hasMany(OnboardingDocument::class, 'submission_id')
-                    ->where('status', 'pending');
-    }
-
-    /**
-     * Approved documents
-     */
-    public function approvedDocuments()
-    {
-        return $this->hasMany(OnboardingDocument::class, 'submission_id')
-                    ->where('status', 'approved');
-    }
-
-    /**
-     * Rejected documents
-     */
-    public function rejectedDocuments()
-    {
-        return $this->hasMany(OnboardingDocument::class, 'submission_id')
-                    ->where('status', 'rejected');
     }
 
     // ============================================
@@ -95,185 +77,148 @@ class OnboardingSubmission extends Model
 
     public function scopeDraft($query)
     {
-        return $query->where('status', 'draft');
-    }
-
-    public function scopeSubmitted($query)
-    {
-        return $query->where('status', 'submitted');
-    }
-
-    public function scopeUnderReview($query)
-    {
-        return $query->where('status', 'under_review');
+        return $query->where('status', self::STATUS_DRAFT);
     }
 
     public function scopeApproved($query)
     {
-        return $query->where('status', 'approved');
+        return $query->where('status', self::STATUS_APPROVED);
     }
 
     // ============================================
-    // HELPER METHODS
+    // STATE CHECKS (Simple boolean checks only)
     // ============================================
 
     /**
-     * Calculate completion percentage based on filled fields
+     * Check if submission can be edited (only drafts)
      */
-    public function calculateCompletion()
+    public function canBeEdited(): bool
     {
-        $sections = [
-            'personal_info' => $this->personal_info ? 20 : 0,
-            'government_ids' => $this->government_ids ? 20 : 0,
-            'emergency_contact' => $this->emergency_contact ? 20 : 0,
-            'documents' => $this->hasRequiredDocuments() ? 40 : 0,
-        ];
-
-        $total = array_sum($sections);
-        
-        $this->update(['completion_percentage' => $total]);
-        
-        return $total;
+        return $this->status === self::STATUS_DRAFT;
     }
 
     /**
-     * Check if all required documents are uploaded
+     * Check if submission is locked (opposite of canBeEdited)
      */
-    public function hasRequiredDocuments()
+    public function isLocked(): bool
     {
-        $requiredTypes = ['resume', 'government_id', 'nbi_clearance', 'pnp_clearance', 'medical_certificate'];
-        $uploadedTypes = $this->documents()->pluck('document_type')->toArray();
-        
-        foreach ($requiredTypes as $type) {
-            if (!in_array($type, $uploadedTypes)) {
-                return false;
-            }
-        }
-        
-        return true;
+        return !$this->canBeEdited();
     }
 
     /**
-     * Get missing required documents
+     * Check if form sections are complete (100%)
      */
-    public function getMissingDocuments()
-    {
-        $requiredTypes = [
-            'resume' => 'Resume / CV',
-            'government_id' => 'Government ID',
-            'nbi_clearance' => 'NBI Clearance',
-            'pnp_clearance' => 'PNP Clearance',
-            'medical_certificate' => 'Medical Certificate',
-        ];
-        
-        $uploadedTypes = $this->documents()->pluck('document_type')->toArray();
-        
-        $missing = [];
-        foreach ($requiredTypes as $type => $label) {
-            if (!in_array($type, $uploadedTypes)) {
-                $missing[$type] = $label;
-            }
-        }
-        
-        return $missing;
-    }
-
-    /**
-     * Mark section as completed
-     */
-    public function markSectionComplete($sectionName)
-    {
-        $completed = $this->completed_sections ?? [];
-        
-        if (!in_array($sectionName, $completed)) {
-            $completed[] = $sectionName;
-            $this->update(['completed_sections' => $completed]);
-        }
-        
-        $this->calculateCompletion();
-    }
-
-    /**
-     * Check if submission is complete (ready to submit)
-     */
-    public function isComplete()
+    public function isComplete(): bool
     {
         return $this->completion_percentage >= 100;
     }
 
     /**
-     * Submit the onboarding form
+     * Check if submission is approved
      */
-    public function submit()
+    public function isApproved(): bool
     {
-        if (!$this->isComplete()) {
-            throw new \Exception('Cannot submit incomplete onboarding form.');
-        }
-
-        $this->update([
-            'status' => 'submitted',
-            'submitted_at' => now(),
-        ]);
-
-        // Update invite status
-        $this->invite->markAsSubmitted();
+        return $this->status === self::STATUS_APPROVED;
     }
 
     /**
-     * Convert submission data to user array (for creating User account)
+     * Check if submission is draft
      */
-    public function toUserArray()
+    public function isDraft(): bool
     {
-        $personal = $this->personal_info ?? [];
-        $govIds = $this->government_ids ?? [];
-        $emergency = $this->emergency_contact ?? [];
+        return $this->status === self::STATUS_DRAFT;
+    }
+
+    // ============================================
+    // SUBMISSION VALIDATION (Optimized - Single Query)
+    // ============================================
+
+    /**
+     * Get comprehensive submission status with single database query
+     *
+     * Returns array with:
+     * - can_submit: bool - Whether submission can be finalized
+     * - blocker: string|null - Reason why submission is blocked (if blocked)
+     * - missing_documents: array - List of missing required documents
+     *
+     * @return array
+     */
+    public function getSubmissionStatus(): array
+    {
+        // Check if form sections are complete
+        if (!$this->isComplete()) {
+            return [
+                'can_submit' => false,
+                'blocker' => 'Please complete all form sections.',
+                'missing_documents' => [],
+            ];
+        }
+
+        // Get required document types from config
+        $requiredTypes = collect(config('onboarding.document_types'))
+            ->filter(fn($doc) => $doc['required']);
+
+        // Single query - get all approved document types for this submission
+        $approvedTypes = $this->documents()
+            ->where('status', OnboardingDocument::STATUS_APPROVED)
+            ->pluck('document_type');
+
+        // Find missing required documents
+        $missing = $requiredTypes
+            ->keys()
+            ->diff($approvedTypes)
+            ->map(fn($type) => $requiredTypes[$type]['label'])
+            ->values()
+            ->toArray();
 
         return [
-            // Personal Info
-            'first_name' => $personal['first_name'] ?? null,
-            'middle_name' => $personal['middle_name'] ?? null,
-            'last_name' => $personal['last_name'] ?? null,
-            'suffix' => $personal['suffix'] ?? null,
-            'name' => trim(($personal['first_name'] ?? '') . ' ' . ($personal['middle_name'] ?? '') . ' ' . ($personal['last_name'] ?? '')),
-            'birthday' => $personal['birthday'] ?? null,
-            'gender' => $personal['gender'] ?? null,
-            'civil_status' => $personal['civil_status'] ?? null,
-            
-            // Contact
-            'personal_email' => $this->invite->email,
-            'phone_number' => $personal['phone_number'] ?? null,
-            'personal_mobile' => $personal['mobile_number'] ?? null,
-            
-            // Address
-            'address_line_1' => $personal['address_line_1'] ?? null,
-            'address_line_2' => $personal['address_line_2'] ?? null,
-            'city' => $personal['city'] ?? null,
-            'state' => $personal['state'] ?? null,
-            'postal_code' => $personal['postal_code'] ?? null,
-            'country' => $personal['country'] ?? 'Philippines',
-            
-            // Government IDs
-            'sss_number' => $govIds['sss_number'] ?? null,
-            'tin_number' => $govIds['tin_number'] ?? null,
-            'hdmf_number' => $govIds['hdmf_number'] ?? null,
-            'philhealth_number' => $govIds['philhealth_number'] ?? null,
-            'payroll_account' => $govIds['payroll_account'] ?? null,
-            
-            // Emergency Contact
-            'emergency_contact_name' => $emergency['name'] ?? null,
-            'emergency_contact_phone' => $emergency['phone'] ?? null,
-            'emergency_contact_mobile' => $emergency['mobile'] ?? null,
-            'emergency_contact_relationship' => $emergency['relationship'] ?? null,
-            
-            // Employment (from invite)
-            'position' => $this->invite->position,
-            'department' => $this->invite->department,
-            'employment_status' => 'active',
-            'account_status' => 'active',
-            
-            // Default password (must change on first login)
-            'password' => bcrypt('ChangeMe123!'),
-            'email_verified_at' => now(),
+            'can_submit' => empty($missing),
+            'blocker' => empty($missing)
+                ? null
+                : 'Waiting for HR to approve: ' . implode(', ', $missing),
+            'missing_documents' => $missing,
         ];
+    }
+
+    /**
+     * Check if submission can be finalized
+     *
+     * @return bool
+     */
+    public function canSubmit(): bool
+    {
+        return $this->getSubmissionStatus()['can_submit'];
+    }
+
+    /**
+     * Get reason why submission is blocked (if applicable)
+     *
+     * @return string|null
+     */
+    public function getSubmitBlockerMessage(): ?string
+    {
+        return $this->getSubmissionStatus()['blocker'];
+    }
+
+    // ============================================
+    // ACCESSORS (Read-only computed properties)
+    // ============================================
+
+    public function getStatusLabelAttribute(): string
+    {
+        return match($this->status) {
+            self::STATUS_DRAFT => 'In progress',
+            self::STATUS_APPROVED => 'Completed',
+            default => 'Unknown',
+        };
+    }
+
+    public function getStatusColorAttribute(): string
+    {
+        return match($this->status) {
+            self::STATUS_DRAFT => 'blue',
+            self::STATUS_APPROVED => 'green',
+            default => 'gray',
+        };
     }
 }

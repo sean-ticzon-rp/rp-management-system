@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Onboarding;
 
 use App\Http\Controllers\Controller;
-use App\Models\OnboardingInvite;
+use App\Models\OnboardingDocument;
 use App\Services\Onboarding\OnboardingSubmissionService;
 use App\Services\Onboarding\OnboardingDocumentService;
+use App\Http\Resources\OnboardingChecklistResource;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -25,18 +26,10 @@ class GuestOnboardingController extends Controller
     /**
      * Display the guest onboarding form
      */
-    public function show($token)
+    public function show(Request $request, $token)
     {
-        $invite = OnboardingInvite::where('token', $token)
-            ->with(['submission.documents']) // ✅ Load documents relationship
-            ->firstOrFail();
-
-        // Check if invite is valid
-        if (!$invite->isValid()) {
-            return Inertia::render('Guest/Onboarding/Expired', [
-                'invite' => $invite,
-            ]);
-        }
+        // Invite is already validated and loaded by middleware
+        $invite = $request->get('invite');
 
         if ($invite->status === 'approved') {
             return Inertia::render('Guest/Onboarding/Completed', [
@@ -45,44 +38,40 @@ class GuestOnboardingController extends Controller
         }
 
         $submission = $invite->submission;
+
+        // Transform documents for frontend
         if ($submission && $submission->documents) {
-            $submission->documents->each(function($doc) {
-                $doc->document_type_label = $doc->getDocumentTypeLabelAttribute();
-            });
+            $this->transformDocumentsForFrontend($submission);
         }
 
         return Inertia::render('Guest/Onboarding/Form', [
             'invite' => $invite,
             'submission' => $submission,
             'requiredDocuments' => $this->documentService->getRequiredDocumentTypes(),
+            'canEdit' => $submission ? $submission->canBeEdited() : true,
+            'isLocked' => $submission ? $submission->isLocked() : false,
+            'revisionNotes' => $submission->revision_notes ?? null,
         ]);
     }
 
     /**
      * Display requirements checklist
      */
-    public function checklist($token)
+    public function checklist(Request $request, $token)
     {
-        $invite = OnboardingInvite::where('token', $token)
-            ->with(['submission.documents'])
-            ->firstOrFail();
-
-        if (!$invite->isValid()) {
-            return redirect()->route('guest.onboarding.show', $token);
-        }
+        $invite = $request->get('invite');
 
         if ($invite->submission && $invite->submission->documents) {
-            $invite->submission->documents->each(function($doc) {
-                $doc->document_type_label = $doc->getDocumentTypeLabelAttribute();
-            });
+            $this->transformDocumentsForFrontend($invite->submission);
         }
 
-        $checklist = $this->submissionService->getRequirementsChecklist($invite->submission);
+        $checklist = new OnboardingChecklistResource($invite->submission);
 
         return Inertia::render('Guest/Onboarding/Checklist', [
             'invite' => $invite,
             'submission' => $invite->submission,
             'checklist' => $checklist,
+            'canEdit' => $invite->submission ? $invite->submission->canBeEdited() : true,
         ]);
     }
 
@@ -91,18 +80,15 @@ class GuestOnboardingController extends Controller
      */
     public function updatePersonalInfo(Request $request, $token)
     {
-        $invite = OnboardingInvite::where('token', $token)->firstOrFail();
-
-        if (!$invite->isValid()) {
-            return response()->json(['error' => 'Invite expired or invalid'], 403);
-        }
+        $invite = $request->get('invite');
+        $this->validateSubmissionEditable($invite->submission);
 
         $validated = $request->validate([
             'first_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name' => 'required|string|max:255',
             'suffix' => 'nullable|string|max:10',
-            'birthday' => 'required|date',
+            'birthday' => 'required|date|before:today',
             'gender' => 'required|in:male,female,other,prefer_not_to_say',
             'civil_status' => 'nullable|in:single,married,widowed,divorced,separated',
             'phone_number' => 'required|string|max:20',
@@ -125,11 +111,8 @@ class GuestOnboardingController extends Controller
      */
     public function updateGovernmentIds(Request $request, $token)
     {
-        $invite = OnboardingInvite::where('token', $token)->firstOrFail();
-
-        if (!$invite->isValid()) {
-            return response()->json(['error' => 'Invite expired or invalid'], 403);
-        }
+        $invite = $request->get('invite');
+        $this->validateSubmissionEditable($invite->submission);
 
         $validated = $request->validate([
             'sss_number' => 'nullable|string|max:15',
@@ -149,11 +132,8 @@ class GuestOnboardingController extends Controller
      */
     public function updateEmergencyContact(Request $request, $token)
     {
-        $invite = OnboardingInvite::where('token', $token)->firstOrFail();
-
-        if (!$invite->isValid()) {
-            return response()->json(['error' => 'Invite expired or invalid'], 403);
-        }
+        $invite = $request->get('invite');
+        $this->validateSubmissionEditable($invite->submission);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -172,22 +152,39 @@ class GuestOnboardingController extends Controller
      */
     public function uploadDocument(Request $request, $token)
     {
-        $invite = OnboardingInvite::where('token', $token)->firstOrFail();
-
-        if (!$invite->isValid()) {
-            return back()->with('error', 'Invite expired or invalid');
-        }
+        $invite = $request->get('invite');
+        $this->validateSubmissionEditable($invite->submission);
 
         $validated = $request->validate([
-            'document_type' => 'required|string|in:resume,government_id,sss_id,tin_id,philhealth_id,hdmf_pagibig_id,birth_certificate,nbi_clearance,pnp_clearance,medical_certificate,diploma,transcript,previous_employment_coe,other',
-            'file' => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:51200', // 50MB
+            'document_type' => 'required|string|in:' . implode(',', array_keys(config('onboarding.document_types'))),
+            'file' => 'required|file',
             'description' => 'nullable|string|max:500',
         ]);
+
+        // Get config for this document type
+        $docConfig = config("onboarding.document_types.{$validated['document_type']}");
+        $file = $request->file('file');
+
+        // Validate file type
+        $extension = $file->getClientOriginalExtension();
+        if (!in_array($extension, $docConfig['accepted_formats'])) {
+            return back()->withErrors([
+                'file' => "This document type only accepts: " . implode(', ', $docConfig['accepted_formats'])
+            ]);
+        }
+
+        // Validate file size (config uses 'max_size' in KB)
+        $maxSizeBytes = $docConfig['max_size'] * 1024;
+        if ($file->getSize() > $maxSizeBytes) {
+            return back()->withErrors([
+                'file' => "File too large. Maximum size: {$docConfig['max_size']}KB"
+            ]);
+        }
 
         try {
             $document = $this->documentService->uploadDocument(
                 $invite->submission,
-                $request->file('file'),
+                $file,
                 $validated['document_type'],
                 $validated['description'] ?? null
             );
@@ -200,17 +197,52 @@ class GuestOnboardingController extends Controller
     }
 
     /**
-     * Delete uploaded document
+     * Replace an existing document
      */
-    public function deleteDocument($token, $documentId)
+    public function replaceDocument(Request $request, $token, $documentId)
     {
-        $invite = OnboardingInvite::where('token', $token)->firstOrFail();
+        $invite = $request->get('invite');
+        $document = $invite->submission->documents()->findOrFail($documentId);
 
-        if (!$invite->isValid()) {
-            return back()->with('error', 'Invite expired or invalid');
+        // Check if document can be replaced
+        if (!$invite->submission->canBeEdited() || $document->isApproved()) {
+            return back()->with('error', 'This document cannot be replaced.');
         }
 
+        // Get config for validation
+        $docConfig = config("onboarding.document_types.{$document->document_type}");
+
+        $validated = $request->validate([
+            'file' => 'required|file|mimes:' . implode(',', $docConfig['accepted_formats']) . '|max:' . $docConfig['max_size'],
+        ]);
+
+        try {
+            $this->documentService->replaceDocument(
+                $document,
+                $request->file('file')
+            );
+
+            return back()->with('success', 'Document replaced successfully!');
+
+        } catch (\Exception $e) {
+            return back()->with('error', 'Replace failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Delete uploaded document
+     */
+    public function deleteDocument(Request $request, $token, $documentId)
+    {
+        $invite = $request->get('invite');
+        $this->validateSubmissionEditable($invite->submission);
+
         $document = $invite->submission->documents()->findOrFail($documentId);
+
+        // Don't allow deleting approved documents
+        if ($document->isApproved()) {
+            return back()->with('error', 'Cannot delete approved documents.');
+        }
 
         try {
             $this->documentService->deleteDocument($document);
@@ -225,13 +257,10 @@ class GuestOnboardingController extends Controller
     /**
      * Submit final onboarding form
      */
-    public function submit($token)
+    public function submit(Request $request, $token)
     {
-        $invite = OnboardingInvite::where('token', $token)->firstOrFail();
-
-        if (!$invite->isValid()) {
-            return back()->with('error', 'Invite expired or invalid');
-        }
+        $invite = $request->get('invite');
+        $this->validateSubmissionEditable($invite->submission);
 
         try {
             $this->submissionService->submitOnboarding($invite->submission);
@@ -242,5 +271,39 @@ class GuestOnboardingController extends Controller
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
+    }
+
+    // ============================================
+    // PRIVATE HELPER METHODS
+    // ============================================
+
+    /**
+     * Validate that submission can be edited
+     *
+     * @param \App\Models\OnboardingSubmission $submission
+     * @return void
+     * @throws \Illuminate\Http\Exceptions\HttpResponseException
+     */
+    private function validateSubmissionEditable($submission): void
+    {
+        if (!$submission->canBeEdited()) {
+            abort(403, 'This submission is locked. Contact HR if you need to make changes.');
+        }
+    }
+
+    /**
+     * Transform documents for frontend display
+     *
+     * @param \App\Models\OnboardingSubmission $submission
+     * @return void
+     */
+    private function transformDocumentsForFrontend($submission): void
+    {
+        $submission->documents->each(function($doc) use ($submission) {
+            $doc->document_type_label = $doc->document_type_label;
+            $doc->status_label = $doc->status_label;
+            $doc->can_be_replaced = $submission->canBeEdited() && !$doc->isApproved();
+            $doc->needs_action = $doc->isRejected();
+        });
     }
 }
