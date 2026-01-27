@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CalendarController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +11,10 @@ use Illuminate\Support\Facades\DB;
  * These routes are loaded by the RouteServiceProvider and all of them will
  * be assigned to the "api" middleware group.
  */
+
+// ============================================
+// 🏥 HEALTH CHECK ENDPOINTS (Public)
+// ============================================
 
 // Health check endpoint for Docker and monitoring
 Route::get('/health', function () {
@@ -47,3 +52,27 @@ Route::get('/version', function () {
         'php' => PHP_VERSION,
     ]);
 })->name('api.version');
+
+// ============================================
+// 🔒 AUTHENTICATED API ROUTES
+// ============================================
+
+Route::middleware(['auth:sanctum'])->group(function () {
+
+    // ============================================
+    // 📅 CALENDAR API ROUTES
+    // ============================================
+    Route::prefix('calendar')->name('api.calendar.')->group(function () {
+        // Get calendar events
+        Route::get('/events', [CalendarController::class, 'events'])->name('events');
+
+        // Get calendar statistics
+        Route::get('/statistics', [CalendarController::class, 'statistics'])->name('statistics');
+
+        // Get users on leave for a specific date
+        Route::get('/users-on-leave', [CalendarController::class, 'usersOnLeave'])->name('users-on-leave');
+
+        // Get event types (with optional counts)
+        Route::get('/event-types', [CalendarController::class, 'eventTypes'])->name('event-types');
+    });
+});

@@ -18,8 +18,8 @@ class UserController extends Controller
      */
     public function index(Request $request)
     {
-        // ✅ Check if user can MANAGE users (not just approve)
-        if (!auth()->user()->can_manage_users) {
+        // ✅ Check if user can VIEW users
+        if (!auth()->user()->hasPermission('users.view')) {
             abort(403, 'You do not have permission to access user management.');
         }
 
@@ -68,7 +68,7 @@ class UserController extends Controller
     public function pendingApprovals(Request $request)
     {
         // ✅ Check if user can approve users
-        if (!auth()->user()->can_approve_users) {
+        if (!auth()->user()->hasPermission('users.approve')) {
             abort(403, 'You do not have permission to approve users.');
         }
 
@@ -98,7 +98,7 @@ class UserController extends Controller
     public function create()
     {
         // ✅ Check permission
-        if (!auth()->user()->can_manage_users) {
+        if (!auth()->user()->hasPermission('users.create')) {
             abort(403, 'You do not have permission to create users.');
         }
 
@@ -112,7 +112,7 @@ class UserController extends Controller
     public function store(Request $request)
     {
         // ✅ Check permission
-        if (!auth()->user()->can_manage_users) {
+        if (!auth()->user()->hasPermission('users.create')) {
             abort(403, 'You do not have permission to create users.');
         }
 
@@ -218,6 +218,11 @@ class UserController extends Controller
 
     public function show(User $user)
     {
+        // ✅ Check permission
+        if (!auth()->user()->hasPermission('users.view')) {
+            abort(403, 'You do not have permission to view user details.');
+        }
+
         $user->load([
             'roles.permissions',
             'permissions',
@@ -235,7 +240,7 @@ class UserController extends Controller
     public function edit(User $user)
     {
         // ✅ Check permission
-        if (!auth()->user()->can_manage_users) {
+        if (!auth()->user()->hasPermission('users.edit')) {
             abort(403, 'You do not have permission to edit users.');
         }
 
@@ -253,7 +258,7 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         // ✅ Check permission
-        if (!auth()->user()->can_manage_users) {
+        if (!auth()->user()->hasPermission('users.edit')) {
             abort(403, 'You do not have permission to update users.');
         }
 
@@ -372,7 +377,7 @@ class UserController extends Controller
     public function destroy(User $user)
     {
         // ✅ Check permission
-        if (!auth()->user()->can_manage_users) {
+        if (!auth()->user()->hasPermission('users.delete')) {
             abort(403, 'You do not have permission to delete users.');
         }
 
@@ -395,7 +400,7 @@ class UserController extends Controller
     public function approve(User $user)
     {
         // ✅ Check if current user has permission to approve users
-        if (!auth()->user()->can_approve_users) {
+        if (!auth()->user()->hasPermission('users.approve')) {
             abort(403, 'You do not have permission to approve user accounts.');
         }
 
@@ -452,7 +457,7 @@ class UserController extends Controller
     public function reject(User $user)
     {
         // ✅ Check if current user has permission to approve/reject users
-        if (!auth()->user()->can_approve_users) {
+        if (!auth()->user()->hasPermission('users.approve')) {
             abort(403, 'You do not have permission to reject user accounts.');
         }
 

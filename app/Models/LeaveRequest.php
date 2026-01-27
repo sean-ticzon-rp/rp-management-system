@@ -16,16 +16,12 @@ class LeaveRequest extends Model
         'start_date',
         'end_date',
         'total_days',
-        'duration',
-        'custom_start_time',
-        'custom_end_time',
+        'duration', // Always 'full_day' - kept for database compatibility
         'reason',
-        'attachment',
         'emergency_contact_name',
         'emergency_contact_phone',
         'use_default_emergency_contact',
         'availability',
-        'manager_id',
         'manager_approved_by',
         'manager_approved_at',
         'manager_comments',
@@ -64,11 +60,6 @@ class LeaveRequest extends Model
     public function leaveType()
     {
         return $this->belongsTo(LeaveType::class);
-    }
-
-    public function manager()
-    {
-        return $this->belongsTo(User::class, 'manager_id');
     }
 
     public function managerApprover()
@@ -372,5 +363,115 @@ class LeaveRequest extends Model
             'cancelled' => 'Cancelled',
             default => 'Unknown',
         };
+    }
+
+    // ============================================
+    // CALENDAR-RELATED METHODS
+    // ============================================
+
+    /**
+     * Get the calendar event associated with this leave
+     */
+    public function calendarEvent()
+    {
+        return $this->morphOne(CalendarEvent::class, 'eventable');
+    }
+
+    /**
+     * Scope leaves in a date range
+     */
+    public function scopeInDateRange($query, $startDate, $endDate)
+    {
+        return $query->where(function ($q) use ($startDate, $endDate) {
+            $q->whereBetween('start_date', [$startDate, $endDate])
+              ->orWhereBetween('end_date', [$startDate, $endDate])
+              ->orWhere(function ($q2) use ($startDate, $endDate) {
+                  // Leaves that span the entire range
+                  $q2->where('start_date', '<=', $startDate)
+                     ->where('end_date', '>=', $endDate);
+              });
+        });
+    }
+
+    /**
+     * Scope leaves for a specific user
+     */
+    public function scopeForUser($query, $userId)
+    {
+        return $query->where('user_id', $userId);
+    }
+
+    /**
+     * Scope leaves for multiple users
+     */
+    public function scopeForUsers($query, array $userIds)
+    {
+        return $query->whereIn('user_id', $userIds);
+    }
+
+    /**
+     * Scope leaves for a department
+     */
+    public function scopeForDepartment($query, $department)
+    {
+        return $query->whereHas('user', function ($q) use ($department) {
+            $q->where('department', $department);
+        });
+    }
+
+    /**
+     * Convert leave request to calendar event format
+     */
+    public function toCalendarEvent(): array
+    {
+        // Load relationships if not already loaded
+        if (!$this->relationLoaded('user')) {
+            $this->load('user');
+        }
+        if (!$this->relationLoaded('leaveType')) {
+            $this->load('leaveType');
+        }
+
+        // Calculate contrast text color
+        $color = $this->leaveType->color ?? '#3B82F6';
+        $hex = ltrim($color, '#');
+        $r = hexdec(substr($hex, 0, 2));
+        $g = hexdec(substr($hex, 2, 2));
+        $b = hexdec(substr($hex, 4, 2));
+        $luminance = (0.299 * $r + 0.587 * $g + 0.114 * $b) / 255;
+        $textColor = $luminance > 0.5 ? '#000000' : '#FFFFFF';
+
+        return [
+            'id' => 'leave_' . $this->id,
+            'title' => $this->user->name,
+            'start' => $this->start_date->format('Y-m-d'),
+            'end' => $this->end_date->copy()->addDay()->format('Y-m-d'), // FullCalendar exclusive end date
+            'allDay' => true,
+            'color' => $color,
+            'textColor' => $textColor,
+            'type' => 'leave',
+            'extendedProps' => [
+                'event_id' => $this->id,
+                'event_type' => 'leave',
+                'description' => $this->reason,
+                'user_id' => $this->user_id,
+                'user_name' => $this->user->name,
+                'user_avatar' => $this->user->profile_picture,
+                'department' => $this->user->department,
+                'leave_type' => $this->leaveType->name,
+                'leave_type_slug' => $this->leaveType->code,
+                'leave_type_color' => $this->leaveType->color,
+                'total_days' => $this->total_days,
+                'duration' => $this->duration,
+                'reason' => $this->reason,
+                'status' => $this->status,
+                'status_label' => $this->status_label,
+                'visibility' => 'public',
+                'metadata' => [
+                    'emergency_contact' => $this->emergency_contact_name,
+                    'availability' => $this->availability,
+                ],
+            ],
+        ];
     }
 }

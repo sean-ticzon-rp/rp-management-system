@@ -12,8 +12,6 @@ import { Checkbox } from '@/Components/ui/checkbox';
 import { Alert, AlertDescription } from '@/Components/ui/alert';
 import { Progress } from '@/Components/ui/progress';
 import { Switch } from '@/Components/ui/switch';
-import { Popover, PopoverContent, PopoverTrigger } from '@/Components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/Components/ui/command';
 import {
     Calendar,
     ArrowLeft,
@@ -21,96 +19,29 @@ import {
     Loader2,
     AlertCircle,
     Clock,
-    Upload,
     User,
     Phone,
     CheckCircle2,
     XCircle,
     Info,
-    FileText,
-    UserCheck,
-    Users,
-    Shield,
-    ChevronsUpDown,
-    Check,
 } from 'lucide-react';
 
-export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user, managers = [], allUsers = [] }) {
+export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user }) {
     const { flash } = usePage().props;
-    
-    // ✅ Check if user is HR/Admin/Super Admin
-    const isHROrAdmin = auth.user?.roles?.some(role => 
-        ['super-admin', 'admin', 'hr-manager'].includes(role.slug)
-    );
-
-    // ✅ State for filing on behalf of another user
-    const [filingForOther, setFilingForOther] = useState(false);
-    const [selectedEmployee, setSelectedEmployee] = useState(null);
-    const [employeeBalances, setEmployeeBalances] = useState({});
-    const [employeeSearchOpen, setEmployeeSearchOpen] = useState(false);
 
     const { data, setData, post, processing, errors } = useForm({
-        user_id: user?.id || '', // ✅ NEW: Target user (for proxy filing)
         leave_type_id: '',
         start_date: '',
         end_date: '',
-        duration: 'full_day',
-        custom_start_time: '',
-        custom_end_time: '',
         reason: '',
-        attachment: null,
         emergency_contact_name: user?.emergency_contact_name || '',
         emergency_contact_phone: user?.emergency_contact_phone || '',
         use_default_emergency_contact: true,
         availability: 'reachable',
-        manager_id: user?.manager_id?.toString() || '',
     });
 
     const [selectedLeaveType, setSelectedLeaveType] = useState(null);
     const [calculatedDays, setCalculatedDays] = useState(0);
-    const [filePreview, setFilePreview] = useState(null);
-
-    // ✅ Handle employee selection (for HR/Admin filing for others)
-    const handleEmployeeChange = (employeeId) => {
-        setData('user_id', employeeId);
-        setFilingForOther(true);
-        
-        // Find the selected employee
-        const employee = allUsers.find(u => u.id === parseInt(employeeId));
-        setSelectedEmployee(employee);
-        
-        // Update balances to show the selected employee's balances
-        if (employee && employee.leave_balances) {
-            const balancesMap = {};
-            employee.leave_balances.forEach(balance => {
-                balancesMap[balance.leave_type_id] = balance;
-            });
-            setEmployeeBalances(balancesMap);
-        }
-        
-        // Reset manager selection when employee changes
-        setData({
-            ...data,
-            user_id: employeeId,
-            manager_id: employee?.manager_id?.toString() || '',
-            emergency_contact_name: employee?.emergency_contact_name || '',
-            emergency_contact_phone: employee?.emergency_contact_phone || '',
-        });
-    };
-
-    // ✅ Switch back to filing for self
-    const handleFilingForSelf = () => {
-        setFilingForOther(false);
-        setSelectedEmployee(null);
-        setEmployeeBalances({});
-        setData({
-            ...data,
-            user_id: user.id,
-            manager_id: user?.manager_id?.toString() || '',
-            emergency_contact_name: user?.emergency_contact_name || '',
-            emergency_contact_phone: user?.emergency_contact_phone || '',
-        });
-    };
 
     // Update selected leave type when leave_type_id changes
     useEffect(() => {
@@ -120,60 +51,42 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
         }
     }, [data.leave_type_id, leaveTypes]);
 
-    // Calculate days whenever dates or duration changes
+    // Calculate days whenever dates change
     useEffect(() => {
         if (data.start_date && data.end_date) {
             calculateDays();
         } else {
             setCalculatedDays(0);
         }
-    }, [data.start_date, data.end_date, data.duration]);
+    }, [data.start_date, data.end_date]);
 
     const calculateDays = () => {
         const start = new Date(data.start_date);
         const end = new Date(data.end_date);
         const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
-
-        let total = 0;
-        switch (data.duration) {
-            case 'half_day_am':
-            case 'half_day_pm':
-            case 'custom_hours':
-                total = 0.5;
-                break;
-            case 'full_day':
-            default:
-                total = daysDiff;
-                break;
-        }
-
-        setCalculatedDays(total);
-    };
-
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            setData('attachment', file);
-            setFilePreview(file.name);
-        }
+        setCalculatedDays(daysDiff);
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        post(route('leaves.store'));
+        post(route('my-leaves.store'), {
+            preserveScroll: true,
+            onSuccess: () => {
+                // Form submitted successfully
+            },
+            onError: (errors) => {
+                console.error('Form submission errors:', errors);
+            },
+        });
     };
 
-    // ✅ Use employee balances if filing for someone else, otherwise use own balances
-    const activeBalances = filingForOther ? employeeBalances : leaveBalances;
+    // Use own balances
+    const activeBalances = leaveBalances;
     const selectedBalance = data.leave_type_id ? activeBalances[data.leave_type_id] : null;
 
-    const hasSufficientBalance = selectedBalance 
-        ? selectedBalance.remaining_days >= calculatedDays 
+    const hasSufficientBalance = selectedBalance
+        ? selectedBalance.remaining_days >= calculatedDays
         : true;
-
-    const requiresMedicalCert = selectedLeaveType?.requires_medical_cert && 
-        (selectedLeaveType.medical_cert_days_threshold === null || 
-         calculatedDays > selectedLeaveType.medical_cert_days_threshold);
 
     return (
         <AuthenticatedLayout
@@ -194,10 +107,7 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                             <div>
                                 <h2 className="text-3xl font-bold text-gray-900">Apply for Leave</h2>
                                 <p className="text-gray-600 mt-1">
-                                    {filingForOther && selectedEmployee 
-                                        ? `Filing leave for ${selectedEmployee.name}` 
-                                        : 'Submit a new leave request'
-                                    }
+                                    Submit a new leave request
                                 </p>
                             </div>
                         </div>
@@ -216,125 +126,6 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                             {flash.success}
                         </AlertDescription>
                     </Alert>
-                )}
-
-                {/* ✅ NEW: File for Another Employee Toggle (HR/Admin only) */}
-                {isHROrAdmin && allUsers && allUsers.length > 0 && (
-                    <Card className="border-purple-200 border-2 bg-purple-50 animate-fade-in">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-purple-800">
-                                <Shield className="h-5 w-5" />
-                                HR/Admin Feature: File Leave for Employee
-                            </CardTitle>
-                            <CardDescription className="text-purple-700">
-                                As HR/Admin, you can submit leave requests on behalf of employees
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between p-4 bg-white rounded-lg">
-                                <div className="flex-1">
-                                    <Label className="text-base font-semibold">
-                                        Filing leave for another employee
-                                    </Label>
-                                    <p className="text-sm text-gray-600 mt-1">
-                                        {filingForOther 
-                                            ? 'You are filing for: ' + (selectedEmployee?.name || 'another employee')
-                                            : 'Toggle to file leave on behalf of an employee'
-                                        }
-                                    </p>
-                                </div>
-                                <Switch
-                                    checked={filingForOther}
-                                    onCheckedChange={(checked) => {
-                                        if (checked) {
-                                            // Enable proxy mode but don't select user yet
-                                            setFilingForOther(true);
-                                        } else {
-                                            // Switch back to self
-                                            handleFilingForSelf();
-                                        }
-                                    }}
-                                />
-                            </div>
-
-                            {filingForOther && (
-                                <div className="space-y-2 animate-fade-in">
-                                    <Label htmlFor="employee_select">Select Employee *</Label>
-                                    <Popover open={employeeSearchOpen} onOpenChange={setEmployeeSearchOpen}>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                role="combobox"
-                                                aria-expanded={employeeSearchOpen}
-                                                className="w-full justify-between"
-                                            >
-                                                {selectedEmployee ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="flex items-center justify-center w-6 h-6 bg-blue-600 rounded-full">
-                                                            <span className="text-xs font-medium text-white">
-                                                                {selectedEmployee.name.charAt(0).toUpperCase()}
-                                                            </span>
-                                                        </div>
-                                                        <span>{selectedEmployee.name}</span>
-                                                        {selectedEmployee.position && (
-                                                            <span className="text-xs text-gray-500">
-                                                                - {selectedEmployee.position}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                ) : (
-                                                    "Select employee..."
-                                                )}
-                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-full p-0" align="start">
-                                            <Command>
-                                                <CommandInput placeholder="Search employees..." />
-                                                <CommandList>
-                                                    <CommandEmpty>No employee found.</CommandEmpty>
-                                                    <CommandGroup>
-                                                        {allUsers.map((employee) => (
-                                                            <CommandItem
-                                                                key={employee.id}
-                                                                value={employee.name}
-                                                                onSelect={() => {
-                                                                    handleEmployeeChange(employee.id.toString());
-                                                                    setEmployeeSearchOpen(false);
-                                                                }}
-                                                            >
-                                                                <Check
-                                                                    className={`mr-2 h-4 w-4 ${
-                                                                        selectedEmployee?.id === employee.id ? 'opacity-100' : 'opacity-0'
-                                                                    }`}
-                                                                />
-                                                                <div className="flex items-center gap-2 flex-1">
-                                                                    <div className="flex items-center justify-center w-6 h-6 bg-blue-600 rounded-full">
-                                                                        <span className="text-xs font-medium text-white">
-                                                                            {employee.name.charAt(0).toUpperCase()}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="flex flex-col">
-                                                                        <span className="font-medium">{employee.name}</span>
-                                                                        {employee.position && (
-                                                                            <span className="text-xs text-gray-500">
-                                                                                {employee.position}
-                                                                                {employee.department && ` • ${employee.department}`}
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </CommandItem>
-                                                        ))}
-                                                    </CommandGroup>
-                                                </CommandList>
-                                            </Command>
-                                        </PopoverContent>
-                                    </Popover>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
                 )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -418,44 +209,6 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <Label htmlFor="duration">Duration *</Label>
-                                        <Select value={data.duration} onValueChange={(value) => setData('duration', value)}>
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="full_day">Full Day(s)</SelectItem>
-                                                <SelectItem value="half_day_am">Half Day - Morning (8 AM - 12 PM)</SelectItem>
-                                                <SelectItem value="half_day_pm">Half Day - Afternoon (1 PM - 5 PM)</SelectItem>
-                                                <SelectItem value="custom_hours">Custom Hours</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    {data.duration === 'custom_hours' && (
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="custom_start_time">Start Time</Label>
-                                                <Input
-                                                    id="custom_start_time"
-                                                    type="time"
-                                                    value={data.custom_start_time}
-                                                    onChange={(e) => setData('custom_start_time', e.target.value)}
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="custom_end_time">End Time</Label>
-                                                <Input
-                                                    id="custom_end_time"
-                                                    type="time"
-                                                    value={data.custom_end_time}
-                                                    onChange={(e) => setData('custom_end_time', e.target.value)}
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-
                                     {/* Days Calculation Display */}
                                     {calculatedDays > 0 && (
                                         <Alert className="bg-blue-50 border-blue-200">
@@ -474,67 +227,10 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                                         <Alert className="bg-red-50 border-red-200">
                                             <AlertCircle className="h-4 w-4 text-red-600" />
                                             <AlertDescription className="text-red-800">
-                                                <strong>Insufficient balance!</strong> {filingForOther ? selectedEmployee?.name : 'You'} only {filingForOther ? 'has' : 'have'} {selectedBalance.remaining_days} days remaining but requested {calculatedDays} days.
+                                                <strong>Insufficient balance!</strong> You only have {selectedBalance.remaining_days} days remaining but requested {calculatedDays} days.
                                             </AlertDescription>
                                         </Alert>
                                     )}
-                                </CardContent>
-                            </Card>
-
-                            {/* Manager Selection */}
-                            <Card className="animate-fade-in animation-delay-50">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <UserCheck className="h-5 w-5" />
-                                        Select Manager for Approval
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Choose the manager who will review this leave request
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="manager_id">Manager *</Label>
-                                        <Select 
-                                            value={data.manager_id.toString()} 
-                                            onValueChange={(value) => setData('manager_id', value)}
-                                        >
-                                            <SelectTrigger className={errors.manager_id ? 'border-red-500' : ''}>
-                                                <SelectValue placeholder="Select manager" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {Array.isArray(managers) && managers.length > 0 ? (
-                                                    managers.map((manager) => (
-                                                        <SelectItem key={manager.id} value={manager.id.toString()}>
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="flex items-center justify-center w-6 h-6 bg-blue-600 rounded-full">
-                                                                    <span className="text-xs font-medium text-white">
-                                                                        {manager.name.charAt(0).toUpperCase()}
-                                                                    </span>
-                                                                </div>
-                                                                <div>
-                                                                    <span className="font-medium">{manager.name}</span>
-                                                                    {manager.position && (
-                                                                        <span className="text-xs text-gray-500 ml-2">
-                                                                            - {manager.position}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </SelectItem>
-                                                    ))
-                                                ) : (
-                                                    <SelectItem value="none" disabled>No managers available</SelectItem>
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                        {errors.manager_id && (
-                                            <p className="text-sm text-red-500 flex items-center gap-1">
-                                                <AlertCircle className="h-4 w-4" />
-                                                {errors.manager_id}
-                                            </p>
-                                        )}
-                                    </div>
                                 </CardContent>
                             </Card>
 
@@ -557,43 +253,6 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                                         />
                                         {errors.reason && (
                                             <p className="text-sm text-red-500">{errors.reason}</p>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="attachment">
-                                            Medical Certificate / Supporting Document
-                                            {requiresMedicalCert && <span className="text-red-600 ml-1">*</span>}
-                                        </Label>
-                                        <div className="flex items-center gap-3">
-                                            <input
-                                                type="file"
-                                                id="attachment"
-                                                className="hidden"
-                                                accept=".pdf,.jpg,.jpeg,.png"
-                                                onChange={handleFileChange}
-                                            />
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                onClick={() => document.getElementById('attachment').click()}
-                                            >
-                                                <Upload className="h-4 w-4 mr-2" />
-                                                Choose File
-                                            </Button>
-                                            {filePreview && (
-                                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                                    <FileText className="h-4 w-4" />
-                                                    {filePreview}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <p className="text-xs text-gray-500">
-                                            PDF, JPG, PNG up to 5MB
-                                            {requiresMedicalCert && ' · Medical certificate required for this leave'}
-                                        </p>
-                                        {errors.attachment && (
-                                            <p className="text-sm text-red-500">{errors.attachment}</p>
                                         )}
                                     </div>
 
@@ -630,17 +289,16 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                                             onCheckedChange={(checked) => {
                                                 setData('use_default_emergency_contact', checked);
                                                 if (checked) {
-                                                    const targetUser = filingForOther ? selectedEmployee : user;
-                                                    setData('emergency_contact_name', targetUser?.emergency_contact_name || '');
-                                                    setData('emergency_contact_phone', targetUser?.emergency_contact_phone || '');
+                                                    setData('emergency_contact_name', user?.emergency_contact_name || '');
+                                                    setData('emergency_contact_phone', user?.emergency_contact_phone || '');
                                                 }
                                             }}
                                         />
                                         <Label htmlFor="use_default" className="cursor-pointer flex-1">
-                                            Use {filingForOther ? "employee's" : 'my'} default emergency contact from profile
-                                            {(filingForOther ? selectedEmployee : user)?.emergency_contact_name && (
+                                            Use my default emergency contact from profile
+                                            {user?.emergency_contact_name && (
                                                 <span className="block text-sm text-gray-600 mt-1">
-                                                    {(filingForOther ? selectedEmployee : user).emergency_contact_name} - {(filingForOther ? selectedEmployee : user).emergency_contact_phone}
+                                                    {user.emergency_contact_name} - {user.emergency_contact_phone}
                                                 </span>
                                             )}
                                         </Label>
@@ -709,11 +367,6 @@ export default function Apply({ auth, leaveTypes = [], leaveBalances = {}, user,
                                 <CardHeader>
                                     <CardTitle className="text-lg">
                                         {selectedLeaveType?.name} Balance
-                                        {filingForOther && (
-                                            <p className="text-sm text-gray-600 font-normal mt-1">
-                                                for {selectedEmployee?.name}
-                                            </p>
-                                        )}
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">

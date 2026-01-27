@@ -5,7 +5,6 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/ui/card';
-import { Badge } from '@/Components/ui/badge';
 import { Progress } from '@/Components/ui/progress';
 import {
     Table,
@@ -26,49 +25,27 @@ import {
     Search,
     Eye,
     MoreVertical,
-    Clock,
-    CheckCircle2,
-    AlertCircle,
-    XCircle,
     FileText,
     UserCheck,
 } from 'lucide-react';
+import { StatusBadge } from '@/components/onboarding/shared/StatusBadge';
+import { ADMIN_ONBOARDING_ROUTES } from '@/lib/constants/onboarding/routes';
 
 export default function Index({ submissions, stats, filters }) {
     const [searchTerm, setSearchTerm] = useState(filters?.search || '');
 
     const handleSearch = (e) => {
         e.preventDefault();
-        router.get(route('onboarding.submissions.index'), 
+        router.get(route(ADMIN_ONBOARDING_ROUTES.INDEX),
             { search: searchTerm },
             { preserveState: true }
         );
     };
 
     const filterByStatus = (status) => {
-        router.get(route('onboarding.submissions.index'), 
+        router.get(route(ADMIN_ONBOARDING_ROUTES.INDEX),
             { status, search: searchTerm },
             { preserveState: true }
-        );
-    };
-
-    const getStatusBadge = (status) => {
-        const badges = {
-            draft: { color: 'bg-gray-100 text-gray-700 border-gray-200', icon: FileText, label: 'Draft' },
-            submitted: { color: 'bg-yellow-100 text-yellow-700 border-yellow-200', icon: Clock, label: 'Submitted' },
-            under_review: { color: 'bg-blue-100 text-blue-700 border-blue-200', icon: AlertCircle, label: 'Under Review' },
-            approved: { color: 'bg-green-100 text-green-700 border-green-200', icon: CheckCircle2, label: 'Approved' },
-            rejected: { color: 'bg-red-100 text-red-700 border-red-200', icon: XCircle, label: 'Needs Revision' },
-        };
-        
-        const badge = badges[status] || badges.draft;
-        const Icon = badge.icon;
-        
-        return (
-            <Badge className={`${badge.color} border`}>
-                <Icon className="h-3 w-3 mr-1" />
-                {badge.label}
-            </Badge>
         );
     };
 
@@ -86,7 +63,7 @@ export default function Index({ submissions, stats, filters }) {
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                     <Card>
                         <CardHeader className="pb-3">
                             <CardTitle className="text-sm font-medium text-gray-600">Total</CardTitle>
@@ -102,24 +79,37 @@ export default function Index({ submissions, stats, filters }) {
                         </CardHeader>
                         <CardContent>
                             <p className="text-2xl font-bold text-gray-700">{stats.draft}</p>
+                            <p className="text-xs text-gray-500 mt-1">In progress</p>
                         </CardContent>
                     </Card>
 
                     <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => filterByStatus('submitted')}>
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-yellow-600">Needs Review</CardTitle>
+                            <CardTitle className="text-sm font-medium text-yellow-600">Submitted</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <p className="text-2xl font-bold text-yellow-700">{stats.submitted}</p>
+                            <p className="text-xs text-yellow-600 mt-1">Needs review</p>
                         </CardContent>
                     </Card>
 
                     <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => filterByStatus('under_review')}>
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-blue-600">Under Review</CardTitle>
+                            <CardTitle className="text-sm font-medium text-blue-600">Reviewing</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <p className="text-2xl font-bold text-blue-700">{stats.under_review}</p>
+                            <p className="text-xs text-blue-600 mt-1">In progress</p>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => filterByStatus('revision_requested')}>
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-sm font-medium text-orange-600">Revisions</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-2xl font-bold text-orange-700">{stats.revision_requested || 0}</p>
+                            <p className="text-xs text-orange-600 mt-1">Needs fixes</p>
                         </CardContent>
                     </Card>
 
@@ -129,6 +119,7 @@ export default function Index({ submissions, stats, filters }) {
                         </CardHeader>
                         <CardContent>
                             <p className="text-2xl font-bold text-green-700">{stats.approved}</p>
+                            <p className="text-xs text-green-600 mt-1">Complete</p>
                         </CardContent>
                     </Card>
                 </div>
@@ -152,10 +143,10 @@ export default function Index({ submissions, stats, filters }) {
                                 Search
                             </Button>
                             {(filters?.search || filters?.status !== 'all') && (
-                                <Button 
-                                    type="button" 
+                                <Button
+                                    type="button"
                                     variant="outline"
-                                    onClick={() => router.get(route('onboarding.submissions.index'))}
+                                    onClick={() => router.get(route(ADMIN_ONBOARDING_ROUTES.INDEX))}
                                 >
                                     Clear
                                 </Button>
@@ -184,7 +175,11 @@ export default function Index({ submissions, stats, filters }) {
                             </TableHeader>
                             <TableBody>
                                 {submissions.data.length > 0 ? submissions.data.map((submission) => (
-                                    <TableRow key={submission.id} className="hover:bg-gray-50">
+                                    <TableRow
+                                        key={submission.id}
+                                        className="hover:bg-gray-50 cursor-pointer"
+                                        onClick={() => router.get(route(ADMIN_ONBOARDING_ROUTES.REVIEW, submission.id))}
+                                    >
                                         <TableCell>
                                             <div>
                                                 <p className="font-medium text-gray-900">
@@ -206,12 +201,12 @@ export default function Index({ submissions, stats, filters }) {
                                             <div className="flex items-center gap-2">
                                                 <FileText className="h-4 w-4 text-gray-400" />
                                                 <span className="text-sm text-gray-700">
-                                                    {submission.documents?.length || 0} uploaded
+                                                    {submission.documents?.length || 0} files
                                                 </span>
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            {getStatusBadge(submission.status)}
+                                            <StatusBadge status={submission.status} variant="submission" />
                                         </TableCell>
                                         <TableCell>
                                             {submission.submitted_at ? (
@@ -223,35 +218,37 @@ export default function Index({ submissions, stats, filters }) {
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="sm">
-                                                        <MoreVertical className="h-4 w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem asChild>
-                                                        <Link href={route('onboarding.submissions.review', submission.id)}>
-                                                            <Eye className="h-4 w-4 mr-2" />
-                                                            Review Submission
-                                                        </Link>
-                                                    </DropdownMenuItem>
-                                                    
-                                                    {submission.status === 'approved' && !submission.invite.converted_user_id && (
-                                                        <DropdownMenuItem
-                                                            onClick={() => {
-                                                                if (confirm('Convert this submission to a user account?')) {
-                                                                    router.post(route('onboarding.invites.convert-to-user', submission.invite.id));
-                                                                }
-                                                            }}
-                                                            className="text-green-600"
-                                                        >
-                                                            <UserCheck className="h-4 w-4 mr-2" />
-                                                            Convert to User
+                                            <div onClick={(e) => e.stopPropagation()}>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="sm">
+                                                            <MoreVertical className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem asChild>
+                                                            <Link href={route(ADMIN_ONBOARDING_ROUTES.REVIEW, submission.id)}>
+                                                                <Eye className="h-4 w-4 mr-2" />
+                                                                Review Submission
+                                                            </Link>
                                                         </DropdownMenuItem>
-                                                    )}
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+
+                                                        {submission.status === 'approved' && !submission.invite.converted_user_id && (
+                                                            <DropdownMenuItem
+                                                                onClick={() => {
+                                                                    if (confirm('Convert this submission to a user account?')) {
+                                                                        router.post(route(ADMIN_ONBOARDING_ROUTES.CONVERT_TO_USER, submission.invite.id));
+                                                                    }
+                                                                }}
+                                                                className="text-green-600"
+                                                            >
+                                                                <UserCheck className="h-4 w-4 mr-2" />
+                                                                Convert to User
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 )) : (

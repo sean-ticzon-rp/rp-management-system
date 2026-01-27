@@ -14,124 +14,291 @@ class PermissionSeeder extends Seeder
 
         $permissions = [
             // ============================================
-            // USER MANAGEMENT PERMISSIONS
+            // USERS MANAGEMENT
             // ============================================
             [
-                'name' => 'Approve Users',
-                'slug' => 'approve-users',
-                'description' => 'Can approve pending user account registrations',
-                'category' => 'user-management',
+                'name' => 'View User List',
+                'slug' => 'users.view',
+                'description' => 'View user list and profiles',
+                'category' => 'users',
+                'group' => 'users',
             ],
             [
-                'name' => 'Manage Users',
-                'slug' => 'manage-users',
-                'description' => 'Can create, edit, and delete user accounts',
-                'category' => 'user-management',
+                'name' => 'Create New Users',
+                'slug' => 'users.create',
+                'description' => 'Create new user accounts',
+                'category' => 'users',
+                'group' => 'users',
             ],
             [
-                'name' => 'View All Users',
-                'slug' => 'view-all-users',
-                'description' => 'Can view all user profiles and information',
-                'category' => 'user-management',
+                'name' => 'Edit User Details',
+                'slug' => 'users.edit',
+                'description' => 'Edit user details and information',
+                'category' => 'users',
+                'group' => 'users',
+            ],
+            [
+                'name' => 'Delete Users',
+                'slug' => 'users.delete',
+                'description' => 'Delete or deactivate users',
+                'category' => 'users',
+                'group' => 'users',
+            ],
+            [
+                'name' => 'Approve User Registrations',
+                'slug' => 'users.approve',
+                'description' => 'Approve pending user registrations',
+                'category' => 'users',
+                'group' => 'users',
+            ],
+            [
+                'name' => 'Assign User Permissions',
+                'slug' => 'users.assign-permissions',
+                'description' => 'Manage other users\' permission overrides',
+                'category' => 'users',
+                'group' => 'users',
             ],
 
             // ============================================
-            // LEAVE MANAGEMENT PERMISSIONS
+            // ROLES MANAGEMENT
             // ============================================
             [
-                'name' => 'Approve Leave Requests',
-                'slug' => 'approve-leaves',
-                'description' => 'Can approve employee leave requests',
-                'category' => 'leave-management',
+                'name' => 'View Roles',
+                'slug' => 'roles.view',
+                'description' => 'View roles list',
+                'category' => 'roles',
+                'group' => 'roles',
             ],
             [
-                'name' => 'Approve Leave Appeals',
-                'slug' => 'approve-leave-appeals',
-                'description' => 'Can review and approve/reject leave appeals (HR only)',
-                'category' => 'leave-management',
+                'name' => 'Create Roles',
+                'slug' => 'roles.create',
+                'description' => 'Create new roles',
+                'category' => 'roles',
+                'group' => 'roles',
             ],
             [
-                'name' => 'Manage Leave Types',
-                'slug' => 'manage-leave-types',
-                'description' => 'Can create and configure leave types',
-                'category' => 'leave-management',
+                'name' => 'Edit Roles',
+                'slug' => 'roles.edit',
+                'description' => 'Edit role details and built-in permissions',
+                'category' => 'roles',
+                'group' => 'roles',
+            ],
+            [
+                'name' => 'Delete Roles',
+                'slug' => 'roles.delete',
+                'description' => 'Delete roles',
+                'category' => 'roles',
+                'group' => 'roles',
+            ],
+
+            // ============================================
+            // LEAVE MANAGEMENT
+            // ============================================
+            [
+                'name' => 'View Own Leaves',
+                'slug' => 'leaves.view-own',
+                'description' => 'View own leave requests',
+                'category' => 'leaves',
+                'group' => 'leaves',
+            ],
+            [
+                'name' => 'Create Leave Requests',
+                'slug' => 'leaves.create',
+                'description' => 'Submit leave requests',
+                'category' => 'leaves',
+                'group' => 'leaves',
+            ],
+            [
+                'name' => 'View Team Leaves',
+                'slug' => 'leaves.view-team',
+                'description' => 'View direct reports\' leaves',
+                'category' => 'leaves',
+                'group' => 'leaves',
             ],
             [
                 'name' => 'View All Leaves',
-                'slug' => 'view-all-leaves',
-                'description' => 'Can view all employee leave requests',
-                'category' => 'leave-management',
+                'slug' => 'leaves.view-all',
+                'description' => 'View all leaves in system',
+                'category' => 'leaves',
+                'group' => 'leaves',
+            ],
+            [
+                'name' => 'Approve Leave Requests',
+                'slug' => 'leaves.approve',
+                'description' => 'Approve/reject leave requests',
+                'category' => 'leaves',
+                'group' => 'leaves',
+            ],
+            [
+                'name' => 'Manage All Leaves',
+                'slug' => 'leaves.manage',
+                'description' => 'Edit/cancel any leave request',
+                'category' => 'leaves',
+                'group' => 'leaves',
             ],
 
             // ============================================
-            // INVENTORY MANAGEMENT PERMISSIONS
+            // ASSET MANAGEMENT
             // ============================================
             [
-                'name' => 'Manage Inventory',
-                'slug' => 'manage-inventory',
-                'description' => 'Can create, edit, and delete inventory items',
-                'category' => 'inventory-management',
+                'name' => 'View Assets',
+                'slug' => 'assets.view',
+                'description' => 'View asset inventory',
+                'category' => 'assets',
+                'group' => 'assets',
+            ],
+            [
+                'name' => 'Create Assets',
+                'slug' => 'assets.create',
+                'description' => 'Add new assets',
+                'category' => 'assets',
+                'group' => 'assets',
+            ],
+            [
+                'name' => 'Edit Assets',
+                'slug' => 'assets.edit',
+                'description' => 'Edit asset details',
+                'category' => 'assets',
+                'group' => 'assets',
+            ],
+            [
+                'name' => 'Delete Assets',
+                'slug' => 'assets.delete',
+                'description' => 'Remove assets',
+                'category' => 'assets',
+                'group' => 'assets',
             ],
             [
                 'name' => 'Assign Assets',
-                'slug' => 'assign-assets',
-                'description' => 'Can assign assets to employees',
-                'category' => 'inventory-management',
-            ],
-            [
-                'name' => 'View Inventory',
-                'slug' => 'view-inventory',
-                'description' => 'Can view inventory items and assignments',
-                'category' => 'inventory-management',
+                'slug' => 'assets.assign',
+                'description' => 'Assign/unassign assets to users',
+                'category' => 'assets',
+                'group' => 'assets',
             ],
 
             // ============================================
-            // PROJECT MANAGEMENT PERMISSIONS
+            // PROJECT MANAGEMENT
             // ============================================
             [
-                'name' => 'Manage Projects',
-                'slug' => 'manage-projects',
-                'description' => 'Can create, edit, and delete projects',
-                'category' => 'project-management',
+                'name' => 'View Projects',
+                'slug' => 'projects.view',
+                'description' => 'View projects',
+                'category' => 'projects',
+                'group' => 'projects',
+            ],
+            [
+                'name' => 'Create Projects',
+                'slug' => 'projects.create',
+                'description' => 'Create projects',
+                'category' => 'projects',
+                'group' => 'projects',
+            ],
+            [
+                'name' => 'Edit Projects',
+                'slug' => 'projects.edit',
+                'description' => 'Edit project details',
+                'category' => 'projects',
+                'group' => 'projects',
+            ],
+            [
+                'name' => 'Delete Projects',
+                'slug' => 'projects.delete',
+                'description' => 'Delete projects',
+                'category' => 'projects',
+                'group' => 'projects',
+            ],
+            [
+                'name' => 'Manage Project Members',
+                'slug' => 'projects.manage-members',
+                'description' => 'Add/remove project members',
+                'category' => 'projects',
+                'group' => 'projects',
+            ],
+            [
+                'name' => 'View Tasks',
+                'slug' => 'tasks.view',
+                'description' => 'View tasks',
+                'category' => 'projects',
+                'group' => 'projects',
+            ],
+            [
+                'name' => 'Create Tasks',
+                'slug' => 'tasks.create',
+                'description' => 'Create tasks',
+                'category' => 'projects',
+                'group' => 'projects',
+            ],
+            [
+                'name' => 'Edit Tasks',
+                'slug' => 'tasks.edit',
+                'description' => 'Edit any task',
+                'category' => 'projects',
+                'group' => 'projects',
             ],
             [
                 'name' => 'Assign Tasks',
-                'slug' => 'assign-tasks',
-                'description' => 'Can assign tasks to team members',
-                'category' => 'project-management',
-            ],
-            [
-                'name' => 'View All Projects',
-                'slug' => 'view-all-projects',
-                'description' => 'Can view all projects and tasks',
-                'category' => 'project-management',
+                'slug' => 'tasks.assign',
+                'description' => 'Assign tasks to users',
+                'category' => 'projects',
+                'group' => 'projects',
             ],
 
             // ============================================
-            // SYSTEM PERMISSIONS
+            // ONBOARDING
             // ============================================
             [
-                'name' => 'Manage Roles',
-                'slug' => 'manage-roles',
-                'description' => 'Can create and edit roles and permissions',
-                'category' => 'system',
+                'name' => 'View Onboarding Submissions',
+                'slug' => 'onboarding.view',
+                'description' => 'View onboarding submissions',
+                'category' => 'onboarding',
+                'group' => 'onboarding',
             ],
+            [
+                'name' => 'Manage Onboarding',
+                'slug' => 'onboarding.manage',
+                'description' => 'Manage onboarding workflow',
+                'category' => 'onboarding',
+                'group' => 'onboarding',
+            ],
+            [
+                'name' => 'Approve Onboarding Documents',
+                'slug' => 'onboarding.approve-documents',
+                'description' => 'Approve submitted documents',
+                'category' => 'onboarding',
+                'group' => 'onboarding',
+            ],
+
+            // ============================================
+            // SYSTEM
+            // ============================================
             [
                 'name' => 'View System Logs',
-                'slug' => 'view-system-logs',
-                'description' => 'Can view system activity logs',
+                'slug' => 'system.view-logs',
+                'description' => 'View system/audit logs',
                 'category' => 'system',
+                'group' => 'system',
             ],
             [
-                'name' => 'Manage Settings',
-                'slug' => 'manage-settings',
-                'description' => 'Can configure system settings',
+                'name' => 'Manage System Settings',
+                'slug' => 'system.manage-settings',
+                'description' => 'Manage system settings',
                 'category' => 'system',
+                'group' => 'system',
+            ],
+            [
+                'name' => 'Manage Role Permissions',
+                'slug' => 'system.manage-roles',
+                'description' => 'Manage role permissions',
+                'category' => 'system',
+                'group' => 'system',
             ],
         ];
 
         foreach ($permissions as $permission) {
-            Permission::create($permission);
+            Permission::updateOrCreate(
+                ['slug' => $permission['slug']],
+                $permission
+            );
         }
 
         $this->command->info('✅ Created ' . count($permissions) . ' permissions!');
@@ -149,73 +316,111 @@ class PermissionSeeder extends Seeder
         // Super Admin - ALL permissions
         $superAdmin = Role::where('slug', 'super-admin')->first();
         if ($superAdmin) {
-            $superAdmin->permissions()->attach(Permission::all()->pluck('id'));
+            $superAdmin->permissions()->sync(Permission::all()->pluck('id'));
             $this->command->info('   ✅ Super Admin → All permissions');
         }
 
-        // Admin - Most permissions
+        // Admin - All except system.manage-settings
         $admin = Role::where('slug', 'admin')->first();
         if ($admin) {
-            $admin->permissions()->attach(
-                Permission::whereIn('slug', [
-                    'approve-users', 'manage-users', 'view-all-users',
-                    'approve-leaves', 'view-all-leaves',
-                    'manage-inventory', 'assign-assets', 'view-inventory',
-                    'manage-projects', 'assign-tasks', 'view-all-projects',
-                ])->pluck('id')
+            $admin->permissions()->sync(
+                Permission::where('slug', '!=', 'system.manage-settings')->pluck('id')
             );
-            $this->command->info('   ✅ Admin → Management permissions');
+            $this->command->info('   ✅ Admin → All except system settings');
         }
 
         // HR Manager
         $hrManager = Role::where('slug', 'hr-manager')->first();
         if ($hrManager) {
-            $hrManager->permissions()->attach(
+            $hrManager->permissions()->sync(
                 Permission::whereIn('slug', [
-                    'approve-users', 'manage-users', 'view-all-users',
-                    'approve-leaves', 'approve-leave-appeals', 'manage-leave-types', 'view-all-leaves',
-                    'assign-assets',
+                    'users.view', 'users.create', 'users.edit', 'users.delete', 'users.approve',
+                    'leaves.view-own', 'leaves.create', 'leaves.view-team', 'leaves.view-all', 'leaves.approve', 'leaves.manage',
+                    'onboarding.view', 'onboarding.manage', 'onboarding.approve-documents',
+                    'assets.view',
                 ])->pluck('id')
             );
-            $this->command->info('   ✅ HR Manager → User + Leave permissions');
+            $this->command->info('   ✅ HR Manager → Users, Leaves, Onboarding');
         }
 
-        // Project Manager
+        // Project Manager / Department Head
         $projectManager = Role::where('slug', 'project-manager')->first();
         if ($projectManager) {
-            $projectManager->permissions()->attach(
+            $projectManager->permissions()->sync(
                 Permission::whereIn('slug', [
-                    'approve-users',
-                    'approve-leaves',
-                    'manage-projects', 'assign-tasks', 'view-all-projects',
+                    'users.view',
+                    'leaves.view-own', 'leaves.create', 'leaves.view-team', 'leaves.view-all', 'leaves.approve',
+                    'projects.view', 'projects.create', 'projects.edit', 'projects.delete', 'projects.manage-members',
+                    'tasks.view', 'tasks.create', 'tasks.edit', 'tasks.assign',
                 ])->pluck('id')
             );
-            $this->command->info('   ✅ Project Manager → User approval + Project permissions');
+            $this->command->info('   ✅ Project Manager → Leaves, Projects, Tasks');
         }
 
-        // Lead Engineer
+        // Lead Engineer / Team Lead
         $leadEngineer = Role::where('slug', 'lead-engineer')->first();
         if ($leadEngineer) {
-            $leadEngineer->permissions()->attach(
+            $leadEngineer->permissions()->sync(
                 Permission::whereIn('slug', [
-                    'approve-users',
-                    'approve-leaves',
-                    'manage-projects', 'assign-tasks',
+                    'users.view',
+                    'leaves.view-own', 'leaves.create', 'leaves.view-team', 'leaves.approve',
+                    'projects.view', 'projects.edit',
+                    'tasks.view', 'tasks.create', 'tasks.edit', 'tasks.assign',
                 ])->pluck('id')
             );
-            $this->command->info('   ✅ Lead Engineer → User approval + Team management');
+            $this->command->info('   ✅ Lead Engineer → Team leaves, Projects, Tasks');
         }
 
         // Senior Engineer
         $seniorEngineer = Role::where('slug', 'senior-engineer')->first();
         if ($seniorEngineer) {
-            $seniorEngineer->permissions()->attach(
+            $seniorEngineer->permissions()->sync(
                 Permission::whereIn('slug', [
-                    'approve-users',
-                    'approve-leaves',
+                    'leaves.view-own', 'leaves.create',
+                    'projects.view',
+                    'tasks.view', 'tasks.create', 'tasks.edit',
                 ])->pluck('id')
             );
-            $this->command->info('   ✅ Senior Engineer → User + Leave approval');
+            $this->command->info('   ✅ Senior Engineer → Own leaves, Projects view, Tasks');
+        }
+
+        // Mid-Level Engineer / Employee
+        $midLevelEngineer = Role::where('slug', 'mid-level-engineer')->first();
+        if ($midLevelEngineer) {
+            $midLevelEngineer->permissions()->sync(
+                Permission::whereIn('slug', [
+                    'leaves.view-own', 'leaves.create',
+                    'projects.view',
+                    'tasks.view', 'tasks.create',
+                ])->pluck('id')
+            );
+            $this->command->info('   ✅ Mid-Level Engineer → Own leaves, Projects view, Tasks view/create');
+        }
+
+        // Junior Engineer
+        $juniorEngineer = Role::where('slug', 'junior-engineer')->first();
+        if ($juniorEngineer) {
+            $juniorEngineer->permissions()->sync(
+                Permission::whereIn('slug', [
+                    'leaves.view-own', 'leaves.create',
+                    'projects.view',
+                    'tasks.view', 'tasks.create',
+                ])->pluck('id')
+            );
+            $this->command->info('   ✅ Junior Engineer → Own leaves, Projects view, Tasks view/create');
+        }
+
+        // Entry-Level Engineer / Intern
+        $entryLevel = Role::where('slug', 'entry-level-engineer')->first();
+        if ($entryLevel) {
+            $entryLevel->permissions()->sync(
+                Permission::whereIn('slug', [
+                    'leaves.view-own',
+                    'projects.view',
+                    'tasks.view',
+                ])->pluck('id')
+            );
+            $this->command->info('   ✅ Entry-Level Engineer → View only');
         }
 
         $this->command->info('✅ Permission assignments complete!');

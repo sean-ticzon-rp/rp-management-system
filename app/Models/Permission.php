@@ -14,6 +14,7 @@ class Permission extends Model
         'slug',
         'description',
         'category',
+        'group',
         'is_active',
     ];
 
@@ -40,8 +41,16 @@ class Permission extends Model
     public function users()
     {
         return $this->belongsToMany(User::class, 'permission_user')
-                    ->withPivot(['granted', 'granted_by', 'granted_at', 'reason'])
+                    ->withPivot(['type', 'granted_by', 'granted_at', 'reason', 'expires_at'])
                     ->withTimestamps();
+    }
+
+    /**
+     * User overrides for this permission
+     */
+    public function userOverrides()
+    {
+        return $this->hasMany(UserPermissionOverride::class);
     }
 
     // ============================================
@@ -58,6 +67,16 @@ class Permission extends Model
         return $query->where('category', $category);
     }
 
+    public function scopeInGroup($query, string $group)
+    {
+        return $query->where('group', $group);
+    }
+
+    public function scopeBySlug($query, string $slug)
+    {
+        return $query->where('slug', $slug);
+    }
+
     // ============================================
     // HELPER METHODS
     // ============================================
@@ -72,10 +91,11 @@ class Permission extends Model
 
     /**
      * Check if a specific user has this permission (override)
+     * Returns: 'grant', 'revoke', or null
      */
     public function isGrantedToUser($userId)
     {
         $pivot = $this->users()->where('user_id', $userId)->first();
-        return $pivot ? $pivot->pivot->granted : null;
+        return $pivot ? $pivot->pivot->type : null;
     }
 }
