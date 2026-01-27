@@ -6,10 +6,23 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Number;
 
 class OnboardingDocument extends Model
 {
     use HasFactory, SoftDeletes;
+
+    // ============================================
+    // CONSTANTS
+    // ============================================
+
+    const STATUS_UPLOADED = 'uploaded';
+    const STATUS_APPROVED = 'approved';
+    const STATUS_REJECTED = 'rejected';
+
+    // ============================================
+    // MODEL CONFIGURATION
+    // ============================================
 
     protected $fillable = [
         'submission_id',
@@ -29,21 +42,42 @@ class OnboardingDocument extends Model
         'verified_at' => 'datetime',
     ];
 
+    protected $attributes = [
+        'status' => self::STATUS_UPLOADED,
+    ];
+
+    // ============================================
+    // BOOT METHOD - LIFECYCLE HOOKS
+    // ============================================
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Clean up files when document is deleted
+        static::deleting(function ($document) {
+            if ($document->isForceDeleting()) {
+                // Permanently deleting - remove file from storage
+                $document->deleteFile();
+            }
+            // For soft deletes, keep file for potential recovery
+        });
+
+        // Ensure file cleanup on force delete
+        static::forceDeleting(function ($document) {
+            $document->deleteFile();
+        });
+    }
+
     // ============================================
     // RELATIONSHIPS
     // ============================================
 
-    /**
-     * The submission this document belongs to
-     */
     public function submission()
     {
         return $this->belongsTo(OnboardingSubmission::class, 'submission_id');
     }
 
-    /**
-     * HR user who verified the document
-     */
     public function verifier()
     {
         return $this->belongsTo(User::class, 'verified_by');
@@ -53,149 +87,120 @@ class OnboardingDocument extends Model
     // SCOPES
     // ============================================
 
-    public function scopePending($query)
+    public function scopeUploaded($query)
     {
-        return $query->where('status', 'pending');
+        return $query->where('status', self::STATUS_UPLOADED);
     }
 
     public function scopeApproved($query)
     {
-        return $query->where('status', 'approved');
+        return $query->where('status', self::STATUS_APPROVED);
     }
 
     public function scopeRejected($query)
     {
-        return $query->where('status', 'rejected');
-    }
-
-    public function scopeByType($query, $type)
-    {
-        return $query->where('document_type', $type);
+        return $query->where('status', self::STATUS_REJECTED);
     }
 
     // ============================================
-    // HELPER METHODS
+    // ACCESSORS (Read-only computed properties)
     // ============================================
 
     /**
-     * Get the document URL
-     */
-    public function getUrlAttribute()
-    {
-        return Storage::url($this->path);
-    }
-
-    /**
-     * Get human-readable file size
+     * Get human-readable file size using Laravel's Number helper
      */
     public function getFileSizeAttribute()
     {
-        $bytes = $this->size;
-
-        if ($bytes >= 1073741824) {
-            return number_format($bytes / 1073741824, 2) . ' GB';
-        } elseif ($bytes >= 1048576) {
-            return number_format($bytes / 1048576, 2) . ' MB';
-        } elseif ($bytes >= 1024) {
-            return number_format($bytes / 1024, 2) . ' KB';
-        } else {
-            return $bytes . ' bytes';
-        }
+        return Number::fileSize($this->size);
     }
 
-    /**
-     * Get document type label
-     */
     public function getDocumentTypeLabelAttribute()
     {
         return match($this->document_type) {
             'resume' => 'Resume / CV',
             'government_id' => 'Government ID',
+            'nbi_clearance' => 'NBI Clearance',
+            'pnp_clearance' => 'PNP Clearance',
+            'medical_certificate' => 'Medical Certificate',
             'sss_id' => 'SSS ID',
             'tin_id' => 'TIN ID',
             'philhealth_id' => 'PhilHealth ID',
             'hdmf_pagibig_id' => 'HDMF / Pag-IBIG ID',
             'birth_certificate' => 'Birth Certificate',
-            'nbi_clearance' => 'NBI Clearance',
-            'pnp_clearance' => 'PNP Clearance',
-            'medical_certificate' => 'Medical Certificate',
             'diploma' => 'Diploma',
             'transcript' => 'Transcript of Records',
             'previous_employment_coe' => 'Certificate of Employment',
-            'other' => 'Other Document',
-            default => 'Unknown Document',
+            default => ucwords(str_replace('_', ' ', $this->document_type)),
         };
     }
 
-    /**
-     * Approve the document
-     */
-    public function approve($verifiedBy = null)
+    public function getStatusLabelAttribute()
     {
-        $this->update([
-            'status' => 'approved',
-            'verified_at' => now(),
-            'verified_by' => $verifiedBy ?? auth()->id(),
-            'rejection_reason' => null,
+        return match($this->status) {
+            self::STATUS_UPLOADED => 'Uploaded',
+            self::STATUS_APPROVED => 'Approved',
+            self::STATUS_REJECTED => 'Rejected',
+            default => 'Unknown',
+        };
+    }
+
+    // ============================================
+    // STATE CHECKS (Simple boolean checks only)
+    // ============================================
+
+    /**
+     * Check if document is approved
+     */
+    public function isApproved(): bool
+    {
+        return $this->status === self::STATUS_APPROVED;
+    }
+
+    /**
+     * Check if document is rejected
+     */
+    public function isRejected(): bool
+    {
+        return $this->status === self::STATUS_REJECTED;
+    }
+
+    /**
+     * Check if document is uploaded (pending review)
+     */
+    public function isUploaded(): bool
+    {
+        return $this->status === self::STATUS_UPLOADED;
+    }
+
+    /**
+     * Check if this is an image file
+     */
+    public function isImage(): bool
+    {
+        return in_array($this->mime_type, [
+            'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
         ]);
     }
 
     /**
-     * Reject the document
+     * Check if this is a PDF file
      */
-    public function reject($reason, $rejectedBy = null)
+    public function isPdf(): bool
     {
-        $this->update([
-            'status' => 'rejected',
-            'rejection_reason' => $reason,
-            'verified_at' => now(),
-            'verified_by' => $rejectedBy ?? auth()->id(),
-        ]);
+        return $this->mime_type === 'application/pdf';
     }
 
+    // ============================================
+    // FILE OPERATIONS
+    // ============================================
+
     /**
-     * Delete document file from storage
+     * Delete the physical file from storage
      */
-    public function deleteFile()
+    public function deleteFile(): void
     {
         if ($this->path && Storage::exists($this->path)) {
             Storage::delete($this->path);
         }
-    }
-
-    /**
-     * Get status color for badge
-     */
-    public function getStatusColorAttribute()
-    {
-        return match($this->status) {
-            'pending' => 'yellow',
-            'approved' => 'green',
-            'rejected' => 'red',
-            'expired' => 'gray',
-            default => 'gray',
-        };
-    }
-
-    /**
-     * Check if document is an image
-     */
-    public function isImage()
-    {
-        return in_array($this->mime_type, [
-            'image/jpeg',
-            'image/jpg',
-            'image/png',
-            'image/gif',
-            'image/webp',
-        ]);
-    }
-
-    /**
-     * Check if document is a PDF
-     */
-    public function isPdf()
-    {
-        return $this->mime_type === 'application/pdf';
     }
 }

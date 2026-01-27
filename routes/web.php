@@ -21,52 +21,54 @@ use App\Http\Controllers\UserImportController;
 use App\Http\Controllers\Onboarding\OnboardingInviteController;
 use App\Http\Controllers\Onboarding\GuestOnboardingController;
 use App\Http\Controllers\Onboarding\OnboardingSubmissionController;
+use App\Http\Controllers\Onboarding\OnboardingDocumentDownloadController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
+    // Redirect to dashboard if authenticated, otherwise to login
+    return auth()->check()
+        ? redirect('/dashboard')
+        : redirect('/login');
 });
 
 // ============================================
 // 👤 GUEST ONBOARDING ROUTES (No authentication required)
 // ✅ MUST BE OUTSIDE auth middleware - Using /guest prefix to avoid conflicts
 // ============================================
-Route::prefix('guest/onboarding')->name('guest.onboarding.')->group(function () {
-    Route::get('/{token}', [GuestOnboardingController::class, 'show'])->name('show');
-    Route::get('/{token}/checklist', [GuestOnboardingController::class, 'checklist'])->name('checklist');
-    Route::post('/{token}/personal-info', [GuestOnboardingController::class, 'updatePersonalInfo'])->name('update-personal-info');
-    Route::post('/{token}/government-ids', [GuestOnboardingController::class, 'updateGovernmentIds'])->name('update-government-ids');
-    Route::post('/{token}/emergency-contact', [GuestOnboardingController::class, 'updateEmergencyContact'])->name('update-emergency-contact');
-    Route::post('/{token}/upload-document', [GuestOnboardingController::class, 'uploadDocument'])->name('upload-document');
-    Route::delete('/{token}/documents/{document}', [GuestOnboardingController::class, 'deleteDocument'])->name('delete-document');
-    Route::post('/{token}/submit', [GuestOnboardingController::class, 'submit'])->name('submit');
-});
+Route::prefix('guest/onboarding')->name('guest.onboarding.')
+    ->middleware('validate.onboarding.invite')
+    ->group(function () {
+        Route::get('/{token}', [GuestOnboardingController::class, 'show'])->name('show');
+        Route::get('/{token}/checklist', [GuestOnboardingController::class, 'checklist'])->name('checklist');
+        Route::post('/{token}/personal-info', [GuestOnboardingController::class, 'updatePersonalInfo'])->name('update-personal-info');
+        Route::post('/{token}/government-ids', [GuestOnboardingController::class, 'updateGovernmentIds'])->name('update-government-ids');
+        Route::post('/{token}/emergency-contact', [GuestOnboardingController::class, 'updateEmergencyContact'])->name('update-emergency-contact');
+        Route::post('/{token}/upload-document', [GuestOnboardingController::class, 'uploadDocument'])->name('upload-document');
+        Route::post('/{token}/replace-document/{document}', [GuestOnboardingController::class, 'replaceDocument'])->name('replace-document');
+        Route::delete('/{token}/documents/{document}', [GuestOnboardingController::class, 'deleteDocument'])->name('delete-document');
+        Route::post('/{token}/submit', [GuestOnboardingController::class, 'submit'])->name('submit');
+    });
 
 // ============================================
 // 🔐 AUTHENTICATED ROUTES
 // ============================================
 Route::middleware(['auth', 'verified'])->group(function () {
-    
+
     // Pending Approval Page
     Route::get('/account/pending', function () {
         return Inertia::render('Auth/PendingApproval');
     })->name('account.pending');
-    
+
     // ============================================
     // 🏠 SMART DASHBOARD ROUTER
     // ============================================
     Route::get('/dashboard', function () {
         $user = auth()->user();
-        
+
         $isAdmin = $user->roles->whereIn('slug', ['super-admin', 'admin', 'hr-manager'])->count() > 0;
-        
+
         if ($isAdmin) {
             return app(DashboardController::class)->index();
         } else {
@@ -142,14 +144,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ============================================
     Route::get('/users/import', [UserImportController::class, 'show'])->name('users.import');
     Route::post('/users/import', [UserImportController::class, 'import'])->name('users.import.store');
-    
+
     // Pending Approvals (for Senior/Lead/PM)
     Route::get('/users/pending-approvals', [UserController::class, 'pendingApprovals'])->name('users.pending-approvals');
 
     // User Approval Routes (BEFORE resource routes)
     Route::post('/users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
     Route::post('/users/{user}/reject', [UserController::class, 'reject'])->name('users.reject');
-    
+
     Route::resource('users', UserController::class);
 
     // ============================================
@@ -176,20 +178,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('leaves')->name('leaves.')->group(function () {
         // Pending Approvals (Hierarchical - MUST come BEFORE {leave} routes)
         Route::get('/pending-approvals', [LeaveApprovalController::class, 'pendingApprovals'])->name('pending-approvals');
-        
+
         Route::get('/', [LeaveController::class, 'index'])->name('index');
         Route::get('/apply', [LeaveController::class, 'create'])->name('apply');
         Route::post('/', [LeaveController::class, 'store'])->name('store');
         Route::get('/{leave}', [LeaveController::class, 'show'])->name('show');
-        
+
         // Manager Approval
         Route::post('/{leave}/manager-approve', [LeaveApprovalController::class, 'managerApprove'])->name('manager-approve');
         Route::post('/{leave}/manager-reject', [LeaveApprovalController::class, 'managerReject'])->name('manager-reject');
-        
+
         // HR Approval
         Route::post('/{leave}/hr-approve', [LeaveApprovalController::class, 'hrApprove'])->name('hr-approve');
         Route::post('/{leave}/hr-reject', [LeaveApprovalController::class, 'hrReject'])->name('hr-reject');
-        
+
         // Cancellation Approval (HR only)
         Route::post('/{leave}/approve-cancellation', [LeaveApprovalController::class, 'approveCancellation'])->name('approve-cancellation');
         Route::post('/{leave}/reject-cancellation', [LeaveApprovalController::class, 'rejectCancellation'])->name('reject-cancellation');
@@ -221,7 +223,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // 🎓 ONBOARDING MANAGEMENT (HR/Admin only)
     // ============================================
     Route::prefix('onboarding')->name('onboarding.')->group(function () {
-        
+
         // Invites Management
         Route::prefix('invites')->name('invites.')->group(function () {
             Route::get('/', [OnboardingInviteController::class, 'index'])->name('index');
@@ -233,7 +235,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/{invite}/cancel', [OnboardingInviteController::class, 'cancel'])->name('cancel');
             Route::post('/{invite}/convert-to-user', [OnboardingInviteController::class, 'convertToUser'])->name('convert-to-user');
         });
-        
+
         // Submissions Review
         Route::prefix('submissions')->name('submissions.')->group(function () {
             Route::get('/', [OnboardingSubmissionController::class, 'index'])->name('index');
@@ -242,6 +244,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/{submission}/reject', [OnboardingSubmissionController::class, 'reject'])->name('reject');
             Route::post('/documents/{document}/approve', [OnboardingSubmissionController::class, 'approveDocument'])->name('approve-document');
             Route::post('/documents/{document}/reject', [OnboardingSubmissionController::class, 'rejectDocument'])->name('reject-document');
+            Route::get('/documents/{document}/view', [OnboardingDocumentDownloadController::class, 'view'])->name('view-document');
+            Route::get('/documents/{document}/download', [OnboardingDocumentDownloadController::class, 'download'])->name('download-document');
         });
     });
 
