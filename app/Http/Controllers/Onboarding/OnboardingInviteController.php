@@ -107,23 +107,23 @@ class OnboardingInviteController extends Controller
             abort(403, 'Only HR can create onboarding invites.');
         }
 
-        // ✅ Get valid role slugs from database
+        // Get valid role slugs from database
         $validRoles = \App\Models\Role::pluck('slug')->toArray();
 
         $validated = $request->validate([
             'email' => 'required|email|unique:onboarding_invites,email',
             'first_name' => 'nullable|string|max:255',
             'last_name' => 'nullable|string|max:255',
-            'position' => ['required', 'string', 'in:' . implode(',', $validRoles)], // ✅ Dynamic validation
+            'position' => ['required', 'string', 'in:' . implode(',', $validRoles)], // Dynamic validation
             'department' => 'required|string|max:255',
         ]);
 
         try {
             $invite = $this->inviteService->createInvite($validated);
-            
+
             return redirect()->route('onboarding.invites.index')
                 ->with('success', "Onboarding invite sent to {$invite->email}! Guest link: {$invite->guest_url}");
-                
+
         } catch (\Exception $e) {
             return back()->withInput()->with('error', 'Failed to create invite: ' . $e->getMessage());
         }
@@ -158,9 +158,9 @@ class OnboardingInviteController extends Controller
 
         try {
             $this->inviteService->resendInvite($invite);
-            
+
             return back()->with('success', 'Invitation email resent successfully!');
-            
+
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -182,9 +182,9 @@ class OnboardingInviteController extends Controller
 
         try {
             $this->inviteService->extendExpiration($invite, $validated['days']);
-            
+
             return back()->with('success', "Invite extended by {$validated['days']} days!");
-            
+
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -202,10 +202,10 @@ class OnboardingInviteController extends Controller
 
         try {
             $this->inviteService->cancelInvite($invite);
-            
+
             return redirect()->route('onboarding.invites.index')
                 ->with('success', 'Invite cancelled successfully.');
-                
+
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -223,12 +223,16 @@ class OnboardingInviteController extends Controller
 
         try {
             $user = $this->inviteService->convertToUser($invite);
-            
-            return redirect()->route('users.show', $user->id)
-                ->with('success', "User account created for {$user->name}! Temporary password sent via email.");
-                
+
+            return redirect()->route('onboarding.submissions.index')
+                ->with('success', "User account created successfully for {$user->name}! Work email: {$user->work_email}, Temporary password: " . config('onboarding.default_temp_password'));
+
         } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
+            \Log::error('Convert to user failed in controller', [
+                'invite_id' => $invite->id,
+                'error' => $e->getMessage(),
+            ]);
+            return back()->with('error', 'Failed to create user account: ' . $e->getMessage());
         }
     }
 }
