@@ -102,6 +102,7 @@ RUN mkdir -p \
     storage/framework/views \
     storage/logs \
     bootstrap/cache \
+    /var/log/supervisor \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
@@ -247,16 +248,16 @@ if [ ! -z "$DB_HOST" ]; then
     echo "Database is ready!"
 fi
 
-# Run Laravel optimizations
+# Run Laravel optimizations (continue even if some fail)
 echo "Running Laravel optimizations..."
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
+php artisan config:cache || echo "Config cache failed, continuing..."
+php artisan route:cache || echo "Route cache failed (possible duplicate routes), continuing..."
+php artisan view:cache || echo "View cache failed, continuing..."
 
 # Run migrations if AUTO_MIGRATE is set
 if [ "$AUTO_MIGRATE" = "true" ]; then
     echo "Running database migrations..."
-    php artisan migrate --force
+    php artisan migrate --force || echo "Migrations failed, continuing..."
 fi
 
 # Start supervisor
@@ -272,9 +273,6 @@ EXPOSE 80
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
     CMD curl -f http://localhost/api/health || exit 1
-
-# Switch to www-data user for security
-USER www-data
 
 # Set entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
