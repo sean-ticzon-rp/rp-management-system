@@ -202,7 +202,21 @@ return [
     */
 
     'work_email' => [
-        'domain' => 'rocketpartners.io',
-        'format' => '{first}.{last}',
+        'domain' => env('WORK_EMAIL_DOMAIN', 'gmail.com'), // Testing: janetubigon00@gmail.com
+        'username' => env('WORK_EMAIL_USERNAME', 'janetubigon00'), // Testing username
+        'format' => '{first}{last}', // firstname + lastname (no periods)
+        'use_testing_email' => env('APP_ENV') === 'local', // Use testing email in local env
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Default Temporary Password
+    |--------------------------------------------------------------------------
+    |
+    | Default password for newly created user accounts from onboarding.
+    | Users will be required to change this on first login.
+    |
+    */
+
+    'default_temp_password' => env('ONBOARDING_DEFAULT_PASSWORD', 'ChangeMe123!'),
 ];
