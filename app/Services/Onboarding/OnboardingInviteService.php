@@ -145,23 +145,49 @@ class OnboardingInviteService
      */
     public function convertToUser(OnboardingInvite $invite)
     {
+        \Log::info('Converting invite to user', [
+            'invite_id' => $invite->id,
+            'invite_status' => $invite->status,
+            'has_submission' => !!$invite->submission,
+            'submission_submitted_at' => $invite->submission?->submitted_at,
+        ]);
+
         if ($invite->status !== 'submitted') {
-            throw new \Exception('Can only convert submitted invites to user accounts.');
+            \Log::error('Cannot convert: invite status not submitted', [
+                'invite_status' => $invite->status,
+            ]);
+            throw new \Exception("Cannot convert: Invite status is '{$invite->status}', must be 'submitted'.");
         }
-        
+
         if (!$invite->submission) {
             throw new \Exception('No submission found for this invite.');
         }
-        
+
         DB::beginTransaction();
-        
+
         try {
             // Convert submission data to user array
             $userData = $invite->submission->toUserArray();
-            
+
+            \Log::info('Creating user with data', ['email' => $userData['email']]);
+
             // Create user account
             $user = User::create($userData);
-            
+
+            \Log::info('User created, now assigning role', [
+                'user_id' => $user->id,
+                'role_slug' => $invite->position
+            ]);
+
+            // Assign role based on position from invite
+            $role = \App\Models\Role::where('slug', $invite->position)->first();
+            if ($role) {
+                $user->roles()->attach($role->id);
+                \Log::info('Role assigned successfully', ['role' => $role->name]);
+            } else {
+                \Log::warning('Role not found for slug', ['slug' => $invite->position]);
+            }
+
             // Update invite
             $invite->update([
                 'status' => 'approved',
@@ -169,23 +195,29 @@ class OnboardingInviteService
                 'approved_by' => auth()->id(),
                 'converted_user_id' => $user->id,
             ]);
-            
+
             // Update submission
             $invite->submission->update([
                 'status' => 'approved',
                 'reviewed_at' => now(),
                 'reviewed_by' => auth()->id(),
             ]);
-            
+
             // TODO: Send welcome email with credentials
             // TODO: Initialize leave balances
-            
+
             DB::commit();
-            
+
+            \Log::info('User created successfully', ['user_id' => $user->id]);
+
             return $user;
-            
+
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error('Failed to convert to user', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             throw $e;
         }
     }
