@@ -67,9 +67,11 @@ jobs:
           username: ${{ secrets.STAGING_USER }}
           key: ${{ secrets.STAGING_SSH_KEY }}
           port: ${{ secrets.STAGING_PORT || 22 }}
+          command_timeout: 20m
           script: |
             cd ${{ secrets.STAGING_PATH }}
-            git pull origin develop
+            git fetch origin develop
+            git reset --hard origin/develop
             composer install --no-dev --optimize-autoloader --no-interaction
             npm ci
             npm run build
@@ -106,10 +108,12 @@ jobs:
           username: ${{ secrets.PRODUCTION_USER }}
           key: ${{ secrets.PRODUCTION_SSH_KEY }}
           port: ${{ secrets.PRODUCTION_PORT || 22 }}
+          command_timeout: 20m
           script: |
             cd ${{ secrets.PRODUCTION_PATH }}
             php artisan down
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             composer install --no-dev --optimize-autoloader --no-interaction
             npm ci
             npm run build
@@ -139,6 +143,7 @@ jobs:
           username: ${{ secrets.PRODUCTION_USER }}
           key: ${{ secrets.PRODUCTION_SSH_KEY }}
           port: ${{ secrets.PRODUCTION_PORT || 22 }}
+          command_timeout: 10m
           script: |
             cd ${{ secrets.PRODUCTION_PATH }}
             php artisan backup:run --only-db
